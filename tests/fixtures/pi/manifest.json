@@ -1,0 +1,53 @@
+{
+  "schema": "harnie.pi-fixture-manifest.v1",
+  "evidenceCutoff": "2026-08-28",
+  "source": {
+    "kind": "maintainer-published-public-trace",
+    "dataset": "badlogicgames/pi-mono",
+    "revision": "dac2a1d3ba12dda597b973a791a77618ccb5f413",
+    "url": "https://huggingface.co/datasets/badlogicgames/pi-mono/tree/dac2a1d3ba12dda597b973a791a77618ccb5f413"
+  },
+  "localEvidence": {
+    "sessionsFound": 0,
+    "note": "No local Pi executable, configured session root, or persisted Pi session was found. These fixtures are not claimed as local evidence."
+  },
+  "fixtures": [
+    {
+      "class": "A-minimal",
+      "file": "minimal.jsonl",
+      "sourceFile": "2026-01-16T02-31-35-233Z_8072a61b-67e6-4618-8f35-5c5616aea2be.jsonl",
+      "selection": "complete session",
+      "features": ["user message", "assistant message", "outer and nested timestamps", "usage"]
+    },
+    {
+      "class": "B-coding",
+      "file": "coding.jsonl",
+      "sourceFile": "2026-03-21T23-49-19-404Z_cfef1a72-fb89-43a3-bac0-6c7246eda6d8.jsonl",
+      "selection": "complete session",
+      "features": ["bash tool call", "file read", "file edit", "tool results", "multiple assistant turns"]
+    },
+    {
+      "class": "C-stateful",
+      "file": "stateful-prefix.jsonl",
+      "sourceFile": "2026-02-05T19-53-30-151Z_ba67782f-c80e-4287-aa82-b8e8d08a839a.jsonl",
+      "selection": "append-valid lines 1-14 of 21",
+      "features": ["goal", "investigation", "stated implementation decision", "two file edits", "verification still outstanding at captured prefix"]
+    },
+    {
+      "class": "D-structural-edge",
+      "file": "model-transition.jsonl",
+      "sourceFile": "2026-02-17T19-00-38-934Z_2e02a693-1e6b-49bd-97a8-b2fb7a230f7c.jsonl",
+      "selection": "append-valid lines 1-6 of 12",
+      "features": ["two model_change records before the first user message", "assistant model agrees with second transition"]
+    }
+  ],
+  "transformations": [
+    "Replaced absolute user/workspace paths with /workspace/pi-project.",
+    "Rewrote conversation, command, file, and tool-result text while preserving semantic fixture class and JSON shapes.",
+    "Replaced provider reasoning and signatures with typed redaction markers.",
+    "Preserved source record IDs, parent links, timestamps, message roles, tool names, tool-call/result correlation, usage shapes, and record order.",
+    "Shortened provider-scoped tool-call IDs consistently in coding.jsonl while preserving call/result correlation.",
+    "Reduced some opaque tool-result details to small structurally representative objects.",
+    "Did not copy images, environment data, credentials, private paths, or unrelated transcript content."
+  ]
+}
