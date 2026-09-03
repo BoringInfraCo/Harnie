@@ -1,0 +1,88 @@
+# Harnie handoff for Pi
+
+Continue this work. Do not re-investigate from scratch. Do not invent Pi JSONL session files.
+
+## Goal
+"Investigate how harnie handoff works in this repository. Read src/cli/handoff.ts, src/work/handoff.ts, src/handoff/opencode.ts, and src/handoff/pi.ts. Then start adding an optional --json flag to harnie handoff so it also writes the Handoff object as JSON next to the markdown. Decide the approach and make the first code change. Do not finish tests or documentation."
+
+## Current state
+Edits reported success on src/cli/handoff.ts. Verification not recorded.
+
+## Workspace
+/private/tmp/harnie-sprint-016-repo
+
+## Execution
+opencode / opencode / mimo-v2.5-free
+opencode-session-v1
+ses_f9aa2dee0ffexWp97EGu26BCZ3
+
+## Decisions
+- Here's the plan:
+
+- `Handoff` object is built in `work/handoff.ts`
+- `cli/handoff.ts` orchestrates: parse flags → load work → build Handoff → render markdown → write to stdout + file
+- I'll add `--json` flag parsing and write a `.json` file next to the `.md` when it's set
+
+First code change — adding the `--json` flag support to `cli/handoff.ts`:
+
+## Findings
+- Now I understand the flow
+- Let me verify the file looks correct:
+- Now let me check the build compiles and look at existing tests:
+- All 7 existing tests pass, TypeScript compiles cleanly
+- Here's what I did in `src/cli/handoff.ts`:
+
+1
+- **Added `json?: boolean` to `RunHandoffOptions`** (line 13) — supports both CLI flag and programmatic option
+2
+- **Updated usage string** (line 18) to show `[--json]`
+3
+- **Parsed `--json` flag** (line 23) — `hasFlag(argv, "--json") || options.json === true`
+4
+- **Added `hasFlag` helper** (lines 84-85)
+5
+- **Added conditional JSON write** (lines 49-51) — calls `writeJsonFile` only when `--json` is set
+6
+- **Added `writeJsonFile`** (lines 99-107) — writes the `Handoff` object as pretty-printed JSON to `<workId>.json` in the same `handoffs/` directory, next to the `.md` file
+
+The markdown output and file writing remain unchanged — `--json` only adds an additional `.json` sidecar file
+- Tests not started yet per your instruction.
+
+## Files touched
+- src/cli/handoff.ts
+- src/work/handoff.ts
+- src/handoff/opencode.ts
+- src/handoff/pi.ts
+- /private/tmp/harnie-sprint-016-repo
+- tests/cli-handoff.test.ts
+
+## Operations
+- read src/cli/handoff.ts — succeeded
+- read src/work/handoff.ts — succeeded
+- read src/handoff/opencode.ts — succeeded
+- read src/handoff/pi.ts — succeeded
+- edit src/cli/handoff.ts — succeeded
+- edit src/cli/handoff.ts — succeeded
+- edit src/cli/handoff.ts — succeeded
+- edit src/cli/handoff.ts — succeeded
+- edit src/cli/handoff.ts — succeeded
+- read src/cli/handoff.ts — succeeded
+- bash npx tsc --noEmit 2>&1 | head -30 — succeeded
+- glob /private/tmp/harnie-sprint-016-repo — succeeded
+- bash cat package.json | grep -E '"scripts"|"t … — succeeded
+- read tests/cli-handoff.test.ts — succeeded
+- bash ./node_modules/.bin/tsc --noEmit 2>&1 | … — succeeded
+- bash ls node_modules/.bin/ts* 2>/dev/null; ca … — succeeded
+- bash npm install 2>&1 | tail -5 — succeeded
+- bash ./node_modules/.bin/tsc --noEmit 2>&1 — succeeded
+- bash ./node_modules/.bin/vitest run tests/cli … — succeeded
+
+## Event summary
+- message: 5
+- tool_call: 19
+- tool_result: 19
+- unknown: 51
+
+## Provenance
+Work work:opencode:ses_f9aa2dee0ffexWp97EGu26BCZ3
+Source opencode session ses_f9aa2dee0ffexWp97EGu26BCZ3
