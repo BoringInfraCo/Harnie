@@ -1,5 +1,5 @@
 ## Sprint 002 — Pi Evidence Reader + Conservative Normalizer  
-**Status:** Planned **Phase:** 0 — Feasibility **Type:** Implementation / evidence validation **Depends on:** Sprint 001 — CONDITIONAL GO  
+**Status:** Complete — GO **Phase:** 0 — Feasibility **Type:** Implementation / evidence validation **Depends on:** Sprint 001 — CONDITIONAL GO  
 ## Objective  
 Build Harnie’s first production-quality source boundary: a read-only, raw-preserving Pi v3 evidence reader and conservative normalizer.  
 Then close Sprint 001’s outstanding local-evidence condition using real local Pi coding sessions.  

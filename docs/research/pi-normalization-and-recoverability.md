@@ -1,6 +1,6 @@
 # Pi normalization boundary and Work State recoverability
 
-Evidence cutoff: 2026-08-28
+Evidence cutoff: 2026-09-01
 
 ## Proposed smallest boundary
 
@@ -56,7 +56,7 @@ The emitting Pi package version is not available from a normal v3 header and mus
 | Direct `bashExecution` message | `command` | Directly observed in public inspection pool | Distinct from model-issued bash. Retain `excludeFromContext`, truncation, exit/cancellation, and overflow-reference fields. |
 | Call named `bash` | `tool_call`; optional derived `operation.kind = command` | Convention-based derivation | Extensions can override the name. Validate arguments and verify tool provenance before treating the classification as reliable. Never infer file effects from shell syntax here. |
 | Call named `read` | `tool_call`; optional derived `operation.kind = file_read` | Convention-based derivation | Fixture B/C shapes match the built-in convention, but v3 does not prove the invoked definition was built-in. |
-| Call named `write` | `tool_call`; optional derived `operation.kind = file_write` | Convention-based derivation | Current built-in source contract; no committed fixture and no v3 origin field. |
+| Call named `write` | `tool_call`; optional derived `operation.kind = file_write` | Convention-based derivation | Local fixture E has successful and denied write-named calls. v3 still has no tool-origin field, so file-write classification remains deferred. |
 | Call named `edit` | `tool_call`; optional derived `operation.kind = file_write` | Convention-based derivation | Fixture B/C shapes match the built-in convention; edit argument shapes also vary by version. |
 | `model_change` | Unmapped typed source-state record | Directly observed | Fixtures A–D. Needed for execution metadata reconstruction, but not one of the minimal chronological event kinds. |
 | `thinking_level_change` | Unmapped typed source-state record | Directly observed | Fixtures A–D. Preserve; do not force into `message`. |
@@ -143,15 +143,17 @@ derivation: convention "tool named read + valid path"
 confidence: unverified tool origin in v3
 ```
 
-## Phase 0 parser implications for Sprint 002
+## Phase 0 parser implications — Sprint 002 status
 
-This section is a recommendation only; Sprint 002 is not implemented here.
+Sprint 002 implemented this boundary and is **GO** as of 2026-09-01. Local traces E–F confirm the public v3 model.
 
-1. Read source files with ordinary read-only I/O, never Pi's mutating loader.
-2. Sniff v3 `type: session` versus emerging v4 `kind: header` before parsing.
-3. Preserve raw well-formed records and line numbers before validation/projection.
-4. Validate header, IDs, graph edges, timestamps, roles, content blocks, and tool correlation with diagnostics.
-5. Keep physical chronology separate from active-path reconstruction.
-6. Normalize only the direct mappings above; keep tool-operation specialization out unless tool provenance can be verified.
-7. Keep semantic derivation out of the adapter.
-8. Require additional real local fixtures before claiming local Pi compatibility.
+1. Read source files with ordinary read-only I/O, never Pi's mutating loader. **Done.**
+2. Sniff v3 `type: session` versus emerging v4 `kind: header` before parsing. **Done.**
+3. Preserve raw well-formed records and line numbers before validation/projection. **Done.**
+4. Validate header, IDs, graph edges, timestamps, roles, content blocks, and tool correlation with diagnostics. **Done.**
+5. Keep physical chronology separate from active-path reconstruction. **Done.**
+6. Normalize only the direct mappings above; keep tool-operation specialization out unless tool provenance can be verified. **Done.** Local `write` remains `tool_call`.
+7. Keep semantic derivation out of the adapter. **Done; Sprint 003 reconstructs observed Work only.**
+8. Require additional real local fixtures before claiming local Pi compatibility. **Done: traces E and F.**
+
+Sprint 003 (2026-09-01) projects `NormalizedEvent[]` into harness-neutral `Work` / `Execution` / `WorkEvent` with `provenance.observation = "observed"`. Goal, decisions, findings, and next steps remain unpopulated. See `docs/research/sprint-003-outcome.md`.

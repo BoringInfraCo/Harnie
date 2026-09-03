@@ -46,4 +46,28 @@ describe("Pi JSONL reader", () => {
     expect(result.malformedLines[0]?.diagnostics[0]?.code).toBe("non_object_jsonl");
     expect(result.diagnostics.map((diag) => diag.code)).toContain("empty_session");
   });
+
+  it("reads local trace A coding fixture", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-a-coding.jsonl");
+
+    expect(result.source.harness).toBe("pi");
+    expect(result.source.family).toBe("pi-session-v3");
+    expect(result.source.sessionId).toBe("harnie-ta-075fe632");
+    expect(result.records).toHaveLength(31);
+    expect(result.malformedLines).toHaveLength(0);
+    expect(result.records[0]?.sourceType).toBe("session");
+    expect(result.records[0]?.raw.cwd).toBe("/workspace/pi-project");
+  });
+
+  it("reads local trace B unfinished fixture", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-b-unfinished.jsonl");
+
+    expect(result.source.harness).toBe("pi");
+    expect(result.source.family).toBe("pi-session-v3");
+    expect(result.source.sessionId).toBe("harnie-tb-da82c4f8");
+    expect(result.records).toHaveLength(13);
+    expect(result.malformedLines).toHaveLength(0);
+    expect(result.records[0]?.sourceType).toBe("session");
+    expect(result.records[0]?.raw.cwd).toBe("/workspace/pi-project");
+  });
 });

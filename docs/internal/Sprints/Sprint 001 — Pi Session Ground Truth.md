@@ -1,5 +1,5 @@
 # Sprint 001 — Pi Session Ground Truth  
-**Status:** Planned **Phase:** 0 — Feasibility **Type:** Research / evidence / fixture foundation  
+**Status:** Complete — Conditional GO **Phase:** 0 — Feasibility **Type:** Research / evidence / fixture foundation  
 ## Objective  
 Establish evidence-backed ground truth for how Pi persists real coding-agent sessions and determine the smallest Pi → Harnie normalization boundary required for Harnie’s feasibility path.  
 This sprint does **not** implement the complete Pi adapter.  

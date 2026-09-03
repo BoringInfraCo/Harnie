@@ -24,7 +24,9 @@ The decision is not a full GO because:
 4. semantic Work State still requires derivation, with provenance and confidence;
 5. upstream source contains an emerging version-4 session family that is not current CLI fixture evidence.
 
-The condition to remove is concrete: validate the same source shapes and recoverability conclusions against at least two representative user-local coding sessions, including one stateful/unfinished session, using strictly read-only capture.
+The condition to remove was concrete: validate the same source shapes and recoverability conclusions against at least two representative user-local coding sessions, including one stateful/unfinished session, using strictly read-only capture.
+
+Sprint 002 closed that condition on 2026-09-01 with local traces E and F. See `docs/research/sprint-002-outcome.md`.
 
 ## Deliverables
 

@@ -1,0 +1,108 @@
+[0m
+> build · mimo-v2.5-free
+[0m
+[0m→ [0mRead src/cli/handoff.ts
+[0m→ [0mRead src/work/handoff.ts
+[0m→ [0mRead src/handoff/opencode.ts
+[0m
+[0m← [0mEdit src/cli/handoff.ts
+Index: /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+===================================================================
+--- /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
++++ /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+@@ -8,8 +8,9 @@
+ export interface RunHandoffOptions {
+   readonly home?: string;
+   readonly stdout: { write(chunk: string): unknown };
+   readonly stderr: { write(chunk: string): unknown };
++  readonly json?: boolean;
+ }
+ 
+ const usage = "Usage: harnie handoff <work> --to <target>\n";
+ 
+
+[0m
+[0m← [0mEdit src/cli/handoff.ts
+Index: /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+===================================================================
+--- /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
++++ /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+@@ -16,8 +16,9 @@
+ 
+ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Promise<number> => {
+   const workId = firstNonFlag(argv);
+   const target = flagValue(argv, "--to");
++  const jsonFlag = hasFlag(argv, "--json");
+ 
+   if (workId === undefined || workId === "" || target === undefined) {
+     options.stderr.write(usage);
+     return 1;
+
+[0m
+[0m← [0mEdit src/cli/handoff.ts
+Index: /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+===================================================================
+--- /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
++++ /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+@@ -38,11 +38,15 @@
+     options.stderr.write(`Work not found: ${workId}\n`);
+     return 1;
+   }
+ 
+-  const markdown = renderOpenCodeHandoff(buildHandoffFromWork(work));
++  const handoff = buildHandoffFromWork(work);
++  const markdown = renderOpenCodeHandoff(handoff);
+   options.stdout.write(markdown);
+   writeHandoffFile(home, work.id, markdown);
++  if (jsonFlag) {
++    writeJsonHandoffFile(home, work.id, handoff);
++  }
+   return 0;
+ } finally {
+   store.close();
+ }
+
+[0m
+[0m← [0mEdit src/cli/handoff.ts
+Index: /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+===================================================================
+--- /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
++++ /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+@@ -74,8 +74,11 @@
+   if (index === -1) return undefined;
+   return argv[index + 1];
+ };
+ 
++const hasFlag = (argv: readonly string[], flag: string): boolean =>
++  argv.includes(flag);
++
+ const writeHandoffFile = (home: string, workId: string, markdown: string): void => {
+   const directory = join(home, "handoffs");
+   mkdirSync(directory, { recursive: true });
+   writeFileSync(join(directory, `${safeWorkId(workId)}.md`), markdown);
+
+[0m
+[0m← [0mEdit src/cli/handoff.ts
+Index: /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+===================================================================
+--- /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
++++ /private/tmp/harnie-sprint-012-repo/src/cli/handoff.ts
+@@ -83,8 +83,14 @@
+   mkdirSync(directory, { recursive: true });
+   writeFileSync(join(directory, `${safeWorkId(workId)}.md`), markdown);
+ };
+ 
++const writeJsonHandoffFile = (home: string, workId: string, handoff: import("../work/handoff.js").Handoff): void => {
++  const directory = join(home, "handoffs");
++  mkdirSync(directory, { recursive: true });
++  writeFileSync(join(directory, `${safeWorkId(workId)}.json`), JSON.stringify(handoff, null, 2));
++};
++
+ const safeWorkId = (workId: string): string => {
+   const safe = workId.replace(/[^A-Za-z0-9._-]+/g, "_");
+   return safe === "" ? "work" : safe;
+ };
+
+[0m
+[0m→ [0mRead src/cli/handoff.ts
+[0m✱ [0mGrep "runHandoff"[90m in . · 14 matches[0m

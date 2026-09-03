@@ -71,4 +71,44 @@ describe("Pi conservative normalization", () => {
     expect(event?.data.raw).toEqual(result.records[1]?.raw);
     expect(event?.diagnostics.map((diag) => diag.code)).toContain("unknown_record_type");
   });
+
+  it("normalizes trace A local coding fixture with tool calls and results", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-a-coding.jsonl");
+    const graph = validatePiGraph(result.records);
+    const tools = correlatePiTools(result.records);
+    const events = normalizePiRecords(result.records, { diagnostics: [...graph.diagnostics, ...tools.diagnostics] });
+
+    const toolCalls = events.filter((event) => event.kind === "tool_call");
+    const writeCall = toolCalls.find((event) => event.data.toolName === "write");
+    const errorResult = events.find((event) => event.kind === "tool_result" && event.data.isError === true);
+
+    expect(events.some((event) => event.kind === "message")).toBe(true);
+    expect(writeCall?.kind).toBe("tool_call");
+    expect(writeCall?.data).not.toHaveProperty("operation");
+    expect(errorResult?.data.toolName).toBe("write");
+    expect(writeCall?.provenance).toMatchObject({
+      harness: "pi",
+      family: "pi-session-v3",
+      sessionId: "harnie-ta-075fe632",
+      sourceType: "message",
+    });
+    expect(writeCall?.sourceRecord.rawLine).toContain('"toolCall"');
+  });
+
+  it("normalizes trace B local unfinished fixture with partial progress", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-b-unfinished.jsonl");
+    const graph = validatePiGraph(result.records);
+    const tools = correlatePiTools(result.records);
+    const events = normalizePiRecords(result.records, { diagnostics: [...graph.diagnostics, ...tools.diagnostics] });
+
+    const toolCalls = events.filter((event) => event.kind === "tool_call");
+    const pending = toolCalls.find((event) => event.data.toolCallId === "harnie-call-0006");
+
+    expect(events.some((event) => event.kind === "message")).toBe(true);
+    expect(toolCalls).toHaveLength(6);
+    expect(events.filter((event) => event.kind === "tool_result")).toHaveLength(5);
+    expect(pending?.kind).toBe("tool_call");
+    expect(tools.diagnostics.map((diag) => diag.code)).toContain("missing_tool_result");
+    expect(pending?.provenance.sessionId).toBe("harnie-tb-da82c4f8");
+  });
 });

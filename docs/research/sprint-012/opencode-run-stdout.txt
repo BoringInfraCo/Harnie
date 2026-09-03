@@ -1,0 +1,19 @@
+Now I understand the flow. Here's the first code change — adding `--json` flag parsing and writing the JSON handoff file in `src/cli/handoff.ts`:
+Let me verify the final state of the file:
+Let me check how `runHandoff` is called to see if the `json` flag needs to be threaded through:
+The `--json` flag is parsed directly from `argv` (the raw CLI args), so the existing caller in `src/cli.ts:71` will pass it through automatically — no changes needed there.
+
+**First code change complete.** Here's what was done in `src/cli/handoff.ts`:
+
+1. Added `readonly json?: boolean` to `RunHandoffOptions` (line 12)
+2. Added `hasFlag(argv, "--json")` detection (line 20)
+3. Extracted `buildHandoffFromWork` result into a `handoff` variable so both markdown and JSON can use it (lines 42-43)
+4. Added conditional JSON write when `--json` is present (lines 46-48)
+5. Added `hasFlag` helper (lines 78-79)
+6. Added `writeJsonHandoffFile` that writes the `Handoff` object as pretty-printed JSON to `<handoffs>/<workId>.json` (lines 87-91)
+
+When `--json` is passed, the handoff will write both `.md` and `.json` files to `~/.harnie/handoffs/`. Without the flag, behavior is unchanged.
+
+**Remaining work (not done per instructions):**
+- Add tests for the `--json` flag behavior
+- Update usage/help string to mention `--json`

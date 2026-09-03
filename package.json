@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "harnie": "./src/cli.ts"
+  },
   "scripts": {
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "harnie": "node --experimental-strip-types src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

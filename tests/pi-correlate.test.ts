@@ -30,4 +30,33 @@ describe("Pi tool correlation", () => {
     expect(codes).toContain("duplicate_tool_result");
     expect(codes).toContain("ambiguous_tool_result");
   });
+
+  it("correlates trace A local coding fixture tool calls to results", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-a-coding.jsonl");
+    const correlated = correlatePiTools(result.records);
+
+    expect(correlated.toolCalls).toHaveLength(7);
+    expect(correlated.toolResults).toHaveLength(7);
+    expect(correlated.toolCalls.map((call) => call.toolName)).toEqual([
+      "write",
+      "read",
+      "bash",
+      "bash",
+      "bash",
+      "write",
+      "bash",
+    ]);
+    expect(correlated.toolCalls.every((call) => call.results.length === 1)).toBe(true);
+    expect(correlated.diagnostics).toEqual([]);
+  });
+
+  it("correlates trace B local unfinished fixture tool calls to results", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-b-unfinished.jsonl");
+    const correlated = correlatePiTools(result.records);
+
+    expect(correlated.toolCalls).toHaveLength(6);
+    expect(correlated.toolResults).toHaveLength(5);
+    expect(correlated.toolCalls.filter((call) => call.results.length === 0)).toHaveLength(1);
+    expect(correlated.diagnostics.map((diag) => diag.code)).toContain("missing_tool_result");
+  });
 });

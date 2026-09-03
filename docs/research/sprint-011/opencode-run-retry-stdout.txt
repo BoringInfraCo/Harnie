@@ -1,0 +1,7 @@
+The edits are already applied and correct. Let me verify the complete picture:
+Verification complete. The xhigh feature gate extension to model 5.3 is correct and verified:
+
+- `packages/ai/src/models.ts:2` - `supportsXhigh` checks for both `model-5.2` and `model-5.3`
+- `packages/agent/src/types.ts:1` - Comment updated to document both model versions
+
+No other references to these model versions exist in the codebase. The changes are complete and correct.

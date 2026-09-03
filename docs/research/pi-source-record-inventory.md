@@ -1,6 +1,6 @@
 # Pi source-record inventory
 
-Evidence cutoff: 2026-08-28  
+Evidence cutoff: 2026-09-01  
 Target format: current Pi CLI version-3 JSONL
 
 This inventory separates persisted source records from nested message/content types. “Encountered” means observed in a real public trace during this sprint; it does not mean the record appears in every committed fixture.
@@ -55,8 +55,9 @@ Image content is documented and source-defined but was deliberately not copied i
 | `bash` | `arguments.command`; current built-in source may allow timeout | A call with this name and command is directly observed. Classifying it as the built-in command operation is convention-based unless origin is verified. File effects are not known. | Text/output may be truncated; optional overflow paths are transient; exit status may be in details or message error state depending on tool/version. |
 | `read` | `arguments.path`; optional offset/limit in current built-in source | A call with this name/path is directly observed. File-read classification is convention-based because an extension can override the name. | Result content is a captured result, not proof of current file contents. |
 | `edit` | Fixture shape uses `path`, `oldText`, `newText`; built-in source supports evolving/legacy shapes | A call with this name/arguments is directly observed. File-write classification is convention-based unless origin is verified. | Success text/details can confirm tool-reported completion, but not repository revision or durable artifact state. |
+| `write` | Local fixture E uses `arguments.path` and `arguments.content` | A call with this name/path/content is directly observed. File-write classification remains convention-based; v3 has no tool-origin field. | Fixture E includes both tool-reported success and `isError: true` for a denied `.env` path. Denied writes are not artifacts. |
 
-`write` is defined as a built-in in current source but was not present in the committed fixtures. It was encountered in a public candidate trace during selection. Custom tool names and all result `details` remain opaque unless a versioned contract is known.
+`write` is defined as a built-in in current source and is now present in local fixture E (`trace-a-coding.jsonl`), including a successful write and a denied `.env` write with `isError: true`. Name-based file-write classification remains convention-based. Custom tool names and all result `details` remain opaque unless a versioned contract is known.
 
 ## Identity rules
 

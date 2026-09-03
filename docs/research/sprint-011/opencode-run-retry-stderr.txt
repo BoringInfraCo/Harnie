@@ -1,0 +1,9 @@
+[0m
+> build · mimo-v2.5-free
+[0m
+[0m→ [0mRead packages/ai/src/models.ts
+[0m→ [0mRead packages/agent/src/types.ts
+[0m✱ [0mGrep "xhigh"[90m in . · 5 matches[0m
+[0m→ [0mRead README.md
+[0m✱ [0mGrep "model-5\.[23]"[90m in . · 3 matches[0m
+[0m✱ [0mGrep "supportsXhigh"[90m in . · 1 match[0m

@@ -1,12 +1,12 @@
 # Pi session ground truth
 
-Evidence cutoff: 2026-08-28  
+Evidence cutoff: 2026-09-01  
 Sprint: 001 — Pi Session Ground Truth  
 Scope: research, evidence, and fixture foundation only
 
 ## Result in one sentence
 
-Current Pi CLI sessions persist enough structured version-3 JSONL evidence for conservative chronological/tool normalization and provenance-backed semantic derivation, but this repository has no local Pi sessions, so the feasibility result remains a **CONDITIONAL GO** until the same findings are validated against user-local traces.
+Current Pi CLI sessions persist enough structured version-3 JSONL evidence for conservative chronological/tool normalization and provenance-backed semantic derivation. Public fixtures A–D and local traces E–F now agree on that v3 shape, so Sprint 002 is **GO**. Semantic Work State remains a later derivation problem, not an ingest problem.
 
 ## Provenance notation
 
@@ -54,7 +54,7 @@ These pages are unversioned `latest` documentation. Source claims are therefore 
 
 ### Real-session evidence
 
-No real local Pi session was found in the inspected locations. To avoid synthetic evidence, the fixtures derive from real, publicly shared Pi traces published by Pi's maintainer. The exact source file, prefix boundary, and sanitization transformations are recorded in `tests/fixtures/pi/manifest.json`.
+Sprint 001 found no local Pi sessions, so fixtures A–D were derived from maintainer-published public traces. Sprint 002 later captured two real local v3 sessions read-only and committed them only as sanitized derivatives E–F. The exact source class, selection boundary, and sanitization transformations are recorded in `tests/fixtures/pi/manifest.json`.
 
 The public dataset itself says traces were deterministically redacted and reviewed before upload, but Harnie applies an additional sanitization pass because public status is not a security boundary.
 
@@ -62,20 +62,18 @@ Basis: **fixture evidence** and the [dataset description](https://huggingface.co
 
 ## Local Pi storage inspection
 
-Read-only discovery found:
+Sprint 001 read-only discovery found no populated session store (local session count **0**).
 
-- no `pi` or `pi-coding-agent` executable on `PATH`;
-- no installed current or legacy Pi coding-agent package in common npm, pnpm, Bun, Yarn, Homebrew, cache, or local package roots;
-- no Pi session-directory override in the active environment or privacy-scoped shell/config search;
-- a default-looking `~/.pi/agent` directory containing only `skills/`;
-- no `sessions/`, `settings.json`, `auth.json`, or JSON/JSONL file under that root;
-- no alternative Pi root or Pi-format session header in privacy-safe searches of likely user data and development locations.
+Sprint 002 later captured two real local Pi v3 sessions without using Pi's loader:
 
-The discovered path is reported generically as `~/.pi/agent` to avoid persisting the local username. It is evidence of a Pi-style agent root, not evidence of a configured or populated session store.
+- Trace A / fixture E: 31-record coding-adjacent sandbox probe from `~/.pi/agent/sessions/`
+- Trace B / fixture F: 13-record unfinished investigation from a disposable workspace, ending on a tool call with no result
 
-Local session count: **0**. Installed Pi version: **unavailable**.
+Committed files are sanitized derivatives only. Original private session files were not added to the repository. Installed Pi package version remains unknown from the v3 header.
 
-Basis: **local inspection**. No files were opened through Pi APIs, written, migrated, or copied.
+Local session count represented in fixtures: **2**.
+
+Basis: **local inspection** plus **fixture evidence**. No files were opened through Pi APIs, written, migrated, or copied.
 
 ## Storage and discovery behavior
 

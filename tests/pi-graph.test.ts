@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readPiJsonlText } from "../src/pi/reader.js";
+import { readPiJsonlFile, readPiJsonlText } from "../src/pi/reader.js";
 import { validatePiGraph } from "../src/pi/graph.js";
 
 describe("Pi graph validation", () => {
@@ -32,5 +32,19 @@ describe("Pi graph validation", () => {
     expect(codes).toContain("orphan_parent");
     expect(codes).toContain("self_parent");
     expect(codes).toContain("parent_cycle");
+  });
+
+  it("validates trace A local coding fixture parent graph", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-a-coding.jsonl");
+    const graph = validatePiGraph(result.records);
+
+    expect(graph.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+  });
+
+  it("validates trace B local unfinished fixture parent graph", async () => {
+    const result = await readPiJsonlFile("tests/fixtures/pi/trace-b-unfinished.jsonl");
+    const graph = validatePiGraph(result.records);
+
+    expect(graph.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 });
