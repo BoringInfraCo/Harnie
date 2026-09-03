@@ -37,12 +37,14 @@ describe("harnie CLI wiring", () => {
     const listed = capture();
     const shown = capture();
     const handed = capture();
+    const handedPi = capture();
 
     expect(await runCli(["init"], { home, stdout: capture() })).toBe(0);
     expect(await runCli(["import", "pi", TRACE_B], { home, stdout: imported })).toBe(0);
     expect(await runCli(["list"], { home, stdout: listed })).toBe(0);
     expect(await runCli(["show", "work:pi:harnie-tb-da82c4f8"], { home, stdout: shown })).toBe(0);
     expect(await runCli(["handoff", "work:pi:harnie-tb-da82c4f8", "--to", "opencode"], { home, stdout: handed })).toBe(0);
+    expect(await runCli(["handoff", "work:pi:harnie-tb-da82c4f8", "--to", "pi"], { home, stdout: handedPi })).toBe(0);
 
     expect(imported.toString()).toContain("work:pi:harnie-tb-da82c4f8");
     expect(listed.toString()).toContain("work:pi:harnie-tb-da82c4f8");
@@ -55,5 +57,9 @@ describe("harnie CLI wiring", () => {
     expect(handed.toString()).toMatch(/continue this work/i);
     expect(handed.toString()).toMatch(/pending tool call|Unresolved/i);
     expect(handed.toString()).not.toMatch(/investigation (is |was )?complete/i);
+    expect(handedPi.toString()).toMatch(/for Pi/i);
+    expect(handedPi.toString()).toMatch(/continue this work/i);
+    expect(handedPi.toString()).toMatch(/pending tool call|Unresolved/i);
+    expect(handedPi.toString()).not.toMatch(/\{"type":"session"/);
   });
 });

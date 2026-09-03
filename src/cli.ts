@@ -24,10 +24,14 @@ const usage = `Usage: harnie <command>
 Commands:
   init              Create the Harnie home directory and SQLite store
   import pi <path>  Import a Pi session as observed Work
+  import opencode <path>
+                    Import an OpenCode session as observed Work
   list              List persisted observed Work
   show <work>       Show observed Work
   handoff <work> --to opencode
                     Write an OpenCode continuation handoff
+  handoff <work> --to pi
+                    Write a Pi continuation handoff
 `;
 
 export const runCli = async (argv: string[], options?: RunCliOptions): Promise<number> => {

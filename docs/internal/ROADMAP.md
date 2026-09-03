@@ -185,6 +185,17 @@ Each supported harness may provide some combination of:
 
 Support does not imply exact native resume.
 
+### CLI (Phase 2)
+
+```text
+harnie import pi <path>
+harnie import opencode <path>
+harnie handoff <work> --to opencode
+harnie handoff <work> --to pi
+```
+
+Handoffs are markdown from Work. Harnie does not write Pi JSONL or OpenCode SQLite.
+
 ### Validation
 
 Demonstrate:

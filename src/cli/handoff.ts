@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderOpenCodeHandoff } from "../handoff/opencode.js";
+import { renderPiHandoff } from "../handoff/pi.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
 import { buildHandoffFromWork } from "../work/handoff.js";
@@ -10,6 +11,8 @@ export interface RunHandoffOptions {
   readonly stdout: { write(chunk: string): unknown };
   readonly stderr: { write(chunk: string): unknown };
 }
+
+type HandoffTarget = "opencode" | "pi";
 
 const usage = "Usage: harnie handoff <work> --to <target>\n";
 
@@ -22,7 +25,7 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
     return 1;
   }
 
-  if (target !== "opencode") {
+  if (!isHandoffTarget(target)) {
     options.stderr.write(`Target "${target}" is not implemented.\n`);
     return 1;
   }
@@ -37,9 +40,10 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
         return 1;
       }
 
-      const markdown = renderOpenCodeHandoff(buildHandoffFromWork(work));
+      const handoff = buildHandoffFromWork(work);
+      const markdown = target === "pi" ? renderPiHandoff(handoff) : renderOpenCodeHandoff(handoff);
       options.stdout.write(markdown);
-      writeHandoffFile(home, work.id, markdown);
+      writeHandoffFile(home, work.id, markdown, target);
       return 0;
     } finally {
       store.close();
@@ -50,6 +54,9 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
     return 1;
   }
 };
+
+const isHandoffTarget = (value: string): value is HandoffTarget =>
+  value === "opencode" || value === "pi";
 
 const firstNonFlag = (argv: readonly string[]): string | undefined => {
   for (let index = 0; index < argv.length; index += 1) {
@@ -69,10 +76,16 @@ const flagValue = (argv: readonly string[], flag: string): string | undefined =>
   return argv[index + 1];
 };
 
-const writeHandoffFile = (home: string, workId: string, markdown: string): void => {
+const writeHandoffFile = (
+  home: string,
+  workId: string,
+  markdown: string,
+  target: HandoffTarget,
+): void => {
   const directory = join(home, "handoffs");
   mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, `${safeWorkId(workId)}.md`), markdown);
+  const suffix = target === "pi" ? ".pi.md" : ".md";
+  writeFileSync(join(directory, `${safeWorkId(workId)}${suffix}`), markdown);
 };
 
 const safeWorkId = (workId: string): string => {
