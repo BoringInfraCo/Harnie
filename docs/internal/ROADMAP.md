@@ -190,6 +190,7 @@ Support does not imply exact native resume.
 ```text
 harnie import pi <path>
 harnie import opencode <path>
+harnie import codex <path>
 harnie handoff <work> --to opencode
 harnie handoff <work> --to pi
 ```

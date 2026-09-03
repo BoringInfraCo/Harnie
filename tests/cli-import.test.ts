@@ -98,7 +98,7 @@ describe("harnie import", () => {
   it("exits 1 for an unsupported harness", async () => {
     const stderr = capture();
 
-    const code = await runImport(["codex", TRACE_B], { stdout: capture(), stderr });
+    const code = await runImport(["claude", TRACE_B], { stdout: capture(), stderr });
 
     expect(code).toBe(1);
     expect(stderr.toString()).toMatch(/not implemented/i);
@@ -110,7 +110,7 @@ describe("harnie import", () => {
 
     expect(await runImport(["pi", TRACE_B], { home, stdout: capture(), stderr: capture() })).toBe(0);
     expect(await runImport([], { stdout: capture(), stderr: capture() })).toBe(1);
-    expect(await runImport(["codex", TRACE_B], { stdout: capture(), stderr: capture() })).toBe(1);
+    expect(await runImport(["claude", TRACE_B], { stdout: capture(), stderr: capture() })).toBe(1);
 
     expect(existsSync(join(home, "harnie.db"))).toBe(true);
     expectRealHomeUnchanged(before);

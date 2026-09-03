@@ -26,6 +26,8 @@ Commands:
   import pi <path>  Import a Pi session as observed Work
   import opencode <path>
                     Import an OpenCode session as observed Work
+  import codex <path>
+                    Import a Codex rollout as observed Work
   list              List persisted observed Work
   show <work>       Show observed Work
   handoff <work> --to opencode

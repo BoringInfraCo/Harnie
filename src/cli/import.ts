@@ -1,4 +1,8 @@
-import { importOpenCodeSessionFile, importPiSessionFile } from "../engine/import.js";
+import {
+  importCodexSessionFile,
+  importOpenCodeSessionFile,
+  importPiSessionFile,
+} from "../engine/import.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 
 export interface RunImportOptions {
@@ -7,7 +11,8 @@ export interface RunImportOptions {
   readonly stderr: { write(chunk: string): unknown };
 }
 
-const usage = "Usage: harnie import pi <path>\n       harnie import opencode <path>\n";
+const usage =
+  "Usage: harnie import pi <path>\n       harnie import opencode <path>\n       harnie import codex <path>\n";
 
 export const runImport = async (argv: string[], options: RunImportOptions): Promise<number> => {
   const harness = argv[0];
@@ -18,7 +23,7 @@ export const runImport = async (argv: string[], options: RunImportOptions): Prom
     return 1;
   }
 
-  if (harness !== "pi" && harness !== "opencode") {
+  if (harness !== "pi" && harness !== "opencode" && harness !== "codex") {
     options.stderr.write(`Harness "${harness}" is not implemented.\n`);
     return 1;
   }
@@ -33,9 +38,11 @@ export const runImport = async (argv: string[], options: RunImportOptions): Prom
     const store = initHarnieStore({ home });
     try {
       const result =
-        harness === "opencode"
-          ? await importOpenCodeSessionFile(store, path)
-          : await importPiSessionFile(store, path);
+        harness === "codex"
+          ? await importCodexSessionFile(store, path)
+          : harness === "opencode"
+            ? await importOpenCodeSessionFile(store, path)
+            : await importPiSessionFile(store, path);
       options.stdout.write(
         `Imported ${harness} session.\n\nWork\n${result.workId}\nEvents inserted\n${result.eventsInserted}\n`,
       );

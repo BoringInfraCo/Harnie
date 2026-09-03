@@ -133,7 +133,7 @@ describe("harnie import opencode", () => {
   it("exits 1 for an unknown harness", async () => {
     const stderr = capture();
 
-    const code = await runImport(["codex", FIXTURE], { stdout: capture(), stderr });
+    const code = await runImport(["claude", FIXTURE], { stdout: capture(), stderr });
 
     expect(code).toBe(1);
     expect(stderr.toString()).toMatch(/not implemented/i);
@@ -149,7 +149,7 @@ describe("harnie import opencode", () => {
     }
     expect(await runImport([], { stdout: capture(), stderr: capture() })).toBe(1);
     expect(await runImport(["opencode"], { stdout: capture(), stderr: capture() })).toBe(1);
-    expect(await runImport(["codex", FIXTURE], { stdout: capture(), stderr: capture() })).toBe(1);
+    expect(await runImport(["claude", FIXTURE], { stdout: capture(), stderr: capture() })).toBe(1);
 
     expectRealHomeUnchanged(before);
   });
