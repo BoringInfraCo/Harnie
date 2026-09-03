@@ -13,6 +13,7 @@ import type {
 const DECISION_SENTENCE = /\bI will\b|\bI'll\b/i;
 const SENTENCE_SPLIT = /[.!?]+\s+/;
 const SUBSTANCE = /[A-Za-z0-9]/;
+const THINKING_BLOCK_TYPES = new Set(["thinking", "reasoning"]);
 
 export const deriveObservedWork = (work: Work): Work => {
   const goal = deriveGoal(work);
@@ -155,14 +156,22 @@ const hasMissingToolResult = (work: Work): boolean =>
 
 const extractText = (event: WorkEvent): string => {
   const content = event.payload.content;
-  if (typeof content === "string") return content;
+  if (typeof content === "string") return stripThinkingMarkup(content);
   if (!Array.isArray(content)) return "";
   const blocks: string[] = [];
   for (const block of content) {
-    if (!isJsonObject(block) || block.type !== "text") continue;
+    if (!isJsonObject(block)) continue;
+    const type = asString(block.type);
+    if (type !== undefined && THINKING_BLOCK_TYPES.has(type)) continue;
+    if (type !== "text") continue;
     if (typeof block.text === "string") blocks.push(block.text);
   }
-  return blocks.join("\n");
+  return stripThinkingMarkup(blocks.join("\n"));
+};
+
+const stripThinkingMarkup = (text: string): string => {
+  const closed = text.replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, "\n");
+  return closed.replace(/<thinking\b[^>]*>[\s\S]*$/gi, "").trim();
 };
 
 const sentences = (text: string): string[] =>
