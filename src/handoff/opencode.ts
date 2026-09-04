@@ -2,9 +2,29 @@ import type { Handoff } from "../work/handoff.js";
 
 const EVENT_KINDS = ["message", "tool_call", "tool_result", "command", "unknown"] as const;
 
-type OpenCodeHandoffInput = Omit<Handoff, "operations" | "filesTouched"> & {
+type OpenCodeHandoffInput = Omit<
+  Handoff,
+  | "operations"
+  | "filesTouched"
+  | "execution"
+  | "executions"
+  | "revision"
+  | "relevantFiles"
+  | "changedFiles"
+  | "failedApproaches"
+  | "testState"
+  | "readYields"
+> & {
   readonly operations?: readonly string[];
   readonly filesTouched?: readonly string[];
+  readonly execution?: Handoff["execution"];
+  readonly executions?: Handoff["executions"];
+  readonly revision?: string;
+  readonly relevantFiles?: readonly string[];
+  readonly changedFiles?: readonly string[];
+  readonly failedApproaches?: readonly string[];
+  readonly testState?: string;
+  readonly readYields?: readonly string[];
 };
 
 export const renderOpenCodeHandoff = (handoff: OpenCodeHandoffInput): string => {
@@ -16,10 +36,18 @@ export const renderOpenCodeHandoff = (handoff: OpenCodeHandoffInput): string => 
   pushSection(sections, "Goal", handoff.goal);
   pushSection(sections, "Current state", handoff.currentState);
   pushSection(sections, "Workspace", handoff.workspacePath);
-  pushSection(sections, "Execution", formatExecution(handoff.execution));
+  pushSection(sections, "Repository", handoff.revision);
+  pushSection(sections, "Relevant files", formatList(handoff.relevantFiles ?? []));
+  pushSection(sections, "Changed files", formatList(handoff.changedFiles ?? []));
+  pushSection(sections, "Failed approaches", formatList(handoff.failedApproaches ?? []));
+  pushSection(sections, "Test state", handoff.testState);
+  pushSection(sections, "Read yields", formatList(handoff.readYields ?? []));
+  pushSection(sections, "Execution", formatExecutions(handoff));
   pushSection(sections, "Decisions", formatList(handoff.decisions));
   pushSection(sections, "Findings", formatList(handoff.findings));
-  pushSection(sections, "Files touched", formatList(handoff.filesTouched ?? []));
+  if (!hasRoleFiles(handoff)) {
+    pushSection(sections, "Files touched", formatList(handoff.filesTouched ?? []));
+  }
   pushSection(sections, "Operations", formatList(handoff.operations ?? []));
   pushSection(sections, "Next steps", formatList(handoff.nextSteps));
   pushSection(sections, "Event summary", formatEventCounts(handoff.eventCounts));
@@ -27,6 +55,20 @@ export const renderOpenCodeHandoff = (handoff: OpenCodeHandoffInput): string => 
   pushSection(sections, "Provenance", formatProvenance(handoff));
 
   return `${sections.join("\n\n")}\n`;
+};
+
+const hasRoleFiles = (handoff: OpenCodeHandoffInput): boolean =>
+  (handoff.relevantFiles?.length ?? 0) > 0 || (handoff.changedFiles?.length ?? 0) > 0;
+
+const formatExecutions = (handoff: OpenCodeHandoffInput): string | undefined => {
+  if (handoff.executions !== undefined && handoff.executions.length > 1) {
+    const blocks = handoff.executions.flatMap((execution) => {
+      const body = formatExecution(execution);
+      return body ? [body] : [];
+    });
+    return blocks.length > 0 ? blocks.join("\n\n") : undefined;
+  }
+  return formatExecution(handoff.execution);
 };
 
 const formatExecution = (execution: Handoff["execution"]): string | undefined => {

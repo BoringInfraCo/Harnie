@@ -3,6 +3,7 @@ export * from "./work/types.js";
 export * from "./work/observe.js";
 export { deriveObservedWork } from "./work/derive.js";
 export { extractToolOperations } from "./work/operations.js";
+export { extractObservedContext } from "./work/context.js";
 export { buildHandoffFromWork } from "./work/handoff.js";
 export { renderOpenCodeHandoff } from "./handoff/opencode.js";
 export { renderPiHandoff } from "./handoff/pi.js";

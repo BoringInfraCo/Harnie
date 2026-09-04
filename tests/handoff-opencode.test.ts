@@ -62,4 +62,59 @@ describe("renderOpenCodeHandoff", () => {
     expect(markdown).not.toMatch(/complete the investigation/i);
     expect(markdown.length).toBeLessThan(8000);
   });
+
+  it("renders observed revision and read yields without Files touched or ls dumps", () => {
+    const markdown = renderOpenCodeHandoff({
+      workId: "work:pi:harnie-tb-da82c4f8",
+      revision: "47da672",
+      relevantFiles: ["README.md", "analysis.js", "config.json"],
+      readYields: ["README.md — # Mystery Project"],
+      filesTouched: ["README.md", "analysis.js", "config.json", ".git/config"],
+      decisions: [],
+      findings: [],
+      nextSteps: [],
+      operations: ["read README.md — succeeded"],
+      eventCounts: emptyCounts(),
+      diagnosticCodes: [],
+      provenance: { from: "work" },
+    });
+
+    expect(markdown).toContain("47da672");
+    expect(markdown).toContain("Mystery Project");
+    expect(markdown).toMatch(/## Repository/);
+    expect(markdown).toMatch(/## Relevant files/);
+    expect(markdown).toMatch(/## Read yields/);
+    expect(markdown).not.toMatch(/## Files touched/);
+    expect(markdown).not.toMatch(/total 16/);
+    expect(markdown).not.toContain("# Mystery Project\n\nA project that needs");
+    expect(markdown.length).toBeLessThan(8000);
+  });
+
+  it("renders every execution and comma-separated provenance as-is", () => {
+    const markdown = renderOpenCodeHandoff({
+      workId: "work:attached",
+      execution: { harness: "pi", sourceId: "sess-pi" },
+      executions: [
+        { harness: "pi", sourceId: "sess-pi" },
+        { harness: "codex", sourceId: "sess-codex" },
+      ],
+      decisions: [],
+      findings: [],
+      nextSteps: [],
+      eventCounts: emptyCounts(),
+      diagnosticCodes: [],
+      provenance: {
+        from: "work",
+        sourceHarness: "pi,codex",
+        sourceSession: "sess-pi,sess-codex",
+      },
+    });
+
+    expect(markdown).toContain("pi");
+    expect(markdown).toContain("codex");
+    expect(markdown).toContain("sess-pi");
+    expect(markdown).toContain("sess-codex");
+    expect(markdown).toContain("pi,codex");
+    expect(markdown.length).toBeLessThan(8000);
+  });
 });

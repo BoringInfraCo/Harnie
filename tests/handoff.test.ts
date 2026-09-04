@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { importPiSessionFile } from "../src/engine/import.js";
+import { renderOpenCodeHandoff } from "../src/handoff/opencode.js";
 import { initHarnieStore } from "../src/store/database.js";
 import { loadWork } from "../src/store/persist.js";
 import { buildHandoffFromWork } from "../src/work/handoff.js";
@@ -37,6 +38,7 @@ describe("buildHandoffFromWork", () => {
       expect(handoff.decisions.some((decision) => /I will/i.test(decision))).toBe(true);
       expect(handoff.provenance.from).toBe("work");
       expect(JSON.stringify(handoff).length).toBeLessThan(fixtureBytes * 0.5);
+      expect(renderOpenCodeHandoff(handoff).length).toBeLessThan(fixtureBytes * 0.5);
     } finally {
       store.close();
     }
@@ -51,8 +53,13 @@ describe("buildHandoffFromWork", () => {
       const handoff = buildHandoffFromWork(loaded as Work);
       const serialized = JSON.stringify(handoff);
 
+      const fixtureBytes = (await readFile(TRACE_B)).byteLength;
+
       expect(handoff.nextSteps.length).toBeGreaterThanOrEqual(1);
       expect(handoff.currentState).toMatch(/unresolved|pending/i);
+      expect(handoff.revision).toBe("47da672");
+      expect(serialized.length).toBeLessThan(fixtureBytes * 0.5);
+      expect(renderOpenCodeHandoff(handoff).length).toBeLessThan(fixtureBytes * 0.5);
       expect(serialized).not.toMatch(/investigation (is |was )?complete/i);
       expect(serialized).not.toMatch(/refactoring plan ready/i);
     } finally {

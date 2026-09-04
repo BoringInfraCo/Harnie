@@ -60,6 +60,7 @@ describe("harnie show operations", () => {
     expect(output).toContain("Events");
     expect(output).not.toMatch(/\bfile_read\b/);
     expect(output).not.toMatch(/\bfile_write\b/);
+    expectObservedAfterOperations(output);
   });
 
   it("shows Trace B files including pending .git/config without file_read event kinds", async () => {
@@ -79,5 +80,34 @@ describe("harnie show operations", () => {
     expect(output).toContain("Events");
     expect(output).not.toMatch(/\bfile_read\b/);
     expect(output).not.toMatch(/\bfile_write\b/);
+    expect(output).not.toContain("# Mystery Project\n\nA project that needs");
+    expect(output).not.toMatch(/\btotal 16\b/);
+    expectObservedAfterOperations(output);
   });
 });
+
+const OBSERVED_HEADINGS = [
+  "Repository",
+  "Relevant files",
+  "Changed files",
+  "Failed approaches",
+  "Test state",
+  "Read yields",
+] as const;
+
+const expectObservedAfterOperations = (output: string): void => {
+  const headings = output.split("\n\n").map((block) => block.split("\n")[0] ?? "");
+  const operationsIndex = headings.indexOf("Operations");
+  const boundIndex = headings.findIndex(
+    (heading, index) => index > operationsIndex && (heading === "Checkpoints" || heading === "Events"),
+  );
+  for (const heading of OBSERVED_HEADINGS) {
+    const at = headings.indexOf(heading);
+    if (at === -1) continue;
+    expect(operationsIndex).toBeGreaterThanOrEqual(0);
+    expect(at).toBeGreaterThan(operationsIndex);
+    if (boundIndex !== -1) {
+      expect(at).toBeLessThan(boundIndex);
+    }
+  }
+};

@@ -6,11 +6,19 @@ import { importCodexSessionFile, importPiSessionFile } from "../src/engine/impor
 import { renderCodexHandoff } from "../src/handoff/codex.js";
 import { initHarnieStore } from "../src/store/database.js";
 import { loadWork } from "../src/store/persist.js";
-import { buildHandoffFromWork } from "../src/work/handoff.js";
+import { buildHandoffFromWork, type Handoff } from "../src/work/handoff.js";
 import type { Work } from "../src/work/types.js";
 
 const CODEX_FIXTURE = "tests/fixtures/codex/unfinished-read.jsonl";
 const TRACE_B = "tests/fixtures/pi/trace-b-unfinished.jsonl";
+
+const emptyCounts = (): Handoff["eventCounts"] => ({
+  message: 0,
+  tool_call: 0,
+  tool_result: 0,
+  command: 0,
+  unknown: 0,
+});
 
 describe("renderCodexHandoff", () => {
   const homes: string[] = [];
@@ -59,5 +67,29 @@ describe("renderCodexHandoff", () => {
     } finally {
       store.close();
     }
+  });
+
+  it("renders revision and read yields from an explicit handoff", () => {
+    const markdown = renderCodexHandoff({
+      workId: "work:pi:harnie-tb-da82c4f8",
+      revision: "47da672",
+      relevantFiles: ["README.md", "analysis.js", "config.json"],
+      readYields: ["README.md — # Mystery Project"],
+      filesTouched: ["README.md", "analysis.js", "config.json", ".git/config"],
+      decisions: [],
+      findings: [],
+      nextSteps: [],
+      operations: ["read README.md — succeeded"],
+      eventCounts: emptyCounts(),
+      diagnosticCodes: [],
+      provenance: { from: "work" },
+    });
+
+    expect(markdown).toContain("47da672");
+    expect(markdown).toContain("Mystery Project");
+    expect(markdown).toMatch(/## Repository/);
+    expect(markdown).not.toMatch(/## Files touched/);
+    expect(markdown).not.toMatch(/total 16/);
+    expect(markdown.length).toBeLessThan(8000);
   });
 });

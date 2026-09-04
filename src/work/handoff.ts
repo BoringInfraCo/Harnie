@@ -1,5 +1,6 @@
 import type { JsonObject, NormalizedEventKind } from "../types.js";
 import { asString, isJsonObject } from "../types.js";
+import { extractObservedContext } from "./context.js";
 import type { Execution, Work, WorkEvent } from "./types.js";
 
 export interface HandoffExecution {
@@ -15,12 +16,19 @@ export interface Handoff {
   readonly goal?: string;
   readonly workspacePath?: string;
   readonly execution?: HandoffExecution;
+  readonly executions?: readonly HandoffExecution[];
   readonly currentState?: string;
   readonly decisions: readonly string[];
   readonly findings: readonly string[];
   readonly nextSteps: readonly string[];
   readonly operations: readonly string[];
   readonly filesTouched: readonly string[];
+  readonly revision?: string;
+  readonly relevantFiles?: readonly string[];
+  readonly changedFiles?: readonly string[];
+  readonly failedApproaches?: readonly string[];
+  readonly testState?: string;
+  readonly readYields?: readonly string[];
   readonly eventCounts: {
     readonly message: number;
     readonly tool_call: number;
@@ -67,27 +75,39 @@ export const buildHandoffFromWork = (work: Work): Handoff => {
   const findings = compact(work.findings?.map((finding) => finding.statement));
   const nextSteps = compact(work.nextSteps?.map((step) => step.description));
   const diagnosticCodes = uniqueDiagnosticCodes(work);
-  const execution = toHandoffExecution(work.executions[0]);
+  const executions = work.executions.flatMap((item) => {
+    const mapped = toHandoffExecution(item);
+    return mapped ? [mapped] : [];
+  });
+  const execution = executions[0];
   const records = operationsFromWork(work);
   const operations = records.map(formatOperationLine);
   const filesTouched = uniquePaths(records);
   const currentState = resolveCurrentState(nextSteps, diagnosticCodes, records);
   const goal = present(work.goal?.statement);
   const workspacePath = present(work.workspace?.path);
-  const sourceHarness = present(execution?.harness);
-  const sourceSession = present(execution?.sourceId);
+  const context = extractObservedContext(work);
+  const sourceHarness = uniqueJoined(executions.map((item) => item.harness));
+  const sourceSession = uniqueJoined(executions.map((item) => item.sourceId));
 
   return {
     workId: work.id,
     ...(goal ? { goal } : {}),
     ...(workspacePath ? { workspacePath } : {}),
     ...(execution ? { execution } : {}),
+    ...(executions.length > 0 ? { executions } : {}),
     ...(currentState ? { currentState } : {}),
     decisions,
     findings,
     nextSteps,
     operations,
     filesTouched,
+    ...(context.revision ? { revision: context.revision } : {}),
+    ...(context.relevantFiles.length > 0 ? { relevantFiles: context.relevantFiles } : {}),
+    ...(context.changedFiles.length > 0 ? { changedFiles: context.changedFiles } : {}),
+    ...(context.failedApproaches.length > 0 ? { failedApproaches: context.failedApproaches } : {}),
+    ...(context.testState ? { testState: context.testState } : {}),
+    ...(context.readYields.length > 0 ? { readYields: context.readYields } : {}),
     eventCounts: countEvents(work.events),
     diagnosticCodes,
     provenance: {
@@ -328,6 +348,17 @@ const countKey = (kind: NormalizedEventKind): keyof Handoff["eventCounts"] => {
     case "unknown":
       return kind;
   }
+};
+
+const uniqueJoined = (values: readonly (string | undefined)[]): string | undefined => {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (!isPresent(value) || seen.has(value)) continue;
+    seen.add(value);
+    unique.push(value);
+  }
+  return unique.length > 0 ? unique.join(", ") : undefined;
 };
 
 const uniqueDiagnosticCodes = (work: Work): readonly string[] => {

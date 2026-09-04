@@ -87,9 +87,38 @@ const formatShow = (work: Work): string => {
     sections.push(`Next\n${nextSteps}`);
   }
 
-  const operations = buildHandoffFromWork(work).operations.map((line) => `• ${line}`);
+  const handoff = buildHandoffFromWork(work);
+  const operations = handoff.operations.map((line) => `• ${line}`);
   if (operations.length > 0) {
     sections.push(`Operations\n${operations.join("\n")}`);
+  }
+
+  if (handoff.revision) {
+    sections.push(`Repository\n${handoff.revision}`);
+  }
+
+  const relevantFiles = bulletSection(handoff.relevantFiles, (path) => path);
+  if (relevantFiles) {
+    sections.push(`Relevant files\n${relevantFiles}`);
+  }
+
+  const changedFiles = bulletSection(handoff.changedFiles, (path) => path);
+  if (changedFiles) {
+    sections.push(`Changed files\n${changedFiles}`);
+  }
+
+  const failedApproaches = bulletSection(handoff.failedApproaches, (line) => line);
+  if (failedApproaches) {
+    sections.push(`Failed approaches\n${failedApproaches}`);
+  }
+
+  if (handoff.testState) {
+    sections.push(`Test state\n${handoff.testState}`);
+  }
+
+  const readYields = bulletSection(handoff.readYields, (line) => line);
+  if (readYields) {
+    sections.push(`Read yields\n${readYields}`);
   }
 
   if (work.checkpoints !== undefined && work.checkpoints.length > 0) {
