@@ -50,6 +50,7 @@ export const runShow = async (argv: string[], options: CliIo): Promise<number> =
 };
 
 const formatShow = (work: Work): string => {
+  const handoff = buildHandoffFromWork(work);
   const sections: string[] = [`Work\n${work.id}`];
 
   if (work.forkedFrom) {
@@ -77,17 +78,16 @@ const formatShow = (work: Work): string => {
     sections.push(`Decisions\n${decisions}`);
   }
 
-  const findings = bulletSection(work.findings, (finding) => finding.statement);
+  const findings = bulletSection(handoff.findings, (finding) => finding);
   if (findings) {
     sections.push(`Findings\n${findings}`);
   }
 
-  const nextSteps = bulletSection(work.nextSteps, (step) => step.description);
+  const nextSteps = bulletSection(handoff.nextSteps, (step) => step);
   if (nextSteps) {
     sections.push(`Next\n${nextSteps}`);
   }
 
-  const handoff = buildHandoffFromWork(work);
   const operations = handoff.operations.map((line) => `• ${line}`);
   if (operations.length > 0) {
     sections.push(`Operations\n${operations.join("\n")}`);
@@ -119,6 +119,15 @@ const formatShow = (work: Work): string => {
   const readYields = bulletSection(handoff.readYields, (line) => line);
   if (readYields) {
     sections.push(`Read yields\n${readYields}`);
+  }
+
+  if (handoff.unresolved) {
+    sections.push(`Unresolved\n${handoff.unresolved}`);
+  }
+
+  const evidence = bulletSection(handoff.evidence, (id) => id);
+  if (evidence) {
+    sections.push(`Evidence\n${evidence}`);
   }
 
   if (work.checkpoints !== undefined && work.checkpoints.length > 0) {

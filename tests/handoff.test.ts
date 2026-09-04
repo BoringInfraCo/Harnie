@@ -91,4 +91,32 @@ describe("buildHandoffFromWork", () => {
     expect(handoff.decisions).toEqual([]);
     expect(handoff.provenance.from).toBe("work");
   });
+
+  it("caps findings to the last five statements", () => {
+    const provenance = { harness: "synthetic", line: 1, observation: "derived" as const };
+    const work: Work = {
+      id: "work:synthetic:findings",
+      executions: [],
+      events: [],
+      diagnostics: [],
+      findings: Array.from({ length: 8 }, (_, index) => ({
+        id: `finding:${index + 1}`,
+        statement: `finding ${index + 1}`,
+        evidence: [`event:${index + 1}`],
+        provenance,
+        rule: "test",
+      })),
+    };
+
+    const handoff = buildHandoffFromWork(work);
+
+    expect(handoff.findings).toHaveLength(5);
+    expect(handoff.findings).toEqual([
+      "finding 4",
+      "finding 5",
+      "finding 6",
+      "finding 7",
+      "finding 8",
+    ]);
+  });
 });

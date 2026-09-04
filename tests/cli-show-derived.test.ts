@@ -64,6 +64,7 @@ describe("harnie show derived claims", () => {
     expect(output).toContain("Events");
     expect(output).toContain("Workspace");
     expect(output).not.toMatch(/\bStatus\b/);
+    expect(output).toMatch(/Do not re-edit|Verify the edits/);
   });
 
   it("shows Trace B next step without inventing completion", async () => {
@@ -106,7 +107,7 @@ describe("harnie show derived claims", () => {
     expect(output).not.toMatch(/\bDecisions\b/);
     expect(output).not.toMatch(/\bGoal\b/);
     expect(output).not.toMatch(/\bFindings\b/);
-    expect(output).not.toMatch(/\bNext\b/);
+    expect(output).toMatch(/Verify the edits/);
     expect(output).toContain("Events");
     expect(output).toContain("Workspace");
   });

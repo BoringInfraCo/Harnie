@@ -29,6 +29,8 @@ export interface Handoff {
   readonly failedApproaches?: readonly string[];
   readonly testState?: string;
   readonly readYields?: readonly string[];
+  readonly unresolved?: string;
+  readonly evidence?: readonly string[];
   readonly eventCounts: {
     readonly message: number;
     readonly tool_call: number;
@@ -69,11 +71,11 @@ type WorkWithOperations = Work & {
 };
 
 const COMMAND_LIMIT = 40;
+const FINDINGS_CAP = 5;
 
 export const buildHandoffFromWork = (work: Work): Handoff => {
   const decisions = compact(work.decisions?.map((decision) => decision.summary));
-  const findings = compact(work.findings?.map((finding) => finding.statement));
-  const nextSteps = compact(work.nextSteps?.map((step) => step.description));
+  const findings = compact((work.findings ?? []).slice(-FINDINGS_CAP).map((finding) => finding.statement));
   const diagnosticCodes = uniqueDiagnosticCodes(work);
   const executions = work.executions.flatMap((item) => {
     const mapped = toHandoffExecution(item);
@@ -83,10 +85,13 @@ export const buildHandoffFromWork = (work: Work): Handoff => {
   const records = operationsFromWork(work);
   const operations = records.map(formatOperationLine);
   const filesTouched = uniquePaths(records);
-  const currentState = resolveCurrentState(nextSteps, diagnosticCodes, records);
   const goal = present(work.goal?.statement);
   const workspacePath = present(work.workspace?.path);
   const context = extractObservedContext(work);
+  const nextSteps = context.continuation.length > 0
+    ? context.continuation
+    : compact(work.nextSteps?.map((step) => step.description));
+  const currentState = resolveCurrentState(nextSteps, diagnosticCodes, records);
   const sourceHarness = uniqueJoined(executions.map((item) => item.harness));
   const sourceSession = uniqueJoined(executions.map((item) => item.sourceId));
 
@@ -108,6 +113,8 @@ export const buildHandoffFromWork = (work: Work): Handoff => {
     ...(context.failedApproaches.length > 0 ? { failedApproaches: context.failedApproaches } : {}),
     ...(context.testState ? { testState: context.testState } : {}),
     ...(context.readYields.length > 0 ? { readYields: context.readYields } : {}),
+    ...(context.unresolved ? { unresolved: context.unresolved } : {}),
+    ...(context.evidence.length > 0 ? { evidence: context.evidence } : {}),
     eventCounts: countEvents(work.events),
     diagnosticCodes,
     provenance: {
@@ -141,11 +148,6 @@ const resolveCurrentState = (
   const pending = operations.filter((operation) => operation.status === "pending");
   const pendingHint = formatPendingHint(pending[0]);
 
-  if (nextSteps.length > 0) {
-    const base = `Unresolved: ${nextSteps.join("; ")}`;
-    return pendingHint && !base.includes(pendingHint) ? `${base} (${pendingHint})` : base;
-  }
-
   if (pending.length > 0) {
     return pendingHint ? `Unresolved: pending ${pendingHint}` : "Unresolved: pending tool activity";
   }
@@ -158,6 +160,10 @@ const resolveCurrentState = (
   );
   if (succeededEditPaths.length > 0) {
     return `Edits reported success on ${succeededEditPaths.join(", ")}. Verification not recorded.`;
+  }
+
+  if (nextSteps.length > 0) {
+    return `Unresolved: ${nextSteps.join("; ")}`;
   }
 
   if (diagnosticCodes.includes("missing_tool_result")) return "Unresolved: pending tool activity";

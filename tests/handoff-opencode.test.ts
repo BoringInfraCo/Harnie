@@ -117,4 +117,42 @@ describe("renderOpenCodeHandoff", () => {
     expect(markdown).toContain("pi,codex");
     expect(markdown.length).toBeLessThan(8000);
   });
+
+  it("renders evidence without duplicating Unresolved already in current state", () => {
+    const markdown = renderOpenCodeHandoff({
+      workId: "work:pi:harnie-tb-da82c4f8",
+      currentState: "Unresolved: pending read .git/config",
+      unresolved: "pending read .git/config",
+      evidence: ["evt-1"],
+      decisions: [],
+      findings: [],
+      nextSteps: [],
+      eventCounts: emptyCounts(),
+      diagnosticCodes: [],
+      provenance: { from: "work" },
+    });
+
+    expect(markdown).toMatch(/## Evidence/);
+    expect(markdown).toContain("evt-1");
+    expect(markdown).not.toContain("## Unresolved");
+    expect(markdown.length).toBeLessThan(8000);
+  });
+
+  it("renders Unresolved when current state does not already contain it", () => {
+    const markdown = renderOpenCodeHandoff({
+      workId: "work:pi:fixture-c",
+      currentState: "Edits reported success on models.ts",
+      unresolved: "Verification not recorded",
+      decisions: [],
+      findings: [],
+      nextSteps: [],
+      eventCounts: emptyCounts(),
+      diagnosticCodes: [],
+      provenance: { from: "work" },
+    });
+
+    expect(markdown).toContain("## Unresolved");
+    expect(markdown).toContain("Verification not recorded");
+    expect(markdown.length).toBeLessThan(8000);
+  });
 });

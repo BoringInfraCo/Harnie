@@ -10,6 +10,7 @@ export const renderCodexHandoff = (handoff: Handoff): string => {
 
   pushSection(sections, "Goal", handoff.goal);
   pushSection(sections, "Current state", handoff.currentState);
+  pushSection(sections, "Unresolved", unresolvedBody(handoff));
   pushSection(sections, "Workspace", handoff.workspacePath);
   pushSection(sections, "Repository", handoff.revision);
   pushSection(sections, "Relevant files", formatList(handoff.relevantFiles ?? []));
@@ -26,9 +27,19 @@ export const renderCodexHandoff = (handoff: Handoff): string => {
   pushSection(sections, "Operations", formatList(handoff.operations));
   pushSection(sections, "Next steps", formatList(handoff.nextSteps));
   pushSection(sections, "Event summary", formatEventCounts(handoff.eventCounts));
+  pushSection(sections, "Evidence", formatList(handoff.evidence ?? []));
   pushSection(sections, "Provenance", formatProvenance(handoff));
 
   return `${sections.join("\n\n")}\n`;
+};
+
+const unresolvedBody = (handoff: Handoff): string | undefined => {
+  if (!present(handoff.unresolved)) return undefined;
+  const current = handoff.currentState;
+  if (present(current) && current.toLowerCase().includes(handoff.unresolved.toLowerCase())) {
+    return undefined;
+  }
+  return handoff.unresolved;
 };
 
 const hasRoleFiles = (handoff: Handoff): boolean =>

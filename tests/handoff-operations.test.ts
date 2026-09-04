@@ -42,6 +42,8 @@ describe("handoff observed operations", () => {
       expect(operations).toMatch(/edit .*packages\/agent\/src\/types\.ts — succeeded/);
       expect(handoff.changedFiles?.join("\n")).toContain("packages/ai/src/models.ts");
       expect(handoff.changedFiles?.join("\n")).toContain("packages/agent/src/types.ts");
+      expect(handoff.nextSteps.join("\n")).toMatch(/verify/i);
+      expect(handoff.nextSteps.join("\n")).toMatch(/do not re-edit/i);
       expect(handoff.currentState).toMatch(/success|already edited/i);
       expect(handoff.currentState).toMatch(/models\.ts/);
       expect(handoff.currentState).not.toMatch(/not yet edited|still need to edit|re-?do the edits/i);
@@ -75,6 +77,9 @@ describe("handoff observed operations", () => {
       expect(handoff.readYields?.some((line) => line.includes("# Mystery Project"))).toBe(true);
       expect(handoff.currentState).toMatch(/unresolved|pending/i);
       expect(handoff.nextSteps.length).toBeGreaterThanOrEqual(1);
+      expect(handoff.nextSteps.join("\n")).toMatch(/\.git\/config/);
+      expect(handoff.nextSteps.join("\n")).toMatch(/refactoring plan|propose a/i);
+      expect(handoff.evidence?.length).toBeGreaterThan(0);
     } finally {
       store.close();
     }

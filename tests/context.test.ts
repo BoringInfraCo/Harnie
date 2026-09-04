@@ -48,6 +48,15 @@ describe("extractObservedContext", () => {
       expect(blob).not.toMatch(/total /);
       expect(blob).not.toMatch(/drwx/);
       expect(blob).not.toMatch(/directory listing/i);
+
+      const continuation = context.continuation.join("\n");
+      expect(continuation).toContain(".git/config");
+      expect(continuation).toMatch(/propose a refactoring plan/i);
+      expect(continuation).not.toMatch(/read all files/i);
+      expect(continuation).not.toMatch(/report what you find/i);
+      expect(context.unresolved).toMatch(/\.git\/config/);
+      expect(context.unresolved).toMatch(/pending/);
+      expect(context.evidence.length).toBeGreaterThan(0);
     } finally {
       store.close();
     }
@@ -67,6 +76,14 @@ describe("extractObservedContext", () => {
       expect(context.revision).toBeUndefined();
       expect(changed).not.toMatch(/\brg\b/);
       expect(context.changedFiles.some((path) => /rg|grep|bash/i.test(path))).toBe(false);
+
+      const continuation = context.continuation.join("\n");
+      expect(continuation).toMatch(/verify/i);
+      expect(continuation).toMatch(/do not re-edit/i);
+      expect(continuation).toContain("packages/ai/src/models.ts");
+      expect(continuation).toContain("packages/agent/src/types.ts");
+      expect(context.unresolved).toMatch(/verification not recorded/i);
+      expect(context.evidence.length).toBeGreaterThan(0);
     } finally {
       store.close();
     }

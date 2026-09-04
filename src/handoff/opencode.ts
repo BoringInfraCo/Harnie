@@ -14,6 +14,8 @@ type OpenCodeHandoffInput = Omit<
   | "failedApproaches"
   | "testState"
   | "readYields"
+  | "unresolved"
+  | "evidence"
 > & {
   readonly operations?: readonly string[];
   readonly filesTouched?: readonly string[];
@@ -25,6 +27,8 @@ type OpenCodeHandoffInput = Omit<
   readonly failedApproaches?: readonly string[];
   readonly testState?: string;
   readonly readYields?: readonly string[];
+  readonly unresolved?: string;
+  readonly evidence?: readonly string[];
 };
 
 export const renderOpenCodeHandoff = (handoff: OpenCodeHandoffInput): string => {
@@ -35,6 +39,7 @@ export const renderOpenCodeHandoff = (handoff: OpenCodeHandoffInput): string => 
 
   pushSection(sections, "Goal", handoff.goal);
   pushSection(sections, "Current state", handoff.currentState);
+  pushSection(sections, "Unresolved", unresolvedBody(handoff));
   pushSection(sections, "Workspace", handoff.workspacePath);
   pushSection(sections, "Repository", handoff.revision);
   pushSection(sections, "Relevant files", formatList(handoff.relevantFiles ?? []));
@@ -52,9 +57,19 @@ export const renderOpenCodeHandoff = (handoff: OpenCodeHandoffInput): string => 
   pushSection(sections, "Next steps", formatList(handoff.nextSteps));
   pushSection(sections, "Event summary", formatEventCounts(handoff.eventCounts));
   pushSection(sections, "Diagnostics", formatList(handoff.diagnosticCodes));
+  pushSection(sections, "Evidence", formatList(handoff.evidence ?? []));
   pushSection(sections, "Provenance", formatProvenance(handoff));
 
   return `${sections.join("\n\n")}\n`;
+};
+
+const unresolvedBody = (handoff: OpenCodeHandoffInput): string | undefined => {
+  if (!present(handoff.unresolved)) return undefined;
+  const current = handoff.currentState;
+  if (present(current) && current.toLowerCase().includes(handoff.unresolved.toLowerCase())) {
+    return undefined;
+  }
+  return handoff.unresolved;
 };
 
 const hasRoleFiles = (handoff: OpenCodeHandoffInput): boolean =>
