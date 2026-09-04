@@ -3,7 +3,10 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runDiff } from "./cli/diff.js";
+import { runExecutions } from "./cli/executions.js";
 import { runHandoff } from "./cli/handoff.js";
+import { runHistory } from "./cli/history.js";
 import { runImport } from "./cli/import.js";
 import { runInit } from "./cli/init.js";
 import { runList } from "./cli/list.js";
@@ -28,12 +31,19 @@ Commands:
                     Import an OpenCode session as observed Work
   import codex <path>
                     Import a Codex rollout as observed Work
+                    (--work <id> attaches as a new execution)
   list              List persisted observed Work
   show <work>       Show observed Work
+  executions <work> List executions of observed Work
+  history <work>    Show execution history of observed Work
+  diff <work> <execution-a> <execution-b>
+                    Diff two executions of observed Work
   handoff <work> --to opencode
                     Write an OpenCode continuation handoff
   handoff <work> --to pi
-                    Write a Pi continuation handoff
+                     Write a Pi continuation handoff
+  handoff <work> --to codex
+                     Write a Codex continuation handoff
 `;
 
 export const runCli = async (argv: string[], options?: RunCliOptions): Promise<number> => {
@@ -71,6 +81,18 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
 
   if (command === "show") {
     return runShow(argv.slice(1), io);
+  }
+
+  if (command === "executions") {
+    return runExecutions(argv.slice(1), io);
+  }
+
+  if (command === "history") {
+    return runHistory(argv.slice(1), io);
+  }
+
+  if (command === "diff") {
+    return runDiff(argv.slice(1), io);
   }
 
   if (command === "handoff") {
