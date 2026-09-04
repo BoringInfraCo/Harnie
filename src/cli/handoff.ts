@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { renderCodexHandoff } from "../handoff/codex.js";
 import { renderOpenCodeHandoff } from "../handoff/opencode.js";
 import { renderPiHandoff } from "../handoff/pi.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
@@ -12,7 +13,7 @@ export interface RunHandoffOptions {
   readonly stderr: { write(chunk: string): unknown };
 }
 
-type HandoffTarget = "opencode" | "pi";
+type HandoffTarget = "opencode" | "pi" | "codex";
 
 const usage = "Usage: harnie handoff <work> --to <target>\n";
 
@@ -41,7 +42,12 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
       }
 
       const handoff = buildHandoffFromWork(work);
-      const markdown = target === "pi" ? renderPiHandoff(handoff) : renderOpenCodeHandoff(handoff);
+      const markdown =
+        target === "pi"
+          ? renderPiHandoff(handoff)
+          : target === "codex"
+            ? renderCodexHandoff(handoff)
+            : renderOpenCodeHandoff(handoff);
       options.stdout.write(markdown);
       writeHandoffFile(home, work.id, markdown, target);
       return 0;
@@ -56,7 +62,7 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
 };
 
 const isHandoffTarget = (value: string): value is HandoffTarget =>
-  value === "opencode" || value === "pi";
+  value === "opencode" || value === "pi" || value === "codex";
 
 const firstNonFlag = (argv: readonly string[]): string | undefined => {
   for (let index = 0; index < argv.length; index += 1) {
@@ -84,7 +90,7 @@ const writeHandoffFile = (
 ): void => {
   const directory = join(home, "handoffs");
   mkdirSync(directory, { recursive: true });
-  const suffix = target === "pi" ? ".pi.md" : ".md";
+  const suffix = target === "pi" ? ".pi.md" : target === "codex" ? ".codex.md" : ".md";
   writeFileSync(join(directory, `${safeWorkId(workId)}${suffix}`), markdown);
 };
 
