@@ -5,29 +5,53 @@ import { readOpenCodeSnapshotFile } from "../opencode/reader.js";
 import { observePiSession } from "../pi/observe.js";
 import { readPiJsonlFile } from "../pi/reader.js";
 import type { HarnieStore } from "../store/database.js";
-import { persistObservedWork, type PersistObservedWorkResult } from "../store/persist.js";
+import { loadWork, persistObservedWork, type PersistObservedWorkResult } from "../store/persist.js";
 import { deriveObservedWork } from "../work/derive.js";
+import { attachObservedWork } from "../work/observe.js";
+import type { Work } from "../work/types.js";
+
+export interface ImportSessionOptions {
+  readonly workId?: string | undefined;
+}
 
 export const importPiSessionFile = async (
   store: HarnieStore,
   path: string,
+  options?: ImportSessionOptions,
 ): Promise<PersistObservedWorkResult> => {
   const read = await readPiJsonlFile(path);
-  return persistObservedWork(store, deriveObservedWork(observePiSession(read)));
+  return persistWithOptionalAttach(store, observePiSession(read), options?.workId);
 };
 
 export const importOpenCodeSessionFile = async (
   store: HarnieStore,
   path: string,
+  options?: ImportSessionOptions,
 ): Promise<PersistObservedWorkResult> => {
   const snapshot = await readOpenCodeSnapshotFile(path);
-  return persistObservedWork(store, deriveObservedWork(observeOpenCodeSession(snapshot)));
+  return persistWithOptionalAttach(store, observeOpenCodeSession(snapshot), options?.workId);
 };
 
 export const importCodexSessionFile = async (
   store: HarnieStore,
   path: string,
+  options?: ImportSessionOptions,
 ): Promise<PersistObservedWorkResult> => {
   const rollout = await readCodexJsonlFile(path);
-  return persistObservedWork(store, deriveObservedWork(observeCodexSession(rollout)));
+  return persistWithOptionalAttach(store, observeCodexSession(rollout), options?.workId);
+};
+
+const persistWithOptionalAttach = (
+  store: HarnieStore,
+  observed: Work,
+  workId: string | undefined,
+): PersistObservedWorkResult => {
+  if (workId === undefined) {
+    return persistObservedWork(store, deriveObservedWork(observed));
+  }
+  const existing = loadWork(store, workId);
+  if (!existing) {
+    throw new Error(`Work not found: ${workId}`);
+  }
+  return persistObservedWork(store, deriveObservedWork(attachObservedWork(existing, observed)));
 };

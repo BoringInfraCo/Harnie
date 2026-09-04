@@ -102,17 +102,16 @@ interface OperationRow {
 export const persistObservedWork = (store: HarnieStore, work: Work): PersistObservedWorkResult => {
   const db = storeDatabase(store);
   ensureDerivedSchema(db);
-  const execution = work.executions[0];
-  if (!execution) {
+  if (work.executions.length === 0) {
     throw new Error(`Work ${work.id} has no execution to persist.`);
   }
 
   const existing = db.prepare("SELECT id FROM works WHERE id = ?").get(work.id) as unknown as { id: string } | undefined;
   const created = existing === undefined;
-  const sourceSessionId = execution.sourceSession.sourceId;
 
   db.exec("BEGIN IMMEDIATE");
   let eventsInserted = 0;
+  let lastExecutionId = work.executions[work.executions.length - 1]?.id ?? "";
   try {
     db.prepare(`
       INSERT INTO works (id, workspace_path, created_at, updated_at, diagnostics)
@@ -129,7 +128,7 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
       JSON.stringify(work.diagnostics),
     );
 
-    db.prepare(`
+    const upsertExecution = db.prepare(`
       INSERT INTO executions (id, work_id, harness, model, provider, started_at)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
@@ -138,16 +137,8 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
         model = excluded.model,
         provider = excluded.provider,
         started_at = excluded.started_at
-    `).run(
-      execution.id,
-      work.id,
-      execution.harness,
-      execution.model ?? null,
-      execution.provider ?? null,
-      execution.startedAt ?? null,
-    );
-
-    db.prepare(`
+    `);
+    const upsertSourceSession = db.prepare(`
       INSERT INTO source_sessions (execution_id, harness, source_id, source_format, source_location)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(execution_id) DO UPDATE SET
@@ -155,13 +146,35 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
         source_id = excluded.source_id,
         source_format = excluded.source_format,
         source_location = excluded.source_location
-    `).run(
-      execution.id,
-      execution.sourceSession.harness,
-      sourceSessionId,
-      execution.sourceSession.sourceFormat ?? null,
-      execution.sourceSession.sourceLocation ?? null,
+    `);
+    for (const execution of work.executions) {
+      upsertExecution.run(
+        execution.id,
+        work.id,
+        execution.harness,
+        execution.model ?? null,
+        execution.provider ?? null,
+        execution.startedAt ?? null,
+      );
+      upsertSourceSession.run(
+        execution.id,
+        execution.sourceSession.harness,
+        execution.sourceSession.sourceId,
+        execution.sourceSession.sourceFormat ?? null,
+        execution.sourceSession.sourceLocation ?? null,
+      );
+    }
+
+    const executionsById = new Map(work.executions.map((execution) => [execution.id, execution]));
+    const knownEventIds = new Set(
+      (db.prepare("SELECT id FROM events WHERE work_id = ?").all(work.id) as unknown as { id: string }[]).map(
+        (row) => row.id,
+      ),
     );
+    const maxOrdinalRow = db.prepare("SELECT COALESCE(MAX(ordinal), -1) AS max_ordinal FROM events WHERE work_id = ?").get(
+      work.id,
+    ) as unknown as { max_ordinal: number };
+    let nextOrdinal = Number(maxOrdinalRow.max_ordinal) + 1;
 
     const insertEvent = db.prepare(`
       INSERT OR IGNORE INTO events (
@@ -171,20 +184,26 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
     `);
 
     for (const [index, event] of work.events.entries()) {
+      const execution = executionsById.get(event.executionId);
+      const attributed = execution ?? work.executions[index] ?? work.executions[0];
+      if (!attributed) continue;
+      lastExecutionId = attributed.id;
+      const sourceSessionId = event.provenance.sourceSession ?? attributed.sourceSession.sourceId;
+      const ordinal = knownEventIds.has(event.id) ? 0 : nextOrdinal++;
       const result = insertEvent.run(
         event.id,
         work.id,
-        event.executionId,
+        attributed.id,
         event.kind,
         event.timestamp ?? null,
         JSON.stringify(event.payload),
         JSON.stringify(event.provenance),
         JSON.stringify(event.diagnostics),
-        execution.harness,
-        event.provenance.sourceSession ?? sourceSessionId,
+        attributed.harness,
+        sourceSessionId,
         event.id,
         event.provenance.line,
-        index,
+        ordinal,
       );
       eventsInserted += Number(result.changes);
     }
@@ -197,7 +216,7 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
   }
   return {
     workId: work.id,
-    executionId: execution.id,
+    executionId: lastExecutionId,
     eventsInserted,
     eventsExisting: work.events.length - eventsInserted,
     created,
@@ -213,7 +232,7 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
   if (!workRow) return undefined;
 
   const executionRows = db.prepare(
-    "SELECT id, work_id, harness, model, provider, started_at FROM executions WHERE work_id = ?",
+    "SELECT id, work_id, harness, model, provider, started_at FROM executions WHERE work_id = ? ORDER BY rowid ASC",
   ).all(workId) as unknown as ExecutionRow[];
 
   const executions: Execution[] = executionRows.map((row) => {

@@ -1,6 +1,6 @@
 import { diagnostic } from "../diagnostics.js";
 import type { Diagnostic } from "../types.js";
-import type { Execution, ObservedWorkInput, Work, WorkEvent } from "./types.js";
+import type { Execution, ObservedWorkInput, Work, WorkEvent, Workspace } from "./types.js";
 
 export const reconstructObservedWork = (input: ObservedWorkInput): Work => {
   const sourceId = input.sourceId ?? "unknown-session";
@@ -70,6 +70,35 @@ export const observedIdentity = (
   harness: string,
   sourceId: string,
 ): string => `${kind}:${harness}:${sourceId}`;
+
+export const attachObservedWork = (existing: Work, incoming: Work): Work => {
+  const executions: Execution[] = [...existing.executions];
+  for (const execution of incoming.executions) {
+    if (executions.some((known) => known.id === execution.id)) continue;
+    executions.push({ ...execution, workId: existing.id });
+  }
+  const knownEventIds = new Set(existing.events.map((event) => event.id));
+  const events: WorkEvent[] = [...existing.events];
+  for (const event of incoming.events) {
+    if (knownEventIds.has(event.id)) continue;
+    knownEventIds.add(event.id);
+    events.push({ ...event, workId: existing.id });
+  }
+  const diagnostics: Diagnostic[] = [...existing.diagnostics];
+  for (const item of incoming.diagnostics) {
+    if (diagnostics.some((known) => JSON.stringify(known) === JSON.stringify(item))) continue;
+    diagnostics.push(item);
+  }
+  return {
+    id: existing.id,
+    ...(existing.workspace ?? incoming.workspace ? { workspace: (existing.workspace ?? incoming.workspace) as Workspace } : {}),
+    ...(existing.createdAt ?? incoming.createdAt ? { createdAt: (existing.createdAt ?? incoming.createdAt) as string } : {}),
+    ...(incoming.updatedAt ?? existing.updatedAt ? { updatedAt: (incoming.updatedAt ?? existing.updatedAt) as string } : {}),
+    executions,
+    events,
+    diagnostics,
+  };
+};
 
 const lastTimestamp = (events: readonly WorkEvent[]): string | undefined => {
   for (let index = events.length - 1; index >= 0; index -= 1) {
