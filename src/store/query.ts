@@ -98,9 +98,11 @@ export const listExecutions = (store: HarnieStore, workId: string): readonly Exe
         SELECT COUNT(*)
         FROM events
         WHERE events.execution_id = executions.id
+        AND events.work_id = executions.work_id
       ) AS event_count
     FROM executions
     LEFT JOIN source_sessions ON source_sessions.execution_id = executions.id
+      AND source_sessions.work_id = executions.work_id
     WHERE executions.work_id = ?
     ORDER BY executions.rowid ASC
   `).all(workId) as unknown as ExecutionSummaryRow[];

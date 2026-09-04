@@ -1,3 +1,4 @@
+import { listCheckpoints } from "../store/checkpoints.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
 import { executionEventCounts } from "../work/diff.js";
@@ -25,7 +26,9 @@ export const runHistory = async (argv: string[], options: CliIo): Promise<number
         options.stderr.write(`Work not found: ${workId}\n`);
         return 1;
       }
-      options.stdout.write(formatHistory(work));
+      const checkpoints = listCheckpoints(store, work.id);
+      const composed: Work = checkpoints.length > 0 ? { ...work, checkpoints } : work;
+      options.stdout.write(formatHistory(composed));
       return 0;
     } finally {
       store.close();
@@ -39,6 +42,11 @@ export const runHistory = async (argv: string[], options: CliIo): Promise<number
 
 const formatHistory = (work: Work): string => {
   const sections: string[] = [`Work\n${work.id}`];
+  if (work.forkedFrom) {
+    sections.push(
+      `Forked from\n${work.forkedFrom.workId} @ ${work.forkedFrom.checkpointId ?? "none"} — "${work.forkedFrom.message ?? ""}"`,
+    );
+  }
   if (work.workspace) {
     sections.push(`Workspace\n${work.workspace.path}`);
   }
@@ -57,6 +65,13 @@ const formatHistory = (work: Work): string => {
     );
   });
   sections.push(`History\n${blocks.join("\n")}`);
+  if (work.checkpoints !== undefined && work.checkpoints.length > 0) {
+    const lines = work.checkpoints.map(
+      (checkpoint) =>
+        `- ${checkpoint.createdAt} ${checkpoint.id} — ${checkpoint.message} [after ${checkpoint.executionId ?? "none"}, ${checkpoint.eventCount} events]`,
+    );
+    sections.push(`Checkpoints\n${lines.join("\n")}`);
+  }
   const decisions = (work.decisions ?? [])
     .map((decision) => decision.summary)
     .filter((summary) => summary.length > 0);

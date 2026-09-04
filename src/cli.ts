@@ -3,8 +3,10 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runCheckpoint } from "./cli/checkpoint.js";
 import { runDiff } from "./cli/diff.js";
 import { runExecutions } from "./cli/executions.js";
+import { runFork } from "./cli/fork.js";
 import { runHandoff } from "./cli/handoff.js";
 import { runHistory } from "./cli/history.js";
 import { runImport } from "./cli/import.js";
@@ -36,6 +38,10 @@ Commands:
   show <work>       Show observed Work
   executions <work> List executions of observed Work
   history <work>    Show execution history of observed Work
+  checkpoint <work> [message]
+                     Create a checkpoint snapshot of observed Work
+  fork <work> [--checkpoint <id>] [message]
+                     Fork observed Work at a checkpoint
   diff <work> <execution-a> <execution-b>
                     Diff two executions of observed Work
   handoff <work> --to opencode
@@ -89,6 +95,14 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
 
   if (command === "history") {
     return runHistory(argv.slice(1), io);
+  }
+
+  if (command === "checkpoint") {
+    return runCheckpoint(argv.slice(1), io);
+  }
+
+  if (command === "fork") {
+    return runFork(argv.slice(1), io);
   }
 
   if (command === "diff") {

@@ -10,27 +10,31 @@ CREATE TABLE IF NOT EXISTS works (
 );
 
 CREATE TABLE IF NOT EXISTS executions (
-  id TEXT PRIMARY KEY,
+  id TEXT NOT NULL,
   work_id TEXT NOT NULL REFERENCES works(id),
   harness TEXT NOT NULL,
   model TEXT,
   provider TEXT,
-  started_at TEXT
+  started_at TEXT,
+  PRIMARY KEY (work_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS source_sessions (
-  execution_id TEXT PRIMARY KEY REFERENCES executions(id),
+  work_id TEXT NOT NULL,
+  execution_id TEXT NOT NULL,
   harness TEXT NOT NULL,
   source_id TEXT NOT NULL,
   source_format TEXT,
   source_location TEXT,
-  UNIQUE (harness, source_id)
+  PRIMARY KEY (work_id, execution_id),
+  UNIQUE (work_id, harness, source_id),
+  FOREIGN KEY (work_id, execution_id) REFERENCES executions(work_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS events (
-  id TEXT PRIMARY KEY,
+  id TEXT NOT NULL,
   work_id TEXT NOT NULL REFERENCES works(id),
-  execution_id TEXT NOT NULL REFERENCES executions(id),
+  execution_id TEXT NOT NULL,
   kind TEXT NOT NULL,
   timestamp TEXT,
   payload TEXT NOT NULL,
@@ -41,7 +45,9 @@ CREATE TABLE IF NOT EXISTS events (
   source_event_id TEXT NOT NULL,
   provenance_line INTEGER,
   ordinal INTEGER NOT NULL,
-  UNIQUE (harness, source_session_id, source_event_id)
+  PRIMARY KEY (work_id, id),
+  UNIQUE (work_id, harness, source_session_id, source_event_id),
+  FOREIGN KEY (work_id, execution_id) REFERENCES executions(work_id, id)
 );
 `;
 
@@ -89,4 +95,22 @@ CREATE TABLE IF NOT EXISTS operations (
   rule TEXT NOT NULL,
   ordinal INTEGER NOT NULL
 );
+`;
+
+export const CHECKPOINTS_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS checkpoints (
+  id TEXT PRIMARY KEY,
+  work_id TEXT NOT NULL REFERENCES works(id),
+  execution_id TEXT,
+  message TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  event_ordinal_watermark INTEGER NOT NULL,
+  event_count INTEGER NOT NULL,
+  goal_json TEXT,
+  decisions_json TEXT NOT NULL DEFAULT '[]',
+  findings_json TEXT NOT NULL DEFAULT '[]',
+  next_steps_json TEXT NOT NULL DEFAULT '[]',
+  operations_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_work_seq ON checkpoints(work_id, rowid);
 `;

@@ -16,7 +16,7 @@ import type {
 } from "../work/types.js";
 import { isJsonObject } from "../types.js";
 import { storeDatabase, type HarnieStore } from "./database.js";
-import { DERIVED_SCHEMA_SQL } from "./schema.js";
+import { CHECKPOINTS_SCHEMA_SQL, DERIVED_SCHEMA_SQL } from "./schema.js";
 
 export interface PersistObservedWorkResult {
   readonly workId: string;
@@ -33,6 +33,9 @@ interface WorkRow {
   updated_at: string | null;
   diagnostics: string;
   goal_json: string | null;
+  forked_from_work_id: string | null;
+  forked_from_checkpoint_id: string | null;
+  fork_message: string | null;
 }
 
 interface ExecutionRow {
@@ -131,17 +134,16 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
     const upsertExecution = db.prepare(`
       INSERT INTO executions (id, work_id, harness, model, provider, started_at)
       VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        work_id = excluded.work_id,
+      ON CONFLICT(work_id, id) DO UPDATE SET
         harness = excluded.harness,
         model = excluded.model,
         provider = excluded.provider,
         started_at = excluded.started_at
     `);
     const upsertSourceSession = db.prepare(`
-      INSERT INTO source_sessions (execution_id, harness, source_id, source_format, source_location)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(execution_id) DO UPDATE SET
+      INSERT INTO source_sessions (work_id, execution_id, harness, source_id, source_format, source_location)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(work_id, execution_id) DO UPDATE SET
         harness = excluded.harness,
         source_id = excluded.source_id,
         source_format = excluded.source_format,
@@ -157,6 +159,7 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
         execution.startedAt ?? null,
       );
       upsertSourceSession.run(
+        work.id,
         execution.id,
         execution.sourceSession.harness,
         execution.sourceSession.sourceId,
@@ -227,7 +230,7 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
   const db = storeDatabase(store);
   ensureDerivedSchema(db);
   const workRow = db.prepare(
-    "SELECT id, workspace_path, created_at, updated_at, diagnostics, goal_json FROM works WHERE id = ?",
+    "SELECT id, workspace_path, created_at, updated_at, diagnostics, goal_json, forked_from_work_id, forked_from_checkpoint_id, fork_message FROM works WHERE id = ?",
   ).get(workId) as unknown as WorkRow | undefined;
   if (!workRow) return undefined;
 
@@ -237,8 +240,8 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
 
   const executions: Execution[] = executionRows.map((row) => {
     const sessionRow = db.prepare(
-      "SELECT execution_id, harness, source_id, source_format, source_location FROM source_sessions WHERE execution_id = ?",
-    ).get(row.id) as unknown as SourceSessionRow | undefined;
+      "SELECT execution_id, harness, source_id, source_format, source_location FROM source_sessions WHERE work_id = ? AND execution_id = ?",
+    ).get(row.work_id, row.id) as unknown as SourceSessionRow | undefined;
     const sourceSession: SourceSession = {
       harness: sessionRow?.harness ?? row.harness,
       sourceId: sessionRow?.source_id ?? "unknown-session",
@@ -280,12 +283,20 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
   const findings = loadFindings(db, workId);
   const nextSteps = loadNextSteps(db, workId);
   const operations = loadOperations(db, workId);
+  const forkedFrom = workRow.forked_from_work_id
+    ? {
+        workId: workRow.forked_from_work_id,
+        ...(workRow.forked_from_checkpoint_id ? { checkpointId: workRow.forked_from_checkpoint_id } : {}),
+        ...(workRow.fork_message !== null ? { message: workRow.fork_message } : {}),
+      }
+    : undefined;
 
   return {
     id: workRow.id,
     ...(workspace ? { workspace } : {}),
     ...(workRow.created_at ? { createdAt: workRow.created_at } : {}),
     ...(workRow.updated_at ? { updatedAt: workRow.updated_at } : {}),
+    ...(forkedFrom ? { forkedFrom } : {}),
     executions,
     events,
     diagnostics: parseDiagnostics(workRow.diagnostics),
@@ -298,11 +309,140 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
 };
 
 const ensureDerivedSchema = (db: DatabaseSync): void => {
+  migratePerWorkIdentity(db);
   db.exec(DERIVED_SCHEMA_SQL);
   try {
-    db.exec("ALTER TABLE works ADD COLUMN goal_json TEXT");
+    db.exec(CHECKPOINTS_SCHEMA_SQL);
   } catch (error) {
-    if (!isDuplicateColumnError(error)) throw error;
+    if (!isRowidIndexError(error)) throw error;
+    db.exec(CHECKPOINTS_SCHEMA_SQL.slice(0, CHECKPOINTS_SCHEMA_SQL.indexOf("CREATE INDEX")));
+  }
+  for (const column of [
+    "ALTER TABLE works ADD COLUMN goal_json TEXT",
+    "ALTER TABLE works ADD COLUMN forked_from_work_id TEXT",
+    "ALTER TABLE works ADD COLUMN forked_from_checkpoint_id TEXT",
+    "ALTER TABLE works ADD COLUMN fork_message TEXT",
+  ]) {
+    try {
+      db.exec(column);
+    } catch (error) {
+      if (!isDuplicateColumnError(error)) throw error;
+    }
+  }
+};
+
+const migratePerWorkIdentity = (db: DatabaseSync): void => {
+  const rows = db.prepare(
+    "SELECT name, sql FROM sqlite_master WHERE name IN ('executions','source_sessions','events')",
+  ).all() as unknown as { name: string; sql: string | null }[];
+  const sqlByName = new Map(rows.map((row) => [row.name, row.sql ?? ""]));
+  const needsMigration = ["executions", "source_sessions", "events"].some((name) => {
+    const sql = sqlByName.get(name);
+    return sql !== undefined && !sql.includes("PRIMARY KEY (work_id");
+  });
+  const checkpointRow = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE name = 'checkpoints'",
+  ).get() as unknown as { sql: string | null } | undefined;
+  const needsCheckpointMigration = checkpointRow?.sql?.includes("REFERENCES executions") === true;
+  if (!needsMigration && !needsCheckpointMigration) return;
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const executionsSql = sqlByName.get("executions") ?? "";
+    if (executionsSql !== "" && !executionsSql.includes("PRIMARY KEY (work_id")) {
+      db.exec(`CREATE TABLE executions_new (
+        id TEXT NOT NULL,
+        work_id TEXT NOT NULL REFERENCES works(id),
+        harness TEXT NOT NULL,
+        model TEXT,
+        provider TEXT,
+        started_at TEXT,
+        PRIMARY KEY (work_id, id)
+      )`);
+      db.exec(`INSERT INTO executions_new (id, work_id, harness, model, provider, started_at)
+        SELECT id, work_id, harness, model, provider, started_at FROM executions`);
+      db.exec("DROP TABLE executions");
+      db.exec("ALTER TABLE executions_new RENAME TO executions");
+    }
+    const sessionsSql = sqlByName.get("source_sessions") ?? "";
+    if (sessionsSql !== "" && !sessionsSql.includes("PRIMARY KEY (work_id")) {
+      db.exec(`CREATE TABLE source_sessions_new (
+        work_id TEXT NOT NULL,
+        execution_id TEXT NOT NULL,
+        harness TEXT NOT NULL,
+        source_id TEXT NOT NULL,
+        source_format TEXT,
+        source_location TEXT,
+        PRIMARY KEY (work_id, execution_id),
+        UNIQUE (work_id, harness, source_id),
+        FOREIGN KEY (work_id, execution_id) REFERENCES executions(work_id, id)
+      )`);
+      db.exec(`INSERT INTO source_sessions_new (work_id, execution_id, harness, source_id, source_format, source_location)
+        SELECT executions.work_id, source_sessions.execution_id, source_sessions.harness,
+          source_sessions.source_id, source_sessions.source_format, source_sessions.source_location
+        FROM source_sessions JOIN executions ON executions.id = source_sessions.execution_id`);
+      db.exec("DROP TABLE source_sessions");
+      db.exec("ALTER TABLE source_sessions_new RENAME TO source_sessions");
+    }
+    const eventsSql = sqlByName.get("events") ?? "";
+    if (eventsSql !== "" && !eventsSql.includes("PRIMARY KEY (work_id")) {
+      db.exec(`CREATE TABLE events_new (
+        id TEXT NOT NULL,
+        work_id TEXT NOT NULL REFERENCES works(id),
+        execution_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        timestamp TEXT,
+        payload TEXT NOT NULL,
+        provenance TEXT NOT NULL,
+        diagnostics TEXT NOT NULL,
+        harness TEXT NOT NULL,
+        source_session_id TEXT NOT NULL,
+        source_event_id TEXT NOT NULL,
+        provenance_line INTEGER,
+        ordinal INTEGER NOT NULL,
+        PRIMARY KEY (work_id, id),
+        UNIQUE (work_id, harness, source_session_id, source_event_id),
+        FOREIGN KEY (work_id, execution_id) REFERENCES executions(work_id, id)
+      )`);
+      db.exec(`INSERT INTO events_new (id, work_id, execution_id, kind, timestamp, payload, provenance,
+          diagnostics, harness, source_session_id, source_event_id, provenance_line, ordinal)
+        SELECT id, work_id, execution_id, kind, timestamp, payload, provenance,
+          diagnostics, harness, source_session_id, source_event_id, provenance_line, ordinal FROM events`);
+      db.exec("DROP TABLE events");
+      db.exec("ALTER TABLE events_new RENAME TO events");
+    }
+    const checkpointNeedsRebuild = needsCheckpointMigration;
+    if (checkpointNeedsRebuild) {
+      db.exec(`CREATE TABLE checkpoints_new (
+        id TEXT PRIMARY KEY,
+        work_id TEXT NOT NULL REFERENCES works(id),
+        execution_id TEXT,
+        message TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        event_ordinal_watermark INTEGER NOT NULL,
+        event_count INTEGER NOT NULL,
+        goal_json TEXT,
+        decisions_json TEXT NOT NULL DEFAULT '[]',
+        findings_json TEXT NOT NULL DEFAULT '[]',
+        next_steps_json TEXT NOT NULL DEFAULT '[]',
+        operations_json TEXT NOT NULL DEFAULT '[]'
+      )`);
+      db.exec(`INSERT INTO checkpoints_new (id, work_id, execution_id, message, created_at,
+          event_ordinal_watermark, event_count, goal_json, decisions_json, findings_json,
+          next_steps_json, operations_json)
+        SELECT id, work_id, execution_id, message, created_at,
+          event_ordinal_watermark, event_count, goal_json, decisions_json, findings_json,
+          next_steps_json, operations_json FROM checkpoints`);
+      db.exec("DROP TABLE checkpoints");
+      db.exec("ALTER TABLE checkpoints_new RENAME TO checkpoints");
+      db.exec("CREATE INDEX IF NOT EXISTS idx_checkpoints_work_seq ON checkpoints(work_id, rowid)");
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
   }
 };
 
@@ -507,6 +647,11 @@ const hasEvidence = (claim: { readonly evidence?: readonly unknown[] | JsonValue
 const isDuplicateColumnError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error);
   return /duplicate column name/i.test(message);
+};
+
+const isRowidIndexError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /no such column: rowid/i.test(message);
 };
 
 const parseObject = (text: string): JsonObject => {

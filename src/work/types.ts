@@ -93,11 +93,33 @@ export interface ToolOperation {
   readonly rule: string;
 }
 
+export interface Checkpoint {
+  readonly id: string;
+  readonly workId: string;
+  readonly executionId?: string | undefined;
+  readonly message: string;
+  readonly createdAt: string;
+  readonly eventOrdinalWatermark: number;
+  readonly eventCount: number;
+  readonly goal?: DerivedGoal;
+  readonly decisions: readonly Decision[];
+  readonly findings: readonly Finding[];
+  readonly nextSteps: readonly NextStep[];
+  readonly operations: readonly ToolOperation[];
+}
+
 export interface Work {
   readonly id: string;
   readonly workspace?: Workspace | undefined;
   readonly createdAt?: string | undefined;
   readonly updatedAt?: string | undefined;
+  readonly forkedFrom?:
+    | {
+        readonly workId: string;
+        readonly checkpointId?: string | undefined;
+        readonly message?: string | undefined;
+      }
+    | undefined;
   readonly executions: readonly Execution[];
   readonly events: readonly WorkEvent[];
   readonly diagnostics: readonly Diagnostic[];
@@ -106,6 +128,7 @@ export interface Work {
   readonly findings?: readonly Finding[];
   readonly nextSteps?: readonly NextStep[];
   readonly operations?: readonly ToolOperation[];
+  readonly checkpoints?: readonly Checkpoint[] | undefined;
 }
 
 export interface ObservedEvent {

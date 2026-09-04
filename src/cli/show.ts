@@ -1,3 +1,4 @@
+import { listCheckpoints } from "../store/checkpoints.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
 import type { NormalizedEventKind } from "../types.js";
@@ -34,7 +35,9 @@ export const runShow = async (argv: string[], options: CliIo): Promise<number> =
         options.stderr.write(`Work not found: ${workId}\n`);
         return 1;
       }
-      options.stdout.write(formatShow(work));
+      const checkpoints = listCheckpoints(store, work.id);
+      const composed: Work = checkpoints.length > 0 ? { ...work, checkpoints } : work;
+      options.stdout.write(formatShow(composed));
       return 0;
     } finally {
       store.close();
@@ -48,6 +51,12 @@ export const runShow = async (argv: string[], options: CliIo): Promise<number> =
 
 const formatShow = (work: Work): string => {
   const sections: string[] = [`Work\n${work.id}`];
+
+  if (work.forkedFrom) {
+    sections.push(
+      `Forked from\n${work.forkedFrom.workId} @ ${work.forkedFrom.checkpointId ?? "none"} — "${work.forkedFrom.message ?? ""}"`,
+    );
+  }
 
   if (work.workspace) {
     sections.push(`Workspace\n${work.workspace.path}`);
@@ -81,6 +90,14 @@ const formatShow = (work: Work): string => {
   const operations = buildHandoffFromWork(work).operations.map((line) => `• ${line}`);
   if (operations.length > 0) {
     sections.push(`Operations\n${operations.join("\n")}`);
+  }
+
+  if (work.checkpoints !== undefined && work.checkpoints.length > 0) {
+    const lines = work.checkpoints.map((checkpoint) => {
+      const message = checkpoint.message === "" ? "(no message)" : checkpoint.message;
+      return `• ${checkpoint.id} ${checkpoint.createdAt} — ${message} (${checkpoint.eventCount} events)`;
+    });
+    sections.push(`Checkpoints\n${lines.join("\n")}`);
   }
 
   sections.push(`Events\n${EVENT_KINDS.map((kind) => `${kind} ${countKind(work, kind)}`).join("\n")}`);
