@@ -2,20 +2,13 @@
 
 AI coding work should outlive the agent that performed it.
 
-Harnie is a local-first work-state layer for coding agents. It reads Pi, OpenCode, and Codex sessions without mutating them, stores observed Work in SQLite, and emits continuation handoffs.
+Harnie is a local-first work-state layer for coding agents. It reads Pi, OpenCode, and Codex sessions without mutating them, stores observed work in SQLite, and emits continuation handoffs.
 
-```text
-npm test
-npx --yes tsx src/cli.ts init
-npx --yes tsx src/cli.ts import pi <session.jsonl>
-npx --yes tsx src/cli.ts import opencode <snapshot.json>
-npx --yes tsx src/cli.ts import codex <rollout.jsonl>
-npx --yes tsx src/cli.ts list
-npx --yes tsx src/cli.ts show <work>
-npx --yes tsx src/cli.ts handoff <work> --to opencode
-npx --yes tsx src/cli.ts handoff <work> --to pi
-```
+**One-sentence pitch:**
+Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Codex sessions) into SQLite, enabling continuation handoffs across tools—offline, without mutating source sessions.
 
-Store: `$HARNIE_HOME/harnie.db` or `~/.harnie/harnie.db`. Handoffs: `$HARNIE_HOME/handoffs/<work>.md` (OpenCode) and `$HARNIE_HOME/handoffs/<work>.pi.md` (Pi). Markdown from Work — not Pi JSONL, not OpenCode SQLite.
+**For engineers:**
+Harnie captures the agent-work handoff graph (sessions → observed work → continuation targets) into a local SQLite DB at `$HARNIE_HOME/harnie.db`. Run `harnie init` + `harnie import pi <session.jsonl>` to build a normalized work archive. All data stays on your machine; core functionality requires no internet. Think of it as "git log" for agent work states—preserving what was accomplished so it can be restored or handed off later.
 
-Phase 0 (Pi → Work → OpenCode) is through Sprint 012. Phase 2 includes `import opencode`, `handoff --to pi`, and `import codex`. See `docs/internal/` and `docs/research/`.
+**For technical product folks:**
+A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is complete; Phase 2 adds import/handoff tooling.
