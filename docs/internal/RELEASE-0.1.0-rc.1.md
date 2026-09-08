@@ -1,8 +1,10 @@
 # Release notes — harnie 0.1.0-rc.1 (developer preview)
 
-Date: 2026-09-08. Status: **prepared, pending tag** (`v0.1.0-rc.1`). This is the
+Date: 2026-09-08. Status: **released** — tagged `v0.1.0-rc.1`, pushed, and CI
+green. This was the
 named release candidate for the developer preview defined in
 `docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md` (Order 6).
+Superseded by `docs/internal/RELEASE-0.1.0-rc.2.md` (re-audit remediation).
 
 ## What this preview does
 
@@ -123,7 +125,8 @@ Verified 2026-09-08: `npm pack` → install tarball into an empty directory →
 `--help` / `init` / fixture import / `handoff` all green against an isolated
 `HARNIE_HOME`.
 
-## What remains to tag
+## Tag history
 
-Commit the working tree, tag `v0.1.0-rc.1`, push, and confirm CI green
-(`docs/internal/LAUNCH-CHECKLIST.md`, Order 6).
+Tagged `v0.1.0-rc.1`, pushed, and CI green on 2026-09-08. Re-audit
+remediation landed afterwards and is covered by
+`docs/internal/RELEASE-0.1.0-rc.2.md`.

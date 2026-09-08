@@ -1,4 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
+import { deriveObservedWork } from "../work/derive.js";
+import { reconcileToolDiagnostics } from "../work/observe.js";
 import { storeDatabase, type HarnieStore } from "./database.js";
 import { loadWork } from "./persist.js";
 import { CHECKPOINTS_SCHEMA_SQL } from "./schema.js";
@@ -9,7 +11,16 @@ import type {
   Finding,
   NextStep,
   ToolOperation,
+  Work,
 } from "../work/types.js";
+
+// Test seam: invoked inside the checkpoint transaction after the event
+// watermark is pinned and before the snapshot's semantic state is derived.
+export interface CheckpointFaultHooks {
+  afterWatermarkCapture?: ((context: { readonly workId: string; readonly watermark: number }) => void) | undefined;
+}
+
+export const checkpointFaultHooks: CheckpointFaultHooks = {};
 
 interface CheckpointRow {
   id: string;
@@ -27,18 +38,15 @@ interface CheckpointRow {
 }
 
 export const createCheckpoint = (store: HarnieStore, workId: string, message: string): Checkpoint => {
-  const work = loadWork(store, workId);
-  if (work === undefined) {
+  // Outside the transaction: the "Work not found" check and any pending legacy
+  // schema migration, so migrations never nest inside the snapshot transaction.
+  const known = loadWork(store, workId);
+  if (known === undefined) {
     throw new Error(`Work not found: ${workId}`);
   }
   const db = storeDatabase(store);
   ensureCheckpointsSchema(db);
   const createdAt = new Date().toISOString();
-  const goalJson = work.goal ? JSON.stringify(work.goal) : null;
-  const decisionsJson = JSON.stringify(work.decisions ?? []);
-  const findingsJson = JSON.stringify(work.findings ?? []);
-  const nextStepsJson = JSON.stringify(work.nextSteps ?? []);
-  const operationsJson = JSON.stringify(work.operations ?? []);
 
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -62,6 +70,24 @@ export const createCheckpoint = (store: HarnieStore, workId: string, message: st
       .prepare("SELECT COUNT(*) AS count FROM events WHERE work_id = ?")
       .get(workId) as unknown as { count: number };
     const eventCount = Number(eventCountRow.count);
+
+    checkpointFaultHooks.afterWatermarkCapture?.({ workId, watermark });
+
+    // Snapshot semantics derive from exactly the events the watermark pins:
+    // events are read under the write lock and filtered to ordinal <= watermark
+    // before the claims are re-derived, so no concurrent append can slip
+    // between the watermark and the snapshot's semantic state.
+    const pinned = loadWork(store, workId, { rawDiagnostics: true });
+    if (pinned === undefined) {
+      throw new Error(`Work not found: ${workId}`);
+    }
+    const derived = deriveObservedWork(snapshotAtWatermark(db, pinned, watermark));
+
+    const goalJson = (derived.goal?.evidence?.length ?? 0) > 0 ? JSON.stringify(derived.goal) : null;
+    const decisionsJson = JSON.stringify(derived.decisions ?? []);
+    const findingsJson = JSON.stringify(derived.findings ?? []);
+    const nextStepsJson = JSON.stringify(derived.nextSteps ?? []);
+    const operationsJson = JSON.stringify(derived.operations ?? []);
 
     db.prepare(
       `INSERT INTO checkpoints (
@@ -92,16 +118,39 @@ export const createCheckpoint = (store: HarnieStore, workId: string, message: st
       createdAt,
       eventOrdinalWatermark: watermark,
       eventCount,
-      ...(work.goal ? { goal: work.goal } : {}),
-      decisions: work.decisions ?? [],
-      findings: work.findings ?? [],
-      nextSteps: work.nextSteps ?? [],
-      operations: work.operations ?? [],
+      ...(derived.goal ? { goal: derived.goal } : {}),
+      decisions: derived.decisions ?? [],
+      findings: derived.findings ?? [],
+      nextSteps: derived.nextSteps ?? [],
+      operations: derived.operations ?? [],
     };
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
   }
+};
+
+// Rebuild the Work from events the watermark covers, mirroring
+// loadWorkAtCheckpoint: raw rows filtered to the boundary, then reconciled so
+// tool-call diagnostics agree with the pinned evidence.
+const snapshotAtWatermark = (db: DatabaseSync, pinned: Work, watermark: number): Work => {
+  const eventIds = new Set(
+    (db
+      .prepare("SELECT id FROM events WHERE work_id = ? AND ordinal <= ? ORDER BY ordinal ASC")
+      .all(pinned.id, watermark) as unknown as { id: string }[]).map((row) => row.id),
+  );
+  const events = pinned.events.filter((event) => eventIds.has(event.id));
+  const executionIds = new Set(events.map((event) => event.executionId));
+  const executions = pinned.executions.filter((execution) => executionIds.has(execution.id));
+  return reconcileToolDiagnostics({
+    id: pinned.id,
+    ...(pinned.workspace ? { workspace: pinned.workspace } : {}),
+    ...(pinned.createdAt ? { createdAt: pinned.createdAt } : {}),
+    ...(pinned.updatedAt ? { updatedAt: pinned.updatedAt } : {}),
+    executions,
+    events,
+    diagnostics: [],
+  });
 };
 
 export const listCheckpoints = (store: HarnieStore, workId: string): readonly Checkpoint[] => {

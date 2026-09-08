@@ -481,6 +481,11 @@ function cmdRun(parsed) {
     }
     handoffContent = readFileSync(handoffPath, "utf8");
   }
+  // `--handoff` is the prior-session context for the handoff condition only.
+  // A baseline run must never inherit the handoff artifact (path, size, sha):
+  // the 2026-09-07 summary showed handoff char counts on baseline rows purely
+  // because this value leaked across conditions.
+  const conditionHandoff = (c) => (c === "handoff" ? { path: handoffPath, content: handoffContent } : { path: null, content: null });
 
   let agentName = parsed.flags.agent || null;
   let agentArgv = null;
@@ -494,12 +499,13 @@ function cmdRun(parsed) {
   }
 
   for (const condition of conditions) {
+    const { path: condHandoffPath, content: condHandoffContent } = conditionHandoff(condition);
     const dir = join(runDir, task.id, condition);
     mkdirSync(dir, { recursive: true });
     const cloneDir = join(dir, "clone");
     const prep = prepareClone({ repo: run.repo, ref: run.ref, dir: cloneDir });
     const promptPath = join(dir, "prompt.md");
-    writeFileSync(promptPath, buildPrompt(task, condition, handoffContent));
+    writeFileSync(promptPath, buildPrompt(task, condition, condHandoffContent));
 
     const manual = manualInstructions({
       task,
@@ -507,7 +513,7 @@ function cmdRun(parsed) {
       run,
       cloneDir,
       promptPath,
-      handoffPath,
+      handoffPath: condHandoffPath,
     });
 
     let invocation = null;
@@ -516,7 +522,7 @@ function cmdRun(parsed) {
       invocation = agentArgv.map((a) =>
         a
           .replace("{prompt_file}", promptPath)
-          .replace("{prompt_text}", buildPrompt(task, condition, handoffContent))
+          .replace("{prompt_text}", buildPrompt(task, condition, condHandoffContent))
           .replace("{clone}", cloneDir),
       );
       canRun = true;
@@ -531,7 +537,7 @@ function cmdRun(parsed) {
           );
           args = [...modelArgs, ...args];
         }
-        invocation = [binPath, ...args.map((a) => a.replace("{prompt_text}", buildPrompt(task, condition, handoffContent)).replace("{prompt_file}", promptPath).replace("{clone}", cloneDir))];
+        invocation = [binPath, ...args.map((a) => a.replace("{prompt_text}", buildPrompt(task, condition, condHandoffContent)).replace("{prompt_file}", promptPath).replace("{clone}", cloneDir))];
         canRun = true;
       } else {
         console.error(`[manual] ${spec.bin} not found on PATH — degrading to manual run mode.`);
@@ -540,9 +546,9 @@ function cmdRun(parsed) {
 
     if (!canRun) {
       writeFileSync(join(dir, "manual-instructions.md"), manual);
-      writeFileSync(join(dir, "result-template.json"), JSON.stringify(resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath }), null, 2) + "\n");
+      writeFileSync(join(dir, "result-template.json"), JSON.stringify(resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath }), null, 2) + "\n");
       const result = {
-        ...resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath }),
+        ...resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath }),
         status: "manual",
         recordedAt: new Date().toISOString(),
         notRunReason: "no agent CLI available/selected; manual-run mode — see manual-instructions.md",
@@ -582,7 +588,7 @@ function cmdRun(parsed) {
     closeSync(errFd);
     const wallMs = Date.now() - started;
 
-    const evidence = collectEvidence(dir, cloneDir, task, handoffPath, run);
+    const evidence = collectEvidence(dir, cloneDir, task, condHandoffPath, run);
     const result = {
       schema: RESULT_SCHEMA,
       runId: run.runId,
@@ -741,7 +747,14 @@ function cmdSummarize(parsed) {
         repeatedFinishedEdits: r.metrics?.repeatedFinishedEdits ?? "unknown",
         falseCompletion: r.metrics?.falseCompletion ?? null,
         taskCompleted: r.metrics?.taskCompleted ?? null,
-        packageSizeChars: r.metrics?.packageSizeChars ?? (r.handoff?.chars ?? null),
+        // packageSizeChars must describe THIS condition's own handoff artifact.
+        // Baseline rows get no handoff, so they must never inherit the handoff
+        // condition's size (the 2026-09-07 summary bug); they report their own
+        // measured value or null, rendered "N/A" in summary.md.
+        packageSizeChars:
+          r.condition === "handoff"
+            ? (r.metrics?.packageSizeChars ?? (r.handoff?.chars ?? null))
+            : (r.metrics?.packageSizeChars ?? null),
         notRunReason: r.notRunReason ?? null,
         notes: r.notes ?? null,
       });
@@ -762,8 +775,12 @@ function cmdSummarize(parsed) {
       md.push(`| ${r.taskId} | ${r.condition} | missing | | | | | | | | | | |`);
       continue;
     }
+    const sizeCell =
+      r.condition === "baseline" && r.packageSizeChars === null
+        ? "N/A"
+        : (r.packageSizeChars ?? "");
     md.push(
-      `| ${r.taskId} | ${r.condition} | ${r.status} | ${r.agent ?? ""} | ${r.model ?? ""} | ${r.exitCode ?? ""} | ${r.filesEdited.join(", ")} | ${r.outOfScopeFiles.join(", ")} | ${r.verificationPassed ?? "unknown"} | ${r.repeatedFinishedEdits} | ${r.falseCompletion ?? "unknown"} | ${r.taskCompleted ?? "unknown"} | ${r.packageSizeChars ?? ""} |`,
+      `| ${r.taskId} | ${r.condition} | ${r.status} | ${r.agent ?? ""} | ${r.model ?? ""} | ${r.exitCode ?? ""} | ${r.filesEdited.join(", ")} | ${r.outOfScopeFiles.join(", ")} | ${r.verificationPassed ?? "unknown"} | ${r.repeatedFinishedEdits} | ${r.falseCompletion ?? "unknown"} | ${r.taskCompleted ?? "unknown"} | ${sizeCell} |`,
     );
   }
   md.push("");

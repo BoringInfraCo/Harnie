@@ -1,0 +1,20 @@
+Report:
+
+1. **Files edited**
+   - `src/cli.ts` — added `--version` / `-v` handling and dynamic package-version read.
+
+2. **Commands run**
+   - `npm run build` — succeeded.
+   - `node dist/cli.js --version` — prints package version and exits 0.
+   - `node dist/cli.js -v` — also prints package version and exits 0.
+   - `npx vitest run tests/cli-init.test.ts` — 7/7 tests passed.
+   - `npm test` — required `cli-init` test passed; unrelated `tests/eval-harness.test.ts` has 6 pre-existing failures (clone/eval-directory state).
+
+3. **Verification**
+   - Build: **pass**.
+   - `--version` / `-v` exits 0 and prints version read from `package.json`: **pass**.
+   - `tests/cli-init.test.ts`: **pass**.
+
+4. **Task complete?** Yes — the `--version` / `-v` flag is implemented before any other argument handling, reads `package.json` without hardcoding, and existing CLI behavior plus the required test remain unchanged.
+
+Note: `package.json` currently declares version `0.1.0-rc.1`, so `node dist/cli.js --version` prints `0.1.0-rc.1` and exits 0. The implementation dynamically reads the declared version, so if `package.json` were at `0.0.0` it would print `0.0.0`.

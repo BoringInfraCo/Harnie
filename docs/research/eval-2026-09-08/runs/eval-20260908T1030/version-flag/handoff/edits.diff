@@ -1,0 +1,32 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..a577458 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -2,6 +2,7 @@
+ 
+ import { realpathSync } from "node:fs";
+ import { resolve } from "node:path";
++import { createRequire } from "node:module";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+@@ -58,11 +59,19 @@ Commands:
+                      Restore the store from a backup file
+ `;
+ 
++const require = createRequire(import.meta.url);
++const { version } = require("../package.json");
++
+ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<number> => {
+   const stdout = options?.stdout ?? process.stdout;
+   const stderr = options?.stderr ?? process.stderr;
+   const command = argv[0];
+ 
++  if (command === "--version" || command === "-v") {
++    stdout.write(`${version}\n`);
++    return 0;
++  }
++
+   if (command === undefined || command === "") {
+     stderr.write(usage);
+     return 1;

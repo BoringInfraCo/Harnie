@@ -262,6 +262,83 @@ describe("eval harness — manual-run mode", () => {
   });
 });
 
+describe("eval harness — handoff/baseline isolation", () => {
+  it("baseline runs never inherit the handoff artifact (path, size, prompt)", () => {
+    const runId = uniqueRun();
+    const handoffFile = join(scratch, "fake-handoff.md");
+    const handoffMarker = "PRIOR-SESSION-CONTEXT-MARKER-42";
+    writeFileSync(handoffFile, `# fake handoff\n\n${handoffMarker}\n`);
+    const res = runHarness([
+      "run",
+      "--task",
+      "version-flag",
+      "--condition",
+      "handoff,baseline",
+      "--run",
+      runId,
+      "--agent-command",
+      agentCommand("HB"),
+      "--handoff",
+      handoffFile,
+    ]);
+    expect(res.code).toBe(0);
+
+    const base = join(EVAL_BASE, runId, "version-flag");
+    const handoffResult = JSON.parse(readFileSync(join(base, "handoff", "result.json"), "utf8"));
+    const baselineResult = JSON.parse(readFileSync(join(base, "baseline", "result.json"), "utf8"));
+
+    expect(handoffResult.handoff.path).toBe(handoffFile);
+    expect(handoffResult.handoff.chars).toBeGreaterThan(0);
+    expect(handoffResult.handoff.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(readFileSync(join(base, "handoff", "prompt.md"), "utf8")).toContain(handoffMarker);
+
+    expect(baselineResult.handoff).toEqual({ path: null, chars: null, sha256: null });
+    const baselinePrompt = readFileSync(join(base, "baseline", "prompt.md"), "utf8");
+    expect(baselinePrompt).not.toContain(handoffMarker);
+    expect(mod.validateResult(baselineResult).ok).toBe(true);
+
+    const summary = runHarness(["summarize", "--run", runId]);
+    expect(summary.code).toBe(0);
+    const summaryJson = JSON.parse(readFileSync(join(EVAL_BASE, runId, "summary.json"), "utf8"));
+    const rows = summaryJson.rows.filter((r: { taskId: string }) => r.taskId === "version-flag");
+    const handoffRow = rows.find((r: { condition: string }) => r.condition === "handoff");
+    const baselineRow = rows.find((r: { condition: string }) => r.condition === "baseline");
+    expect(handoffRow.packageSizeChars).toBe(handoffResult.handoff.chars);
+    expect(baselineRow.packageSizeChars).toBeNull();
+    const summaryMd = readFileSync(join(EVAL_BASE, runId, "summary.md"), "utf8");
+    const baselineLine = summaryMd
+      .split("\n")
+      .find((l) => l.startsWith(`| version-flag | baseline |`));
+    expect(baselineLine).toContain("N/A");
+    expect(baselineLine).not.toContain(String(handoffResult.handoff.chars));
+  });
+  it("manual-run mode also isolates baseline from the handoff artifact", () => {
+    const runId = uniqueRun();
+    const handoffFile = join(scratch, "fake-handoff-manual.md");
+    writeFileSync(handoffFile, "# fake handoff for manual mode\n");
+    const res = runHarness([
+      "run",
+      "--task",
+      "first-run-recovery",
+      "--condition",
+      "handoff,baseline",
+      "--run",
+      runId,
+      "--handoff",
+      handoffFile,
+    ]);
+    expect(res.code).toBe(0);
+
+    const base = join(EVAL_BASE, runId, "first-run-recovery");
+    const handoffResult = JSON.parse(readFileSync(join(base, "handoff", "result.json"), "utf8"));
+    const baselineResult = JSON.parse(readFileSync(join(base, "baseline", "result.json"), "utf8"));
+    expect(handoffResult.handoff.path).toBe(handoffFile);
+    expect(baselineResult.handoff).toEqual({ path: null, chars: null, sha256: null });
+    expect(mod.validateResult(baselineResult).ok).toBe(true);
+    expect(mod.validateResult(handoffResult).ok).toBe(true);
+  });
+});
+
 describe("eval harness — summarize", () => {
   it("emits a side-by-side summary and preview-gate line", () => {
     const runId = uniqueRun();

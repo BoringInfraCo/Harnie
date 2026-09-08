@@ -186,11 +186,15 @@ const writeHandoffFile = (
   checkpointId?: string,
 ): string => {
   const directory = join(home, "handoffs");
-  mkdirSync(directory, { recursive: true });
+  // Handoff artifacts carry session content, so create-time modes must be
+  // private regardless of umask: directory 0700, artifact 0600. The tighten
+  // pass on store open (enforceHandoffArtifactPermissions) stays as a
+  // convergence backstop for artifacts written by older versions.
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
   const suffix = target === "pi" ? ".pi.md" : target === "codex" ? ".codex.md" : ".md";
   const checkpointSuffix = checkpointId === undefined ? "" : `.${safeWorkId(checkpointId)}`;
   const path = join(directory, `${safeWorkId(workId)}${checkpointSuffix}${suffix}`);
-  writeFileSync(path, markdown);
+  writeFileSync(path, markdown, { mode: 0o600 });
   return path;
 };
 

@@ -1,11 +1,11 @@
 # Harnie Launch Checklist
 
-Date: 2026-09-07. Maps the audit's Orders 1–6
+Date: 2026-09-08. Maps the audit's Orders 1–6
 (`docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md`, "Recommended launch
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
-on the `0.1.0-rc.1` tree on 2026-09-08 (typecheck clean, 55 test files /
-333 tests passed, package smoke passed on v22.23.0); the suite-green caveats
+on the `0.1.0-rc.2` tree on 2026-09-08 (typecheck clean, 60 test files /
+346 tests passed, package smoke passed on v22.23.0); the suite-green caveats
 below describe the state at the time each order was closed, superseded by
 that run.
 
@@ -23,8 +23,6 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   attaches, checkpoints, forks, and renders all three handoff targets in an
   isolated `HARNIE_HOME` (see SUPPORT-MATRIX.md).
   How to verify: `npm run check`.
-  Caveat: suite-green was not re-run in this pass (final gate does that); the
-  audit's "191 tests" count predates uncommitted `sessions` work — do not quote it.
 - [x] **Order 2 — Protect retained/output data and harden storage upgrades.**
   Gate: fake secrets redacted with traceability; supported legacy stores
   upgrade without loss; backup/restore verified.
@@ -34,79 +32,93 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   `tests/cli-backup-restore.test.ts` (round-trip). Manual 2026-09-07: secrets
   fixture imports redacted with `secret_redacted` diagnostic and zero raw
   spans in `show`/handoff; backup → fresh-home restore round-trip verified.
-  How to verify: `npm run check` (covers all five files), plus
+  Post-rc.1 re-audit remediation (this round): create-time handoff artifact
+  permissions (`0600` file, `0700` dir; `tests/cli-handoff-permissions.test.ts`)
+  and JSON redaction covering the `show --json` output pass with true
+  `redactions` counts (`tests/cli-json-redaction.test.ts`); checkpoint/fork/
+  backup writes made atomic (`tests/fix-checkpoint-atomicity.test.ts`,
+  `tests/fix-fork-atomicity.test.ts`, `tests/fix-backup-atomicity.test.ts`).
+  How to verify: `npm run check` (covers all of the above), plus
   `HARNIE_HOME="$(mktemp -d)" node dist/cli.js backup <path>` /
   `restore <path> --force` spot-check.
-  Caveat: same suite-green caveat as Order 1. Redaction is best-effort with a
-  legacy caveat (see SUPPORT-MATRIX.md), which is the accepted scope of this gate.
-- [ ] **Order 3 — Deliver a complete first-run journey and honest support matrix.**
+  Caveat: redaction is best-effort with a legacy caveat (see
+  SUPPORT-MATRIX.md), which is the accepted scope of this gate.
+- [x] **Order 3 — Deliver a complete first-run journey and honest support matrix.**
   Gate: a new developer imports a fixture and their own supported session,
   finds the handoff, and continues it using the docs alone.
-  Status 2026-09-07: in progress. Honesty half (this task): SUPPORT-MATRIX.md
-  created (evidence-backed, Codex experimental, preview promise verbatim);
-  IMPLEMENTATION.md marked superseded (top note only, body untouched).
-  Journey half (sibling): `sessions` discovery + `import opencode <ses_id>`
-  landed in the working tree and verified live in this pass, but README /
-  FIRST-RUN still describe them as absent (stale text reported, not fixed here).
+  Status 2026-09-08: done. Journey: `sessions` discovery + `import opencode
+  <ses_id>` documented and verified in `docs/internal/FIRST-RUN.md` and
+  README (both refreshed; install command version-agnostic `harnie-*.tgz`).
+  Honesty: SUPPORT-MATRIX.md evidence-backed and refreshed for RC2 (machine
+  contract and budgeted handoffs now listed as supported; permissions and
+  JSON redaction rows updated). Package now carries the user docs
+  (`FIRST-RUN`, `BACKUP-RECOVERY`, `MACHINE-CONTRACT`, `SUPPORT-MATRIX`,
+  `RELEASE-0.1.0-rc.2`) and the example fixture
+  `tests/fixtures/pi/coding.jsonl` (verified via `npm pack --dry-run`);
+  internal strategy material is excluded.
   How to verify: follow `docs/internal/FIRST-RUN.md` on a clean checkout with
   a scratch `HARNIE_HOME`; confirm `harnie sessions`, fixture import, own-session
-  import, `show`, `handoff`, and continuation-from-handoff with no other help.
+  import, `show`, `handoff`, and continuation-from-handoff with no other help;
+  `npm pack --dry-run` shows the docs + fixture in the manifest.
 - [x] **Order 4 — Add a minimal stable machine contract and bounded handoffs.**
   Gate: JSON schema/error tests, deterministic output and explicit truncation;
   text compatibility retained.
-  Status: done (landed in the working tree; re-read 2026-09-07). Opt-in
-  schema-versioned `--json` with stable error codes on inspection/handoff
-  commands (`src/contract/`, `docs/internal/MACHINE-CONTRACT.md`); total
-  bounded-handoff size budget with explicit omitted counts.
+  Status: done. Opt-in schema-versioned `--json` with stable error codes on
+  inspection/handoff commands (`src/contract/`,
+  `docs/internal/MACHINE-CONTRACT.md`); total bounded-handoff size budget
+  with explicit omitted counts. RC2: `show --json` redacts all free-text
+  fields and reports true output-pass `redactions` counts; semantics
+  documented in MACHINE-CONTRACT.md.
   Evidence: `tests/contract-json.test.ts`, `tests/contract-errors.test.ts`,
-  `tests/handoff-bounds.test.ts`; text compatibility retained
-  (`tests/eval-harness.test.ts`, `tests/cli-init.test.ts`).
+  `tests/handoff-bounds.test.ts`, `tests/cli-json-redaction.test.ts`; text
+  compatibility retained (`tests/eval-harness.test.ts`, `tests/cli-init.test.ts`).
   How to verify: `node dist/cli.js <command> --json` output matches the
   envelope schema in MACHINE-CONTRACT.md; `npm run check`.
 - [x] **Order 5 — Re-run continuation evaluation on the release candidate.**
   Gate: unrelated-repository tasks, bidirectional paths, baseline comparison,
   raw outcome evidence; no false completion or repeated completed edits in the
   benchmark tasks for the initial preview gate.
-  Status: done 2026-09-07 (initial preview gate PASS, with limits below).
-  Evidence: `docs/research/eval-2026-09-07/` — `summary.md`/`summary.json`
-  (from `node scripts/eval-continuation.mjs summarize`), 8 registered
-  `result.json`s + raw logs/diffs under `runs/eval-20260907T2041/`, and the
-  full report in that directory's `README.md`. 4 unrelated tasks ×
-  {handoff, baseline} on fresh clones of the RC worktree snapshot
-  (`3cfc045`), receiver `opencode run --auto` with
-  `opencode-go/kimi-k2.7-code`. Result: no false completion, no repeated
-  finished edits, no out-of-scope edits in any condition; verification
-  independently re-run by the evaluator in every clone; handoff condition
-  faster and with less exploration in 4/4 pairs.
-  Caveats recorded honestly in the results README: synthetic (not live)
-  driver sessions produced the handoffs; single receiver/model; pi and codex
-  receivers NOT exercised, so the "bidirectional paths" element of the gate
-  is only partially covered (codex/pi non-interactive flags verified
-  statically only); first evaluation attempt was discarded after a harness
-  `PWD` bug let receivers edit the real repo (documented, repo restored,
-  harness fixed, `tests/eval-harness.test.ts` green after changes).
+  Status: extended 2026-09-08, PASS (initial gate 2026-09-07
+  `docs/research/eval-2026-09-07/`).
+  Evidence: `docs/research/eval-2026-09-08/` — all three receivers exercised
+  (pi 0.84.4 -p, codex 0.149.1 exec --sandbox workspace-write, opencode
+  1.18.29 run --auto); bidirectional paths (--to pi→pi, --to codex driven by
+  a real 248-event codex session, --to opencode ×4); unrelated-repo leg
+  (scratch slugify-util); long-session leg (4 execs/52 events → 3100-char
+  handoff, correct next action); repeats n=2; baseline-size reporting bug
+  fixed (`tests/eval-harness.test.ts`).
+  Caveats recorded honestly: real-session drivers codex-only, pi/codex
+  baselines not run, n=1 per leg.
   How to verify: `node scripts/eval-continuation.mjs tasks --json`;
-  re-run §6 of EVALUATION-PROTOCOL.md; inspect `docs/research/eval-2026-09-07/`.
+  inspect `docs/research/eval-2026-09-08/`.
 - [ ] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
   instructions, known limitations, recovery instructions.
-  Status 2026-09-08: **prepared, pending tag.** All gate ingredients are on
-  the working tree: named RC `0.1.0-rc.1` (package.json + package-lock via
-  npm; `private: true` kept, distribution via `npm pack` tarball); CI workflow
-  `.github/workflows/ci.yml` (Node 22.23.0, `npm ci && npm run check`;
-  package smoke test runs offline); install instructions re-verified for the
-  RC (`npm pack` → tarball install into an empty dir → `--help` / `init` /
-  fixture import / `handoff` under an isolated `HARNIE_HOME`;
-  `harnie-0.0.0.tgz` reference in README fixed to `harnie-0.1.0-rc.1.tgz`);
+  Status 2026-09-08: **release engineering complete; RC2 tag + GitHub Release
+  publish pending.** All gate ingredients are on the working tree: named RC
+  `0.1.0-rc.2` (package.json + package-lock via `npm version
+  0.1.0-rc.2 --no-git-tag-version`; `private: true` kept, distribution via
+  `npm pack` tarball + GitHub Release asset); CI workflow
+  `.github/workflows/ci.yml` now also triggers on `v*` tag pushes; new
+  release workflow `.github/workflows/release.yml` (Node 22.23.0,
+  `npm ci && npm run check`, `npm pack`, GitHub Release for the tag with the
+  tarball attached, `contents: write`); install instructions re-verified for
+  RC2 (pack → install `./harnie-*.tgz` into an empty dir → `--help` / `init`
+  / fixture import / `handoff` under an isolated `HARNIE_HOME`);
   release notes with known limitations + recovery pointer
-  (`docs/internal/RELEASE-0.1.0-rc.1.md`); recovery source
-  `docs/internal/BACKUP-RECOVERY.md`; Orders 4–5 done, Order 3 journey text
-  refreshed (README/FIRST-RUN now document `sessions`).
-  Exactly what remains (user-executed, explicit handoff — nothing is
+  (`docs/internal/RELEASE-0.1.0-rc.2.md`); rc.1 notes corrected (rc.1 was
+  tagged, pushed, CI green); recovery source `docs/internal/BACKUP-RECOVERY.md`;
+  Orders 1–5 done as above.
+  Exactly what remains (orchestrator, explicit handoff — nothing is
   committed, tagged, pushed, or staged by the release prep):
-  1. `git commit` the working tree, 2. `git tag v0.1.0-rc.1`, 3. `git push`
-  (with tags), 4. confirm CI green on the pushed tag.
-  How to verify: `npm run check` (final numbers recorded in
-  RELEASE-0.1.0-rc.1.md and the release-prep pass: see checklist note below),
+  1. `git commit` the working tree (RC2 remediation + docs + workflows +
+     version bump),
+  2. `git tag v0.1.0-rc.2`,
+  3. `git push && git push origin v0.1.0-rc.2` — CI gates the tag and
+     `.github/workflows/release.yml` creates the GitHub Release for
+     `v0.1.0-rc.2` with the tarball attached,
+  4. confirm both workflows green on the pushed tag and the tarball asset
+     present on the release.
+  How to verify: `npm run check` (numbers above),
   `npm run test:package`, install-instructions walkthrough on a clean machine,
-  release tag.
+  release tag + published GitHub Release.

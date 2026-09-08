@@ -1,0 +1,71 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260908T1030-r1",
+  "ref": "HEAD",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "src/cli.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1712,
+      "notRunReason": null,
+      "notes": "REPEATED-TRIAL leg r1 (same handoff package as trial r1, 1712 chars, opencode-go/kimi-k2.7-code). Census from opencode DB: bash x12, edit x3, read x2; final src/cli.ts diff contains exactly one --version branch — no repeated finished edits. Wall time 146.1s (~27% variance between the two repeats)."
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "harness": "opencode",
+  "format": "opencode-session-v1",
+  "session": {
+    "id": "ses_drvlg0000000000000000000004a",
+    "directory": "/workspace/harnie-project",
+    "title": "help regression \u2014 final verify",
+    "agent": "build",
+    "model": {
+      "id": "kimi-k2.7-code",
+      "providerID": "opencode-go"
+    },
+    "version": "1.18.29",
+    "time_created": 1788838806000,
+    "time_updated": 1788838822000
+  },
+  "messages": [
+    {
+      "id": "msg_drv_e4_000",
+      "time_created": 1788838806000,
+      "data": {
+        "role": "user",
+        "time": {
+          "created": 1788838806000
+        }
+      }
+    },
+    {
+      "id": "msg_drv_e4_001",
+      "time_created": 1788838812500,
+      "data": {
+        "role": "assistant",
+        "parentID": "msg_drv_e4_000",
+        "path": {
+          "cwd": "/workspace/harnie-project"
+        },
+        "modelID": "kimi-k2.7-code",
+        "providerID": "opencode-go",
+        "time": {
+          "created": 1788838812500
+        }
+      }
+    },
+    {
+      "id": "msg_drv_e4_002",
+      "time_created": 1788838822000,
+      "data": {
+        "role": "assistant",
+        "parentID": "msg_drv_e4_001",
+        "path": {
+          "cwd": "/workspace/harnie-project"
+        },
+        "modelID": "kimi-k2.7-code",
+        "providerID": "opencode-go",
+        "time": {
+          "created": 1788838822000
+        }
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "prt_drv_e4_000",
+      "message_id": "msg_drv_e4_000",
+      "time_created": 1788838806500,
+      "data": {
+        "type": "text",
+        "text": "Final check before the next session writes the file: confirm the test runner and capture helper names once more."
+      }
+    },
+    {
+      "id": "prt_drv_e4_001",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838813000,
+      "data": {
+        "type": "step-start"
+      }
+    },
+    {
+      "id": "prt_drv_e4_002",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838813500,
+      "data": {
+        "type": "reasoning",
+        "text": "[SANITIZED REASONING]"
+      }
+    },
+    {
+      "id": "prt_drv_e4_003",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838814000,
+      "data": {
+        "type": "tool",
+        "tool": "bash",
+        "callID": "call_drv_e4_01",
+        "state": {
+          "status": "completed",
+          "input": {
+            "command": "npx vitest --version"
+          }
+        }
+      }
+    },
+    {
+      "id": "prt_drv_e4_004",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838814500,
+      "data": {
+        "type": "text",
+        "text": "vitest 4.x present."
+      }
+    },
+    {
+      "id": "prt_drv_e4_005",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838815000,
+      "data": {
+        "type": "tool",
+        "tool": "read",
+        "callID": "call_drv_e4_02",
+        "state": {
+          "status": "completed",
+          "input": {
+            "filePath": "/workspace/harnie-project/tests/cli-init.test.ts"
+          }
+        }
+      }
+    },
+    {
+      "id": "prt_drv_e4_006",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838815500,
+      "data": {
+        "type": "text",
+        "text": "capture() helper confirmed at the top of tests/cli-init.test.ts."
+      }
+    },
+    {
+      "id": "prt_drv_e4_007",
+      "message_id": "msg_drv_e4_001",
+      "time_created": 1788838816000,
+      "data": {
+        "type": "step-finish",
+        "reason": "stop"
+      }
+    },
+    {
+      "id": "prt_drv_e4_008",
+      "message_id": "msg_drv_e4_002",
+      "time_created": 1788838822500,
+      "data": {
+        "type": "step-start"
+      }
+    },
+    {
+      "id": "prt_drv_e4_009",
+      "message_id": "msg_drv_e4_002",
+      "time_created": 1788838823000,
+      "data": {
+        "type": "text",
+        "text": "Everything verified: the next session should write tests/regression-help.test.ts exactly as planned (import runCli from ../src/cli.js, capture stdout of ['--help'], assert the four strings). Still nothing has been written."
+      }
+    },
+    {
+      "id": "prt_drv_e4_010",
+      "message_id": "msg_drv_e4_002",
+      "time_created": 1788838823500,
+      "data": {
+        "type": "step-finish",
+        "reason": "stop"
+      }
+    }
+  ]
+}

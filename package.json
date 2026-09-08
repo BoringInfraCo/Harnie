@@ -1,6 +1,6 @@
 {
   "name": "harnie",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "private": true,
   "type": "module",
   "bin": {
@@ -23,7 +23,13 @@
     "vitest": "^4.0.16"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs/internal/FIRST-RUN.md",
+    "docs/internal/BACKUP-RECOVERY.md",
+    "docs/internal/MACHINE-CONTRACT.md",
+    "docs/internal/SUPPORT-MATRIX.md",
+    "docs/internal/RELEASE-0.1.0-rc.2.md",
+    "tests/fixtures/pi/coding.jsonl"
   ],
   "engines": {
     "node": ">=22.23.0 <23"

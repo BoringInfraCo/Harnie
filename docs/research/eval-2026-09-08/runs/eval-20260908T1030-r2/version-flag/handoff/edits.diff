@@ -1,0 +1,27 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..85c9439 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -15,6 +15,10 @@ import { runInit } from "./cli/init.js";
+ import { runList } from "./cli/list.js";
+ import { runSessions } from "./cli/sessions.js";
+ import { runShow } from "./cli/show.js";
++import { createRequire } from "node:module";
++
++const require = createRequire(import.meta.url);
++const { version } = require("../package.json") as { version: string };
+ 
+ export interface CliWriter {
+   write(chunk: string): unknown;
+@@ -63,6 +67,11 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
+   const stderr = options?.stderr ?? process.stderr;
+   const command = argv[0];
+ 
++  if (command === "--version" || command === "-v") {
++    stdout.write(`${version}\n`);
++    return 0;
++  }
++
+   if (command === undefined || command === "") {
+     stderr.write(usage);
+     return 1;

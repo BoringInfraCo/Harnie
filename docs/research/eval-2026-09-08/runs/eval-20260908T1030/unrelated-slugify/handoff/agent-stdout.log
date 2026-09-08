@@ -1,0 +1,15 @@
+Report:
+
+1. Files edited:
+   - `src/slugify.ts` — new file exporting `slugify(input: string): string`
+   - `tests/slugify.test.ts` — new vitest test file
+
+2. Commands run:
+   - `npx vitest run tests/slugify.test.ts`
+   - `git status --short`
+
+3. Verification:
+   - Vitest: PASS — 1 test file, 6 tests passed
+   - Git status: PASS — only `src/slugify.ts` and `tests/slugify.test.ts` are untracked
+
+4. Task complete: Yes.

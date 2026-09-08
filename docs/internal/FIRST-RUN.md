@@ -18,7 +18,7 @@ From a checkout of the Harnie repository:
 ```sh
 npm ci
 npm pack
-npm install --global ./harnie-0.0.0.tgz
+npm install --global ./harnie-*.tgz
 harnie --help
 ```
 

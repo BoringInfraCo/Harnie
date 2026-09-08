@@ -1,0 +1,175 @@
+{
+  "harness": "opencode",
+  "format": "opencode-session-v1",
+  "session": {
+    "id": "ses_drvlg0000000000000000000002a",
+    "directory": "/workspace/harnie-project",
+    "title": "help regression — string enumeration",
+    "agent": "build",
+    "model": {
+      "id": "kimi-k2.7-code",
+      "providerID": "opencode-go"
+    },
+    "version": "1.18.29",
+    "time_created": 1788858006000,
+    "time_updated": 1788858022000
+  },
+  "messages": [
+    {
+      "id": "msg_drv_00002a_000",
+      "time_created": 1788858006000,
+      "data": {
+        "role": "user",
+        "time": {
+          "created": 1788858006000
+        }
+      }
+    },
+    {
+      "id": "msg_drv_00002a_001",
+      "time_created": 1788858012500,
+      "data": {
+        "role": "assistant",
+        "parentID": "msg_drv_00002a_000",
+        "path": {
+          "cwd": "/workspace/harnie-project"
+        },
+        "modelID": "kimi-k2.7-code",
+        "providerID": "opencode-go",
+        "time": {
+          "created": 1788858012500
+        }
+      }
+    },
+    {
+      "id": "msg_drv_00002a_002",
+      "time_created": 1788858022000,
+      "data": {
+        "role": "assistant",
+        "parentID": "msg_drv_00002a_001",
+        "path": {
+          "cwd": "/workspace/harnie-project"
+        },
+        "modelID": "kimi-k2.7-code",
+        "providerID": "opencode-go",
+        "time": {
+          "created": 1788858022000
+        }
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "prt_drv_00002a_000",
+      "message_id": "msg_drv_00002a_000",
+      "time_created": 1788858006500,
+      "data": {
+        "type": "text",
+        "text": "Continuing: enumerate the exact help strings the regression test must pin."
+      }
+    },
+    {
+      "id": "prt_drv_00002a_001",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858013000,
+      "data": {
+        "type": "step-start"
+      }
+    },
+    {
+      "id": "prt_drv_00002a_002",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858013500,
+      "data": {
+        "type": "reasoning",
+        "text": "[SANITIZED REASONING]"
+      }
+    },
+    {
+      "id": "prt_drv_00002a_003",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858014000,
+      "data": {
+        "type": "tool",
+        "tool": "bash",
+        "callID": "call_drv_lg_e2_01",
+        "state": {
+          "status": "completed",
+          "input": {
+            "command": "node dist/cli.js --help"
+          }
+        }
+      }
+    },
+    {
+      "id": "prt_drv_00002a_004",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858014500,
+      "data": {
+        "type": "text",
+        "text": "Help lists backup/restore/handoff/import/show/sessions etc."
+      }
+    },
+    {
+      "id": "prt_drv_00002a_005",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858015000,
+      "data": {
+        "type": "tool",
+        "tool": "grep",
+        "callID": "call_drv_lg_e2_02",
+        "state": {
+          "status": "completed",
+          "input": {
+            "pattern": "backup <path>|restore <path>|handoff <work>|import pi <path>",
+            "path": "/workspace/harnie-project/src"
+          }
+        }
+      }
+    },
+    {
+      "id": "prt_drv_00002a_006",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858015500,
+      "data": {
+        "type": "text",
+        "text": "All four strings are produced by src/cli.ts usage text."
+      }
+    },
+    {
+      "id": "prt_drv_00002a_007",
+      "message_id": "msg_drv_00002a_001",
+      "time_created": 1788858016000,
+      "data": {
+        "type": "step-finish",
+        "reason": "stop"
+      }
+    },
+    {
+      "id": "prt_drv_00002a_008",
+      "message_id": "msg_drv_00002a_002",
+      "time_created": 1788858022500,
+      "data": {
+        "type": "step-start"
+      }
+    },
+    {
+      "id": "prt_drv_00002a_009",
+      "message_id": "msg_drv_00002a_002",
+      "time_created": 1788858023000,
+      "data": {
+        "type": "text",
+        "text": "Confirmed the four strings exist verbatim in the help output: 'backup <path>', 'restore <path> [--force]', 'handoff <work>', 'import pi <path>'. Session interrupted before writing the test."
+      }
+    },
+    {
+      "id": "prt_drv_00002a_010",
+      "message_id": "msg_drv_00002a_002",
+      "time_created": 1788858023500,
+      "data": {
+        "type": "step-finish",
+        "reason": "stop"
+      }
+    }
+  ]
+}

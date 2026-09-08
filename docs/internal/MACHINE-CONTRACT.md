@@ -53,7 +53,11 @@ the envelope):
   ordered by the store query: `updated_at DESC, id`).
 - Data strings are the same redacted strings the text commands render
   (ingestion redaction plus the output-path redaction backstop); `show --json`
-  additionally reports the number of output-redaction spans as `redactions`.
+  redacts all free-text fields and reports the number of output-pass
+  redaction spans as `redactions`. The count reflects spans applied during
+  the output pass only: builder-level `[REDACTED:*]` markers already present
+  in `derived` are idempotent and are not double-counted
+  (`tests/cli-json-redaction.test.ts`).
 
 ## Error codes
 
@@ -131,7 +135,8 @@ An empty store yields `{ "works": [] }` (text mode prints `No observed work.`).
   "checkpoints": [ { "id", "executionId?", "message", "createdAt", "eventCount" } ],
   "eventCounts": { "message", "tool_call", "tool_result", "command", "unknown" },
   "diagnosticCodes": ["missing_tool_result"],
-  "redactions": 0,                // output-redaction spans applied in JSON mode
+  "redactions": 0,                // true output-pass redaction span count (builder-level
+                                  // markers in `derived` are idempotent, not re-counted)
   "provenance": "observed"
 }
 ```

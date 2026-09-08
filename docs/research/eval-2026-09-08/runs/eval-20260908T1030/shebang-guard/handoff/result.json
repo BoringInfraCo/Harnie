@@ -1,0 +1,68 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260908T1030",
+  "taskId": "shebang-guard",
+  "condition": "handoff",
+  "recordedAt": "2026-09-08T14:26:35.310Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "codex",
+    "agentVersion": "codex-cli 0.149.1",
+    "model": null,
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "12dda05279cfbe3e9776ee9966c6d8932c4d984a",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/shebang-guard/handoff/clone"
+  },
+  "handoff": {
+    "path": "/Users/sergio/Documents/Developer/BoringInfraCo/Harnie/docs/research/eval-2026-09-08/driver/handoff-codex-real-sprint024.md",
+    "chars": 3233,
+    "sha256": "ac536b54a0c80629e956a62e1add4f6e2a2b269e79d77d36115cf71bdfe7897d"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.local/bin/codex",
+      "exec",
+      "--sandbox",
+      "workspace-write",
+      "# Harnie continuation evaluation — task: shebang-guard\n\nA previous agent session already worked on this task in this repository. The Harnie handoff package produced from that session appears at the bottom of this message. Use it as your context; do not re-investigate from scratch.\n\n## Task\nMake scripts/prepare-bin.mjs fail with a clear message when dist/cli.js lacks a shebang.\n\nBefore chmodding dist/cli.js, the script must check that dist/cli.js exists and begins with '#!'. If the file is missing or lacks the shebang, print a clear error to stderr naming dist/cli.js and the missing shebang, and exit non-zero. Otherwise chmod 0o755 and exit 0 as today. Edit only scripts/prepare-bin.mjs.\n\n## Required verification\n- npm run build && node scripts/prepare-bin.mjs   # exits 0 (shebang present)\n- node -e \"const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\\n/,''))\" && node scripts/prepare-bin.mjs   # exits non-zero with the shebang error\n- npm run build   # restores dist/cli.js\n- npm run test:package   # still green\n\n## Expected end state\nprepare-bin.mjs exits 0 when dist/cli.js has a shebang and exits non-zero with a clear stderr message when it does not; the normal build and package smoke test still pass.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n\n## Continuation handoff (from prior session)\n# Harnie handoff for Codex\n\nContinue this work. Do not re-investigate from scratch. Do not invent Codex rollout JSONL records.\n\n## Goal\n<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Alpaca (alpaca@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Spotify (app-68de829bf76… [+4254 chars omitted]\n\n## Workspace\n/Users/sergio/Documents/Developer/BoringInfraCo/Harnie\n\n## Test state\nconst r = await tools.exec_command({cmd: … — succeeded\n\n## Execution\ncodex / gpt-5.6-sol\ncodex-rollout-v1\n01a06ce3-76bb-7832-ac8c-81b53bc09a0a\n\n## Findings\n- - Full: 39 files, 191 tests passed (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- - `git diff --check`: clean (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- - Final subagent review: no actionable issues (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- - Vet was invoked repeatedly but could not run due missing credentials and an installed-CLI crash on untracked files (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- Sprint 025 currently changes 7 files and is ready to commit. (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n\n## Operations\n- wait_agent — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Add … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.write_stdin({sessi … — succeeded\n- wait_agent — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Upda … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Upda … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- followup_task — succeeded\n- wait_agent — succeeded\n- wait_agent — succeeded\n- wait_agent — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Upda … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.write_stdin({sessi … — succeeded\n- followup_task — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- wait_agent — succeeded\n- wait_agent — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- [+47 more omitted]\n\n## Event summary\n- message: 15\n- tool_call: 72\n- tool_result: 72\n- unknown: 89\n\n## Evidence\n- codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:329:tool_call\n- codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:331:tool_result\n\n## Provenance\nWork work:codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a\nSource codex session 01a06ce3-76bb-7832-ac8c-81b53bc09a0a\n\n## Receiver instructions\n- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n- Handing this artifact to another agent may transmit its contents through that agent's provider.\n\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 205682,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/shebang-guard/handoff/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/shebang-guard/handoff/agent-stderr.log"
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [
+      "scripts/prepare-bin.mjs"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 611,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/shebang-guard/handoff/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "npm run build && node scripts/prepare-bin.mjs",
+      "shebang-strip && node scripts/prepare-bin.mjs",
+      "npm run build",
+      "npm run test:package"
+    ],
+    "passed": true,
+    "details": "Receiver ran both guard paths itself (exit 0 with shebang; exit 1 with 'Error: dist/cli.js is missing the required shebang (#!).'). Evaluator re-ran all four steps in the clone: 0 / 1 / 0 / 0."
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": null
+  },
+  "notes": "Codex receiver (codex-cli 0.149.1, default model gpt-5.6-sol from user config) — first Codex receiver exercised. Driver context was a REAL Codex session (01a06ce3, 248 events imported read-only from ~/.codex) rendered via 'harnie handoff --to codex' (3233 chars, bounded: [+4254 chars omitted] goal, [+47 more omitted] operations); secret scan of the handoff found no raw credentials. The real session's subject (Sprint 024/025) was unrelated to the task; the receiver correctly prioritized the explicit task statement and did not act on the unrelated handoff content. Single edit of scripts/prepare-bin.mjs (+9/-2)."
+}

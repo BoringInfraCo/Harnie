@@ -1,0 +1,83 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m→ [0mRead src/cli.ts
+[0m→ [0mRead package.json
+[0m→ [0mRead tsconfig.json
+[0m→ [0mRead tsconfig.build.json
+[0m✱ [0mGlob "tests/cli-init.test.ts"[90m in . · 1 match[0m
+[0m→ [0mRead tests/cli-init.test.ts
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone/src/cli.ts
+@@ -14,9 +14,13 @@
+ import { runInit } from "./cli/init.js";
+ import { runList } from "./cli/list.js";
+ import { runSessions } from "./cli/sessions.js";
+ import { runShow } from "./cli/show.js";
++import { createRequire } from "node:module";
+ 
++const require = createRequire(import.meta.url);
++const { version } = require("../package.json") as { version: string };
++
+ export interface CliWriter {
+   write(chunk: string): unknown;
+ }
+ 
+
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone/src/cli.ts
+@@ -66,8 +66,13 @@
+ const stdout = options?.stdout ?? process.stdout;
+ const stderr = options?.stderr ?? process.stderr;
+ const command = argv[0];
+ 
++if (command === "--version" || command === "-v") {
++  stdout.write(`${version}\n`);
++  return 0;
++}
++
+ if (command === undefined || command === "") {
+   stderr.write(usage);
+   return 1;
+ }
+
+[0m
+[0m→ [0mRead src/cli.ts[90m [limit=90][0m
+[0m
+[0m$ [0mnpm run build
+> harnie@0.1.0-rc.1 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.1.0-rc.1 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+[0m
+[0m$ [0mnode dist/cli.js --version
+0.1.0-rc.1
+[0m
+[0m$ [0mnode dist/cli.js -v
+0.1.0-rc.1
+[0m
+[0m$ [0mnode dist/cli.js --version; echo "exit:$?"
+0.1.0-rc.1
+exit:0
+[0m
+[0m$ [0mnpx vitest run tests/cli-init.test.ts
+RUN  v4.1.11 /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r2/version-flag/handoff/clone
+
+(node:90551) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  10:32:06
+   Duration  241ms (transform 136ms, setup 0ms, import 167ms, tests 8ms, environment 0ms)
+[0m

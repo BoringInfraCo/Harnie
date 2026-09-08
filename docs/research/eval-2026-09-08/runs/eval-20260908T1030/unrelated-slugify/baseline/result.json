@@ -1,0 +1,68 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260908T1030",
+  "taskId": "unrelated-slugify",
+  "condition": "baseline",
+  "recordedAt": "2026-09-08T14:42:29.453Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "e84fc64d52b0cd9ae85939eeaca06052f195c199",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/unrelated-slugify/baseline/clone"
+  },
+  "handoff": {
+    "path": null,
+    "chars": null,
+    "sha256": null
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "run",
+      "--auto",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "<prompt_text>"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 218300,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/unrelated-slugify/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/unrelated-slugify/baseline/agent-stderr.log"
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [
+      "src/slugify.ts",
+      "tests/slugify.test.ts"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 0,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030/unrelated-slugify/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "npx vitest run tests/slugify.test.ts",
+      "git status --short"
+    ],
+    "passed": true,
+    "details": "Evaluator re-ran in the clone: vitest 5/5 pass; same slugify behavior. Only the two new files exist."
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "partial",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none-needed",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": null
+  },
+  "notes": "UNRELATED-REPOSITORY leg, baseline condition (no handoff): explored more before writing (bash x7, glob x5, read x7, write x2 census). Wall 218.3s. packageSizeChars is null/N-A — no handoff artifact."
+}

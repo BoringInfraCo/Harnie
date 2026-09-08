@@ -1,0 +1,16 @@
+## Report
+
+1. **Files edited**
+   - Created `tests/regression-help.test.ts` (no existing files modified).
+
+2. **Commands run**
+   - `npx vitest run tests/regression-help.test.ts`
+   - `npm run typecheck`
+   - `git status --short` (to confirm no existing tracked files were changed)
+
+3. **Verification pass/fail**
+   - `npx vitest run tests/regression-help.test.ts` — **pass** (1 test passed)
+   - `npm run typecheck` — **pass** (clean, no output)
+
+4. **Task complete?**  
+   Yes. The new regression test pins the four CLI help strings (`backup <path>`, `restore <path> [--force]`, `handoff <work>`, `import pi <path>`), and both required verification checks pass.

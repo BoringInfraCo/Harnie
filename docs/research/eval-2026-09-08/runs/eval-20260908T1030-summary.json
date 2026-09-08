@@ -1,0 +1,99 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260908T1030",
+  "ref": "HEAD",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "pi",
+      "model": "openrouter/moonshotai/kimi-k2.5",
+      "exitCode": 0,
+      "filesEdited": [
+        "src/cli.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1766,
+      "notRunReason": null,
+      "notes": "Pi receiver (pi 0.84.4, openrouter/moonshotai/kimi-k2.5) — first non-OpenCode receiver exercised. Bidirectional pi path: synthetic pi-format driver -> harnie handoff --to pi (1766 chars) -> pi --print receiver. Went straight to the handoff's file pointers; 1 edit tool call (single edit of src/cli.ts, +9 lines, one --version branch). pi sandbox could not execute node/npm; verification blocked in-run and reported as blocked (not a false completion); evaluator re-verified in the clone."
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "codex",
+      "model": null,
+      "exitCode": 0,
+      "filesEdited": [
+        "scripts/prepare-bin.mjs"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 3233,
+      "notRunReason": null,
+      "notes": "Codex receiver (codex-cli 0.149.1, default model gpt-5.6-sol from user config) — first Codex receiver exercised. Driver context was a REAL Codex session (01a06ce3, 248 events imported read-only from ~/.codex) rendered via 'harnie handoff --to codex' (3233 chars, bounded: [+4254 chars omitted] goal, [+47 more omitted] operations); secret scan of the handoff found no raw credentials. The real session's subject (Sprint 024/025) was unrelated to the task; the receiver correctly prioritized the explicit task statement and did not act on the unrelated handoff content. Single edit of scripts/prepare-bin.mjs (+9/-2)."
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "tests/regression-help.test.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 3100,
+      "notRunReason": null,
+      "notes": "LONG-SESSION leg: synthetic Work with 4 executions / 52 events (import + 3x attach --work), rendered 'harnie handoff --to opencode' = 3100 chars. The four executions converge on an explicit plan (write tests/regression-help.test.ts with capture() pattern + four strings); the receiver's next action matched the plan exactly (bash x4, read x3, write x1 census)."
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    }
+  ]
+}

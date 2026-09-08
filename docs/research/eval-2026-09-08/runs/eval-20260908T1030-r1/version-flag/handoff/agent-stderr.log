@@ -1,0 +1,485 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m$ [0mpwd && ls -la
+/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone
+total 168
+drwxr-xr-x@ 16 sergio  staff    512 Sep  8 10:28 .
+drwxr-xr-x@  6 sergio  staff    192 Sep  8 10:28 ..
+drwxr-xr-x@ 13 sergio  staff    416 Sep  8 10:28 .git
+drwxr-xr-x@  3 sergio  staff     96 Sep  8 10:28 .github
+-rw-r--r--@  1 sergio  staff     47 Sep  8 10:28 .gitignore
+drwxr-xr-x@  4 sergio  staff    128 Sep  8 10:28 docs
+-rw-r--r--@  1 sergio  staff  11357 Sep  8 10:28 LICENSE
+lrwxr-xr-x@  1 sergio  staff     67 Sep  8 10:28 node_modules -> /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/node_modules
+-rw-r--r--@  1 sergio  staff  40202 Sep  8 10:28 package-lock.json
+-rw-r--r--@  1 sergio  staff    746 Sep  8 10:28 package.json
+-rw-r--r--@  1 sergio  staff  15672 Sep  8 10:28 README.md
+drwxr-xr-x@  6 sergio  staff    192 Sep  8 10:28 scripts
+drwxr-xr-x@ 16 sergio  staff    512 Sep  8 10:28 src
+drwxr-xr-x@ 58 sergio  staff   1856 Sep  8 10:28 tests
+-rw-r--r--@  1 sergio  staff    144 Sep  8 10:28 tsconfig.build.json
+-rw-r--r--@  1 sergio  staff    385 Sep  8 10:28 tsconfig.json
+[0m
+[0m→ [0mRead src/cli.ts
+[0m
+[0m$ [0mcat package.json
+{
+  "name": "harnie",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "harnie": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:package": "node scripts/smoke-package.mjs",
+    "check": "npm run typecheck && npm test && npm run test:package",
+    "prepack": "npm run build",
+    "preharnie": "npm run build",
+    "harnie": "node dist/cli.js",
+    "prebuild": "node scripts/clean-dist.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.23.0 <23"
+  }
+}
+[0m
+[0m$ [0mls tests/cli-init.test.ts && cat tests/cli-init.test.ts
+tests/cli-init.test.ts
+import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { runCli } from "../src/cli.js";
+
+const capture = () => {
+  let output = "";
+  return {
+    write(chunk: string) {
+      output += chunk;
+    },
+    toString() {
+      return output;
+    },
+  };
+};
+
+describe("harnie init", () => {
+  const homes: string[] = [];
+
+  const makeHome = async (): Promise<string> => {
+    const home = await mkdtemp(join(tmpdir(), "harnie-cli-"));
+    homes.push(home);
+    return home;
+  };
+
+  afterEach(async () => {
+    await Promise.all(homes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
+  });
+
+  it("creates harnie.db and returns 0", async () => {
+    const home = await makeHome();
+    const stdout = capture();
+    const dbPath = join(home, "harnie.db");
+
+    const code = await runCli(["init"], { home, stdout });
+
+    expect(code).toBe(0);
+    expect(existsSync(dbPath)).toBe(true);
+    expect(stdout.toString()).toContain(dbPath);
+  });
+
+  it("is idempotent on a second init", async () => {
+    const home = await makeHome();
+    const first = capture();
+    const second = capture();
+
+    expect(await runCli(["init"], { home, stdout: first })).toBe(0);
+    expect(await runCli(["init"], { home, stdout: second })).toBe(0);
+    expect(existsSync(join(home, "harnie.db"))).toBe(true);
+  });
+
+  it("mentions the database path on stdout", async () => {
+    const home = await makeHome();
+    const stdout = capture();
+
+    await runCli(["init"], { home, stdout });
+
+    expect(stdout.toString()).toContain(join(home, "harnie.db"));
+    expect(stdout.toString()).toContain("Initialized Harnie.");
+  });
+
+  it("returns non-zero for an unknown command", async () => {
+    const stderr = capture();
+
+    const code = await runCli(["not-a-command"], { stderr });
+
+    expect(code).not.toBe(0);
+    expect(stderr.toString()).toMatch(/unknown command/i);
+  });
+
+  it("prints usage and exits 1 when no command is given", async () => {
+    const stderr = capture();
+
+    const code = await runCli([], { stderr });
+
+    expect(code).toBe(1);
+    expect(stderr.toString()).toMatch(/usage: harnie/i);
+  });
+
+  it("prints usage and exits 0 for --help", async () => {
+    const stdout = capture();
+
+    const code = await runCli(["--help"], { stdout });
+
+    expect(code).toBe(0);
+    expect(stdout.toString()).toMatch(/usage: harnie/i);
+  });
+
+  it("prints usage when handoff is missing required arguments", async () => {
+    const stderr = capture();
+
+    const code = await runCli(["handoff"], { stderr });
+
+    expect(code).toBe(1);
+    expect(stderr.toString()).toMatch(/usage: harnie handoff/i);
+  });
+});
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
+@@ -1,8 +1,8 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
+-import { resolve } from "node:path";
++import { readFileSync, realpathSync } from "node:fs";
++import { dirname, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+ import { runDiff } from "./cli/diff.js";
+
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
+@@ -15,8 +15,11 @@
+ import { runList } from "./cli/list.js";
+ import { runSessions } from "./cli/sessions.js";
+ import { runShow } from "./cli/show.js";
+ 
++const packageJsonPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
++const packageVersion: string = JSON.parse(readFileSync(packageJsonPath, "utf-8")).version;
++
+ export interface CliWriter {
+   write(chunk: string): unknown;
+ }
+ 
+
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone/src/cli.ts
+@@ -70,8 +70,13 @@
+   stderr.write(usage);
+   return 1;
+ }
+ 
++if (command === "--version" || command === "-v") {
++  stdout.write(`${packageVersion}\n`);
++  return 0;
++}
++
+ if (command === "--help" || command === "-h" || command === "help") {
+   stdout.write(usage);
+   return 0;
+ }
+
+[0m
+[0m→ [0mRead src/cli.ts[90m [limit=90][0m
+[0m
+[0m$ [0mnpm run build
+> harnie@0.1.0-rc.1 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.1.0-rc.1 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+[0m
+[0m$ [0mnode dist/cli.js --version ; echo "exit: $?"
+0.1.0-rc.1
+exit: 0
+[0m
+[0m$ [0mnode dist/cli.js -v ; echo "exit: $?"
+0.1.0-rc.1
+exit: 0
+[0m
+[0m$ [0mnpx vitest run tests/cli-init.test.ts
+RUN  v4.1.11 /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone
+
+(node:87520) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  10:29:09
+   Duration  272ms (transform 148ms, setup 0ms, import 184ms, tests 8ms, environment 0ms)
+[0m
+[0m$ [0mnode dist/cli.js --help > /dev/null ; echo "--help exit: $?"
+--help exit: 0
+[0m
+[0m$ [0mnode dist/cli.js > /dev/null 2>&1 ; echo "no args exit: $?"
+no args exit: 1
+[0m
+[0m$ [0mgit diff -- src/cli.ts package.json
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..8bdf177 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
+-import { resolve } from "node:path";
++import { readFileSync, realpathSync } from "node:fs";
++import { dirname, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+@@ -16,6 +16,9 @@ import { runList } from "./cli/list.js";
+ import { runSessions } from "./cli/sessions.js";
+ import { runShow } from "./cli/show.js";
+ 
++const packageJsonPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
++const packageVersion: string = JSON.parse(readFileSync(packageJsonPath, "utf-8")).version;
++
+ export interface CliWriter {
+   write(chunk: string): unknown;
+ }
+@@ -68,6 +71,11 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
+     return 1;
+   }
+ 
++  if (command === "--version" || command === "-v") {
++    stdout.write(`${packageVersion}\n`);
++    return 0;
++  }
++
+   if (command === "--help" || command === "-h" || command === "help") {
+     stdout.write(usage);
+     return 0;
+[0m
+[0m$ [0mnpm test
+> harnie@0.1.0-rc.1 test
+> vitest run
+
+
+ RUN  v4.1.11 /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval2/eval-20260908T1030-r1/version-flag/handoff/clone
+
+(node:87685) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87679) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87681) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87678) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87683) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87680) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87682) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87684) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87726) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87725) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87727) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87728) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87729) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87730) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87731) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87732) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87733) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87735) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87736) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87737) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87738) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87739) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87771) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87774) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87772) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87773) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87806) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87805) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87808) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87811) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87809) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87810) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87813) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87812) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87814) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87815) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87846) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87880) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87886) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87936) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/eval-harness.test.ts (6 tests | 6 failed) 3238ms
+     × prepares isolated, deterministic clones outside the working tree 1400ms
+     × runs the injected command and records a valid result.json 393ms
+     × does not contaminate tasks run in the same run dir 540ms
+     × degrades to instructions + template without any agent 185ms
+     × record validates: rejects bad results, accepts filled ones 223ms
+     × emits a side-by-side summary and preview-gate line 496ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/eval-harness.test.ts > eval harness — clone preparation > prepares isolated, deterministic clones outside the working tree
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/eval-harness.test.ts:96:45
+     94|
+     95|     const clone = join(EVAL_BASE, runId, "version-flag", "baseline", "…
+     96|     expect(existsSync(join(clone, ".git"))).toBe(true);
+       |                                             ^
+     97|     expect(existsSync(join(clone, "node_modules"))).toBe(true);
+     98|     expect(clone.startsWith(EVAL_BASE)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tests/eval-harness.test.ts > eval harness — mocked agent run > runs the injected command and records a valid result.json
+Error: ENOENT: no such file or directory, open '/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-test-1788877811729-87677-1/version-flag/baseline/result.json'
+ ❯ tests/eval-harness.test.ts:140:31
+    138|
+    139|     const dir = join(EVAL_BASE, runId, "version-flag", "baseline");
+    140|     const result = JSON.parse(readFileSync(join(dir, "result.json"), "…
+       |                               ^
+    141|     expect(result.schema).toBe("harnie-eval-result/v1");
+    142|     expect(result.status).toBe("ran");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  tests/eval-harness.test.ts > eval harness — mocked agent run > does not contaminate tasks run in the same run dir
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/eval-harness.test.ts:191:52
+    189|     const cloneA = join(EVAL_BASE, runId, "version-flag", "baseline", …
+    190|     const cloneB = join(EVAL_BASE, runId, "shebang-guard", "baseline",…
+    191|     expect(existsSync(join(cloneA, "FAKE-A.txt"))).toBe(true);
+       |                                                    ^
+    192|     expect(existsSync(join(cloneA, "FAKE-B.txt"))).toBe(false);
+    193|     expect(existsSync(join(cloneB, "FAKE-B.txt"))).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tests/eval-harness.test.ts > eval harness — manual-run mode > degrades to instructions + template without any agent
+Error: ENOENT: no such file or directory, open '/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-test-1788877812662-87677-3/first-run-recovery/handoff/manual-instructions.md'
+ ❯ tests/eval-harness.test.ts:221:26
+    219|
+    220|     const dir = join(EVAL_BASE, runId, "first-run-recovery", "handoff"…
+    221|     const instructions = readFileSync(join(dir, "manual-instructions.m…
+       |                          ^
+    222|     expect(instructions).toContain("Manual receiver run");
+    223|     expect(instructions).toContain("record --dir");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  tests/eval-harness.test.ts > eval harness — manual-run mode > record validates: rejects bad results, accepts filled ones
+Error: ENOENT: no such file or directory, open '/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-test-1788877812847-87677-4/first-run-recovery/handoff/result-template.json'
+ ❯ tests/eval-harness.test.ts:247:29
+    245|     expect(rejected.stderr).toContain("schema");
+    246|
+    247|     const good = JSON.parse(readFileSync(join(dir, "result-template.js…
+       |                             ^
+    248|     good.status = "ran";
+    249|     good.recordedAt = new Date().toISOString();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  tests/eval-harness.test.ts > eval harness — summarize > emits a side-by-side summary and preview-gate line
+Error: ENOENT: no such file or directory, open '/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-test-1788877813070-87677-5/summary.md'
+ ❯ tests/eval-harness.test.ts:282:23
+    280|     expect(res.code).toBe(0);
+    281|     const runDir = join(EVAL_BASE, runId);
+    282|     const summaryMd = readFileSync(join(runDir, "summary.md"), "utf8");
+       |                       ^
+    283|     expect(summaryMd).toContain("version-flag");
+    284|     expect(summaryMd).toContain("handoff");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed | 54 passed (55)
+      Tests  6 failed | 327 passed (333)
+   Start at  10:30:10
+   Duration  3.45s (transform 1.77s, setup 0ms, import 4.11s, tests 9.94s, environment 3ms)
+[0m
+[0m$ [0mgit status --short
+M src/cli.ts
+?? node_modules
+[0m

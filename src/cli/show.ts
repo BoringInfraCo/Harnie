@@ -1,8 +1,9 @@
 import { listCheckpoints } from "../store/checkpoints.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
-import type { NormalizedEventKind } from "../types.js";
+import type { JsonValue, NormalizedEventKind } from "../types.js";
 import { buildHandoffFromWork, applyOutputRedaction, redactOutputText } from "../work/handoff.js";
+import { redactJsonValue } from "../work/redact.js";
 import type { Execution, Work } from "../work/types.js";
 import { classifyErrorText, type CliErrorCode } from "../contract/errors.js";
 import { emitJsonFailure, emitJsonSuccess } from "../contract/envelope.js";
@@ -139,7 +140,7 @@ const buildShowData = (work: Work) => {
         evidence: step.evidence,
       })),
       ...(work.operations !== undefined && work.operations.length > 0
-        ? { operations: work.operations.map(toOperationData) }
+        ? { operations: work.operations.map((operation) => toOperationData(operation, redact)) }
         : {}),
     },
     derived: {
@@ -175,20 +176,33 @@ const buildShowData = (work: Work) => {
     })),
     eventCounts: handoff.eventCounts,
     diagnosticCodes: handoff.diagnosticCodes,
-    redactions,
     provenance: "observed" as const,
   };
-  return data;
+  // Final output pass over the whole payload: legacy stores may hold raw
+  // secrets in persisted fields this builder serializes directly (e.g.
+  // work.operations), so every string in the JSON payload goes through the
+  // shared redaction policy before serialization. Evidence IDs/counts are
+  // untouched (secret patterns do not match them). Output-pass redactions
+  // are accumulated into `redactions` so it reports the true number, not
+  // just builder-level markers.
+  const scrubbed = redactJsonValue(data as unknown as JsonValue, "data");
+  return {
+    ...(scrubbed.value as Record<string, unknown>),
+    redactions: redactions + scrubbed.redactions.length,
+  };
 };
 
 type WorkOperation = NonNullable<Work["operations"]>[number];
 
-const toOperationData = (operation: WorkOperation) => ({
+const toOperationData = (
+  operation: WorkOperation,
+  redact: (value: string) => string,
+) => ({
   ...(operation.toolName !== undefined ? { toolName: operation.toolName } : {}),
-  ...(operation.path !== undefined ? { path: operation.path } : {}),
-  ...(operation.command !== undefined ? { command: operation.command } : {}),
+  ...(operation.path !== undefined ? { path: redact(operation.path) } : {}),
+  ...(operation.command !== undefined ? { command: redact(operation.command) } : {}),
   status: operation.status,
-  ...(operation.note !== undefined ? { note: operation.note } : {}),
+  ...(operation.note !== undefined ? { note: redact(operation.note) } : {}),
   evidence: operation.evidence,
 });
 

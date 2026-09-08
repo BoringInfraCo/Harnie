@@ -1,0 +1,35 @@
+# Release workflow: runs on v* tag pushes only (CI gates the tag first via ci.yml,
+# which also triggers on tags: ['v*']).
+# Assumptions:
+# - The tag is cut from a tree where `npm run check` is green; this workflow re-runs
+#   `npm run check` as a final gate before packing.
+# - `prepack` (npm run build) runs automatically during `npm pack`, producing dist/.
+# - Releases are published with auto-generated notes; the tarball is attached.
+# - GitHub CLI (`gh`) is preinstalled on ubuntu runners and authenticated with
+#   GITHUB_TOKEN; `permissions: contents: write` is required to create the release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.0
+          cache: npm
+      - run: npm ci && npm run check
+      - run: npm pack
+      - name: Create release and upload tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TARBALL="$(ls harnie-*.tgz)"
+          gh release create "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "$TARBALL" --clobber
