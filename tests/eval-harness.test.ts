@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -20,7 +20,9 @@ const mod = (await import(modUrl)) as EvalMod;
 const SCRIPT = join(import.meta.dirname, "..", "scripts", "eval-continuation.mjs");
 const EVAL_BASE = join(tmpdir(), "opencode", "harnie-eval");
 
-const scratch = mkdtempSync(join(tmpdir(), "opencode", "harnie-eval-test-"));
+const scratchParent = join(tmpdir(), "opencode");
+mkdirSync(scratchParent, { recursive: true });
+const scratch = mkdtempSync(join(scratchParent, "harnie-eval-test-"));
 const cleanupDirs: string[] = [];
 
 const runHarness = (args: string[], env: Record<string, string> = {}) => {
