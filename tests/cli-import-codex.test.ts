@@ -160,7 +160,7 @@ describe("harnie import codex", () => {
 
     const listed = capture();
     const shown = capture();
-    expect(await runList({ home, stdout: listed, stderr: capture() })).toBe(0);
+    expect(await runList([], { home, stdout: listed, stderr: capture() })).toBe(0);
     expect(await runShow([WORK_ID], { home, stdout: shown, stderr: capture() })).toBe(0);
     expect(listed.toString()).toContain(WORK_ID);
     expect(shown.toString()).toContain(WORK_ID);

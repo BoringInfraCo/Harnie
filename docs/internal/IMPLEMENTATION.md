@@ -1,5 +1,12 @@
 # Harnie Implementation Plan
 
+> **Note (2026-09-07): this plan's V0-only scope is SUPERSEDED.** It is retained
+> below as historical intent. For what the CLI actually supports today, see
+> `docs/internal/SUPPORT-MATRIX.md` (evidence-backed capability/compatibility
+> matrix) and the current code. Preview promise: "Import supported local coding
+> sessions, inspect evidence-backed work history, and prepare Markdown
+> continuation packages."
+
 ## 1. Objective
 
 Build the smallest implementation capable of testing Harnie's central hypothesis:

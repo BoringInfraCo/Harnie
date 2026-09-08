@@ -1,0 +1,79 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260907T2041",
+  "taskId": "first-run-recovery",
+  "condition": "baseline",
+  "recordedAt": "2026-09-08T00:54:44.236682+00:00",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "3cfc04502aa9db3f846f534441342f011a0781a1",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/clone"
+  },
+  "handoff": {
+    "path": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/driver/harnie-home/handoffs/work_opencode_ses_drv_00000soa2fkk.md",
+    "chars": 1697,
+    "sha256": "91aadd6ce463a8e63b1eb3398d51e0a945af415bfe92fb5f369344c01a48f93c"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: first-run-recovery\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nDocument backup/restore recovery in the first-run walkthrough.\n\nAdd a short '## Recovery' section to docs/internal/FIRST-RUN.md covering: `harnie backup <path>` writes a consistent SQLite snapshot (0600), `harnie restore <path> --force` validates the backup and then overwrites the live store, and restore has no undo. Edit only that file; no code changes.\n\n## Required verification\n- grep -n '^## Recovery' docs/internal/FIRST-RUN.md   # section exists\n- git diff --stat   # only docs/internal/FIRST-RUN.md modified\n\n## Expected end state\ndocs/internal/FIRST-RUN.md has a Recovery section with backup/restore usage and the no-undo caveat; no other file is modified.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 38796,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "read docs/internal/FIRST-RUN.md",
+      "purpose": "understand document to extend"
+    },
+    {
+      "cmd": "edit docs/internal/FIRST-RUN.md (append ## Recovery)",
+      "purpose": "implement task"
+    },
+    {
+      "cmd": "grep -n '^## Recovery' + git diff --stat",
+      "purpose": "verify section and scope"
+    }
+  ],
+  "edits": {
+    "files": [
+      "docs/internal/FIRST-RUN.md"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 965,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "grep -n '^## Recovery' + git diff --stat"
+    ],
+    "passed": true,
+    "details": "Receiver-reported verification cross-checked: the evaluator independently re-ran the task's verification commands in the clone after the run; all pass. Receiver's completion claim is supported by the recorded diff and re-run results."
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": 1697
+  },
+  "notes": "Same shape as the handoff condition here (task statement already names the file). Content covers all three required points. Evaluator re-ran verification: pass. Tool-call census from receiver session trace: bash×1, edit×1, read×1."
+}

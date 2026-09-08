@@ -145,13 +145,7 @@ const parseGoal = (text: string | null): DerivedGoal | undefined => {
 };
 
 const ensureCheckpointsSchema = (db: DatabaseSync): void => {
-  try {
-    db.exec(CHECKPOINTS_SCHEMA_SQL);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column: rowid/i.test(message)) throw error;
-    db.exec(CHECKPOINTS_SCHEMA_SQL.slice(0, CHECKPOINTS_SCHEMA_SQL.indexOf("CREATE INDEX")));
-  }
+  db.exec(CHECKPOINTS_SCHEMA_SQL);
 };
 
 const parseArray = <T>(text: string): readonly T[] => {

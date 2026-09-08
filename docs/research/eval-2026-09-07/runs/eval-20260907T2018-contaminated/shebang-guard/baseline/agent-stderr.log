@@ -1,0 +1,1173 @@
+[0m
+> build · omen-alpha
+[0m
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/scripts/prepare-bin.mjs
+[0m
+[0m$ [0mls
+dist
+docs
+LICENSE
+node_modules
+package-lock.json
+package.json
+README.md
+scripts
+src
+tests
+tsconfig.build.json
+tsconfig.json
+[0m
+[0m$ [0mgit status && git diff
+...output truncated...
+
+Full output saved to: /Users/sergio/.local/share/opencode/tool-output/tool_07e644056001F9tMMgPV1ZAnB0
+
++  const safeNextSteps = nextSteps.map((step, index) => redactor.nextStep(step, index));
++  const safeOperations = operations.map((operation, index) => redactor.operation(operation, index));
++
++  const diagnostics = redactor.redactions.length === 0
++    ? work.diagnostics
++    : [...work.diagnostics, redactor.diagnostic()];
++
+   return {
+     id: work.id,
+     ...(work.workspace ? { workspace: work.workspace } : {}),
+@@ -29,15 +46,72 @@ export const deriveObservedWork = (work: Work): Work => {
+     ...(work.updatedAt ? { updatedAt: work.updatedAt } : {}),
+     executions: work.executions,
+     events: work.events,
+-    diagnostics: work.diagnostics,
+-    ...(goal ? { goal } : {}),
+-    ...(decisions.length > 0 ? { decisions } : {}),
+-    ...(findings.length > 0 ? { findings } : {}),
+-    ...(nextSteps.length > 0 ? { nextSteps } : {}),
+-    ...(operations.length > 0 ? { operations } : {}),
++    diagnostics,
++    ...(safeGoal ? { goal: safeGoal } : {}),
++    ...(safeDecisions.length > 0 ? { decisions: safeDecisions } : {}),
++    ...(safeFindings.length > 0 ? { findings: safeFindings } : {}),
++    ...(safeNextSteps.length > 0 ? { nextSteps: safeNextSteps } : {}),
++    ...(safeOperations.length > 0 ? { operations: safeOperations } : {}),
+   };
+ };
+ 
++class ClaimRedactor {
++  redactions: SecretRedaction[] = [];
++
++  text(value: string, field: string): string {
++    const redacted = redactText(value, field);
++    if (redacted.text === value) return value;
++    this.redactions.push(...redacted.redactions);
++    return redacted.text;
++  }
++
++  goal(value: DerivedGoal): DerivedGoal {
++    const statement = this.text(value.statement, "goal.statement");
++    return statement === value.statement ? value : { ...value, statement };
++  }
++
++  decision(value: Decision, index: number): Decision {
++    const summary = this.text(value.summary, `decisions[${index}].summary`);
++    return summary === value.summary ? value : { ...value, summary };
++  }
++
++  finding(value: Finding, index: number): Finding {
++    const statement = this.text(value.statement, `findings[${index}].statement`);
++    return statement === value.statement ? value : { ...value, statement };
++  }
++
++  nextStep(value: NextStep, index: number): NextStep {
++    const description = this.text(value.description, `nextSteps[${index}].description`);
++    return description === value.description ? value : { ...value, description };
++  }
++
++  operation(value: ToolOperation, index: number): ToolOperation {
++    let next = value;
++    if (value.path !== undefined) {
++      const path = this.text(value.path, `operations[${index}].path`);
++      if (path !== value.path) next = { ...next, path };
++    }
++    if (value.command !== undefined) {
++      const command = this.text(value.command, `operations[${index}].command`);
++      if (command !== value.command) next = { ...next, command };
++    }
++    if (value.note !== undefined) {
++      const note = this.text(value.note, `operations[${index}].note`);
++      if (note !== value.note) next = { ...next, note };
++    }
++    return next;
++  }
++
++  diagnostic() {
++    const summary = summarizeRedactions(this.redactions);
++    return secretRedactedDiagnostic(
++      summary,
++      `Redacted ${summary.count} secret value(s) (${summary.kinds.join(", ")}) from derived claims.`,
++      {},
++    );
++  }
++}
++
+ const deriveGoal = (work: Work): DerivedGoal | undefined => {
+   for (const event of work.events) {
+     if (event.kind !== "message" || event.payload.role !== "user") continue;
+@@ -99,12 +173,12 @@ const deriveFindings = (work: Work): readonly Finding[] => {
+ };
+ 
+ const deriveNextSteps = (work: Work): readonly NextStep[] => {
+-  if (!hasMissingToolResult(work)) return [];
+-
+-  const pending = work.events.filter((event) =>
+-    event.kind === "tool_call" && event.diagnostics.some((diag) => diag.code === "missing_tool_result"),
+-  );
+-  const events = pending.length > 0 ? pending : lastUnmatchedToolCall(work);
++  const results = indexToolResults(work);
++  const events = work.events.filter((event) => {
++    if (event.kind !== "tool_call") return false;
++    const callId = asString(event.payload.toolCallId);
++    return !callId || !results.has(toolResultKey(event.executionId, callId));
++  });
+   const nextSteps: NextStep[] = [];
+ 
+   for (const event of events) {
+@@ -136,24 +210,6 @@ const pendingToolCallDescription = (toolName: string | undefined, path: string |
+   return parts.join(" ");
+ };
+ 
+-const lastUnmatchedToolCall = (work: Work): readonly WorkEvent[] => {
+-  for (let index = work.events.length - 1; index >= 0; index -= 1) {
+-    const event = work.events[index];
+-    if (!event || event.kind !== "tool_call") continue;
+-    const toolCallId = asString(event.payload.toolCallId);
+-    if (!toolCallId) continue;
+-    const matched = work.events.slice(index + 1).some((later) =>
+-      later.kind === "tool_result" && asString(later.payload.toolCallId) === toolCallId
+-    );
+-    if (!matched) return [event];
+-  }
+-  return [];
+-};
+-
+-const hasMissingToolResult = (work: Work): boolean =>
+-  work.diagnostics.some((diag) => diag.code === "missing_tool_result") ||
+-  work.events.some((event) => event.diagnostics.some((diag) => diag.code === "missing_tool_result"));
+-
+ const extractText = (event: WorkEvent): string => {
+   const content = event.payload.content;
+   if (typeof content === "string") return stripThinkingMarkup(content);
+diff --git a/src/work/handoff.ts b/src/work/handoff.ts
+index 94289cc..a326784 100644
+--- a/src/work/handoff.ts
++++ b/src/work/handoff.ts
+@@ -1,5 +1,6 @@
+ import type { JsonObject, NormalizedEventKind } from "../types.js";
+ import { asString, isJsonObject } from "../types.js";
++import { extractToolOperations, indexToolResults, toolResultKey } from "./operations.js";
+ import { extractObservedContext } from "./context.js";
+ import type { Execution, Work, WorkEvent } from "./types.js";
+ 
+@@ -28,9 +29,12 @@ export interface Handoff {
+   readonly changedFiles?: readonly string[];
+   readonly failedApproaches?: readonly string[];
+   readonly testState?: string;
++  readonly verification?: string;
+   readonly readYields?: readonly string[];
+   readonly unresolved?: string;
+   readonly evidence?: readonly string[];
++  readonly evidenceRefs?: HandoffEvidenceRefs;
++  readonly budget?: HandoffBudget;
+   readonly eventCounts: {
+     readonly message: number;
+     readonly tool_call: number;
+@@ -72,49 +76,266 @@ type WorkWithOperations = Work & {
+ 
+ const COMMAND_LIMIT = 40;
+ const FINDINGS_CAP = 5;
++const EXECUTIONS_CAP = 3;
++
++// Handoff size budget (bounded packages, launch-readiness audit 2026-09-05).
++//
++// Unit: characters (UTF-16 code units), measured deterministically over the
++// bounded package content: section items joined by "\n" (one separator per
++// gap). Section titles, event summaries, provenance, and the receiver
++// instruction section are outside the budget; they are fixed-form and small.
++//
++// Three deterministic layers, applied in order:
++//   1. Per item: text longer than HANDOFF_BUDGET_LIMITS.itemChars is cut with
++//      an explicit "… [+N chars omitted]" suffix. The cut never splits a
++//      [REDACTED:<kind>] marker: it backs up to before an unclosed marker.
++//   2. Per section: content over HANDOFF_BUDGET_LIMITS.sectionChars drops the
++//      OLDEST items first (most recent work survives, matching the
++//      findings-keep-last-FINDINGS_CAP semantics). At least one item always
++//      survives, so a section can never silently vanish; dropped items are
++//      summarized as a final "[+N more omitted]" list entry.
++//   3. Total: content over HANDOFF_BUDGET_LIMITS.totalChars drops whole
++//      sections lowest-priority first. Priorities <= HANDOFF_PROTECTED_PRIORITY
++//      (unresolved/uncertainty: unresolved, currentState, nextSteps,
++//      verification; plus goal) are never dropped, so a maximally truncated
++//      package still carries uncertainty and unresolved work first.
++//
++// FINDINGS_CAP=5 semantics are unchanged: findings beyond the cap are counted
++// in budget.omittedItems.findings (structured, visible in JSON) without a
++// Markdown marker item, preserving the pre-existing five-statement contract.
++//
++// Same Work in, same Handoff out: no timestamps, no randomness, no locale
++// sensitivity anywhere below.
++export interface HandoffBudgetLimits {
++  readonly itemChars: number;
++  readonly sectionChars: number;
++  readonly totalChars: number;
++}
++
++export const HANDOFF_BUDGET_LIMITS: HandoffBudgetLimits = {
++  itemChars: 240,
++  sectionChars: 1200,
++  totalChars: 6000,
++};
++
++// Priority order when the total budget is exceeded. Lower drops last;
++// priorities at or below HANDOFF_PROTECTED_PRIORITY are never dropped.
++export const HANDOFF_SECTION_PRIORITY = {
++  unresolved: 1,
++  currentState: 1,
++  nextSteps: 1,
++  verification: 1,
++  goal: 2,
++  testState: 3,
++  decisions: 4,
++  findings: 5,
++  operations: 6,
++  filesTouched: 7,
++  relevantFiles: 8,
++  changedFiles: 9,
++  failedApproaches: 10,
++  readYields: 11,
++  evidence: 12,
++} as const;
++
++export const HANDOFF_PROTECTED_PRIORITY = 2;
++export const HANDOFF_EVIDENCE_REF_CAP = 3;
++
++export interface HandoffBudget {
++  readonly limits: HandoffBudgetLimits;
++  /** Items hidden per section key (oldest-first drops, total-budget drops, and the findings cap). Sparse: absent key means 0. */
++  readonly omittedItems: Readonly<Record<string, number>>;
++  /** Items that hit the per-item character limit, per section key. Sparse: absent key means 0. */
++  readonly truncatedItems: Readonly<Record<string, number>>;
++  /** Approximate characters removed per section key (truncation + drops). Sparse: absent key means 0. */
++  readonly omittedChars: Readonly<Record<string, number>>;
++  /** Measured bounded content characters after budgeting. */
++  readonly boundedChars: number;
++  readonly withinBudget: boolean;
++}
++
++export interface HandoffEvidenceRefs {
++  readonly decisions: readonly (readonly string[] | undefined)[];
++  readonly findings: readonly (readonly string[] | undefined)[];
++  readonly nextSteps: readonly (readonly string[] | undefined)[];
++}
++
++export const formatOmittedMarker = (count: number): string | undefined =>
++  count > 0 ? `[+${count} more omitted]` : undefined;
++
++export const formatEvidenceReference = (ids: readonly string[] | undefined): string | undefined => {
++  const clean = (ids ?? []).filter(isPresent);
++  if (clean.length === 0) return undefined;
++  const kept = clean.slice(0, HANDOFF_EVIDENCE_REF_CAP);
++  const more = clean.length - kept.length;
++  const parts = more > 0 ? [...kept, `+${more} more`] : [...kept];
++  return `(evidence: ${parts.join(", ")})`;
++};
++
++// Output redaction policy (defense in depth for legacy stores).
++//
++// Stores imported before ingestion redaction existed may already contain
++// unredacted secrets, so the output path redacts independently: structured
++// handoff strings are redacted in buildHandoffFromWork (below), and every
++// renderer plus the handoff/show CLI commands apply applyOutputRedaction as
++// a final pass over rendered text.
++//
++// REUSE NOTE: patterns and markers live in the sibling ingestion module
++// (./redact.js) and are reused here, not duplicated. This file only adds the
++// output-specific adapter (plain count result + provenance note) and the
++// shared receiver-instruction section. Policy gaps (e.g. lowercase or
++// colon-style assignments, bare fake words) are shared policy follow-ups,
++// not output-specific behavior.
++
++export { REDACTION_MARKER_PREFIX } from "./redact.js";
++import { containsRedactionMarker, REDACTION_MARKER_PREFIX, redactText } from "./redact.js";
++
++export const RECEIVER_INSTRUCTION_BODY =
++  "- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n" +
++  "- Handing this artifact to another agent may transmit its contents through that agent's provider.";
++
++export const RECEIVER_INSTRUCTION_SECTION = `## Receiver instructions\n${RECEIVER_INSTRUCTION_BODY}`;
++
++export interface OutputRedaction {
++  readonly text: string;
++  readonly redactions: number;
++}
++
++export const redactOutputText = (value: string): OutputRedaction => {
++  const redacted = redactText(value, "output");
++  return { text: redacted.text, redactions: redacted.redactions.length };
++};
++
++export const applyOutputRedaction = (value: string): string => {
++  const redacted = redactOutputText(value);
++  const text = redacted.text;
++  // Markers may pre-exist from builder-level redaction; the provenance note
++  // must accompany them in either case, but must not duplicate.
++  if (!containsRedactionMarker(text) || text.includes("## Redaction note")) return text;
++  const detail = redacted.redactions > 0
++    ? `Output redaction replaced ${redacted.redactions} secret-like span(s) with ${REDACTION_MARKER_PREFIX}<kind>] markers`
++    : `Some spans in this artifact were redacted upstream and appear as ${REDACTION_MARKER_PREFIX}<kind>] markers`;
++  const separator = text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
++  return `${text}${separator}## Redaction note\n${detail} (conservative, best-effort — not a guarantee that no secret remains). Redacted values are unrecoverable from this artifact.\n`;
++};
+ 
+ export const buildHandoffFromWork = (work: Work): Handoff => {
+-  const decisions = compact(work.decisions?.map((decision) => decision.summary));
+-  const findings = compact((work.findings ?? []).slice(-FINDINGS_CAP).map((finding) => finding.statement));
++  const decisionItems = claimItems(
++    work.decisions?.map((decision) => ({ text: decision.summary, evidence: decision.evidence })),
++  );
++  const findingsSource = claimItems(
++    (work.findings ?? []).map((finding) => ({ text: finding.statement, evidence: finding.evidence })),
++  );
++  const findingsKept = findingsSource.slice(-FINDINGS_CAP);
++  const findingsDropped = findingsSource.slice(0, Math.max(0, findingsSource.length - FINDINGS_CAP));
+   const diagnosticCodes = uniqueDiagnosticCodes(work);
+-  const executions = work.executions.flatMap((item) => {
++  const executionsAll = work.executions.flatMap((item) => {
+     const mapped = toHandoffExecution(item);
+     return mapped ? [mapped] : [];
+   });
+-  const execution = executions[0];
++  const execution = executionsAll[0];
++  const executions = executionsAll.slice(-EXECUTIONS_CAP);
+   const records = operationsFromWork(work);
+-  const operations = records.map(formatOperationLine);
+-  const filesTouched = uniquePaths(records);
++  const operationItems = records.map((record): BudgetItem => ({ text: formatOperationLine(record) }));
++  const filesTouchedItems = uniquePaths(records).map((path): BudgetItem => ({ text: path }));
+   const goal = present(work.goal?.statement);
+   const workspacePath = present(work.workspace?.path);
+   const context = extractObservedContext(work);
+-  const nextSteps = context.continuation.length > 0
+-    ? context.continuation
+-    : compact(work.nextSteps?.map((step) => step.description));
+-  const currentState = resolveCurrentState(nextSteps, diagnosticCodes, records);
+-  const sourceHarness = uniqueJoined(executions.map((item) => item.harness));
+-  const sourceSession = uniqueJoined(executions.map((item) => item.sourceId));
++  const nextStepItems = continuationItems(work, context.continuation);
++  const nextSteps = nextStepItems.map((item) => item.text);
++  const currentState = resolveCurrentState(nextSteps, diagnosticCodes, records, context.verification);
++  const sourceHarness = uniqueJoined(executionsAll.map((item) => item.harness));
++  const sourceSession = uniqueJoined(executionsAll.map((item) => item.sourceId));
++
++  const pushLine = (key: string, priority: number, value: string | undefined): BudgetSectionInput | undefined => {
++    const text = present(value);
++    return text ? { key, priority, items: [{ text: redactLine(text) }] } : undefined;
++  };
++
++  const pushList = (key: string, priority: number, items: readonly BudgetItem[]): BudgetSectionInput => ({
++    key,
++    priority,
++    items: redactItems(items),
++  });
++
++  const budgeted = applyHandoffBudget(
++    [
++      pushLine("goal", HANDOFF_SECTION_PRIORITY.goal, goal),
++      pushLine("currentState", HANDOFF_SECTION_PRIORITY.currentState, currentState),
++      pushLine("unresolved", HANDOFF_SECTION_PRIORITY.unresolved, context.unresolved),
++      pushLine("verification", HANDOFF_SECTION_PRIORITY.verification, context.verification),
++      pushLine("testState", HANDOFF_SECTION_PRIORITY.testState, context.testState),
++      pushList("decisions", HANDOFF_SECTION_PRIORITY.decisions, decisionItems),
++      pushList("findings", HANDOFF_SECTION_PRIORITY.findings, findingsKept),
++      pushList("nextSteps", HANDOFF_SECTION_PRIORITY.nextSteps, nextStepItems),
++      pushList("operations", HANDOFF_SECTION_PRIORITY.operations, operationItems),
++      pushList("filesTouched", HANDOFF_SECTION_PRIORITY.filesTouched, filesTouchedItems),
++      pushList("relevantFiles", HANDOFF_SECTION_PRIORITY.relevantFiles, context.relevantFiles.map((text) => ({ text }))),
++      pushList("changedFiles", HANDOFF_SECTION_PRIORITY.changedFiles, context.changedFiles.map((text) => ({ text }))),
++      pushList("failedApproaches", HANDOFF_SECTION_PRIORITY.failedApproaches, context.failedApproaches.map((text) => ({ text }))),
++      pushList("readYields", HANDOFF_SECTION_PRIORITY.readYields, context.readYields.map((text) => ({ text }))),
++      pushList("evidence", HANDOFF_SECTION_PRIORITY.evidence, context.evidence.map((text) => ({ text }))),
++    ].filter(isDefined),
++    HANDOFF_BUDGET_LIMITS,
++  );
++
++  const itemsOf = (key: string): readonly BudgetItem[] =>
++    budgeted.sections.find((section) => section.key === key)?.items ?? [];
++  const textList = (key: string): readonly string[] => itemsOf(key).map((item) => item.text);
++  const refList = (key: string): readonly (readonly string[] | undefined)[] => itemsOf(key).map((item) => item.refs);
++  const lineText = (key: string): string | undefined => itemsOf(key)[0]?.text;
++
++  const droppedFindingsChars = findingsDropped.reduce((sum, finding) => sum + finding.text.length + 1, 0);
++  const budget: HandoffBudget = {
++    ...budgeted.budget,
++    omittedItems: {
++      ...budgeted.budget.omittedItems,
++      ...(findingsDropped.length > 0
++        ? { findings: (budgeted.budget.omittedItems.findings ?? 0) + findingsDropped.length }
++        : {}),
++      ...(executionsAll.length > EXECUTIONS_CAP ? { executions: executionsAll.length - EXECUTIONS_CAP } : {}),
++    },
++    omittedChars: {
++      ...budgeted.budget.omittedChars,
++      ...(droppedFindingsChars > 0
++        ? { findings: (budgeted.budget.omittedChars.findings ?? 0) + droppedFindingsChars }
++        : {}),
++    },
++  };
++
++  const goalText = lineText("goal");
++  const currentStateText = lineText("currentState");
++  const testStateText = lineText("testState");
++  const verificationText = lineText("verification");
++  const unresolvedText = lineText("unresolved");
+ 
+   return {
+     workId: work.id,
+-    ...(goal ? { goal } : {}),
+-    ...(workspacePath ? { workspacePath } : {}),
+-    ...(execution ? { execution } : {}),
+-    ...(executions.length > 0 ? { executions } : {}),
+-    ...(currentState ? { currentState } : {}),
+-    decisions,
+-    findings,
+-    nextSteps,
+-    operations,
+-    filesTouched,
+-    ...(context.revision ? { revision: context.revision } : {}),
+-    ...(context.relevantFiles.length > 0 ? { relevantFiles: context.relevantFiles } : {}),
+-    ...(context.changedFiles.length > 0 ? { changedFiles: context.changedFiles } : {}),
+-    ...(context.failedApproaches.length > 0 ? { failedApproaches: context.failedApproaches } : {}),
+-    ...(context.testState ? { testState: context.testState } : {}),
+-    ...(context.readYields.length > 0 ? { readYields: context.readYields } : {}),
+-    ...(context.unresolved ? { unresolved: context.unresolved } : {}),
+-    ...(context.evidence.length > 0 ? { evidence: context.evidence } : {}),
++    ...(goalText ? { goal: goalText } : {}),
++    ...(workspacePath ? { workspacePath: redactLine(workspacePath) } : {}),
++    ...(execution ? { execution: redactExecution(execution) } : {}),
++    ...(executions.length > 0 ? { executions: executions.map(redactExecution) } : {}),
++    ...(currentStateText ? { currentState: currentStateText } : {}),
++    decisions: textList("decisions"),
++    findings: textList("findings"),
++    nextSteps: textList("nextSteps"),
++    operations: textList("operations"),
++    filesTouched: textList("filesTouched"),
++    ...(context.revision ? { revision: redactLine(context.revision) } : {}),
++    ...(textList("relevantFiles").length > 0 ? { relevantFiles: textList("relevantFiles") } : {}),
++    ...(textList("changedFiles").length > 0 ? { changedFiles: textList("changedFiles") } : {}),
++    ...(textList("failedApproaches").length > 0 ? { failedApproaches: textList("failedApproaches") } : {}),
++    ...(testStateText ? { testState: testStateText } : {}),
++    ...(verificationText ? { verification: verificationText } : {}),
++    ...(textList("readYields").length > 0 ? { readYields: textList("readYields") } : {}),
++    ...(unresolvedText ? { unresolved: unresolvedText } : {}),
++    ...(textList("evidence").length > 0 ? { evidence: textList("evidence") } : {}),
++    evidenceRefs: {
++      decisions: refList("decisions"),
++      findings: refList("findings"),
++      nextSteps: refList("nextSteps"),
++    },
++    budget,
+     eventCounts: countEvents(work.events),
+     diagnosticCodes,
+     provenance: {
+@@ -125,6 +346,172 @@ export const buildHandoffFromWork = (work: Work): Handoff => {
+   };
+ };
+ 
++interface BudgetItem {
++  readonly text: string;
++  readonly refs?: readonly string[];
++}
++
++interface BudgetSectionInput {
++  readonly key: string;
++  readonly priority: number;
++  readonly items: readonly BudgetItem[];
++}
++
++const truncateBudgetItem = (value: string, limit: number): { text: string; omitted: number } => {
++  if (value.length <= limit) return { text: value, omitted: 0 };
++  let cut = limit;
++  while (cut > 0) {
++    const head = value.slice(0, cut);
++    const open = head.lastIndexOf(REDACTION_MARKER_PREFIX);
++    if (open === -1 || head.indexOf("]", open) !== -1) break;
++    cut = open;
++  }
++  // If a [REDACTED:<kind>] marker is longer than the limit itself, the cut
++  // bottoms out at the marker start and the partial marker is dropped with
++  // the tail rather than split.
++  const kept = value.slice(0, cut).trimEnd();
++  const omitted = value.length - kept.length;
++  return { text: `${kept}… [+${omitted} chars omitted]`, omitted };
++};
++
++const budgetSectionSize = (items: readonly BudgetItem[]): number =>
++  items.reduce((sum, item) => sum + item.text.length, 0) + Math.max(0, items.length - 1);
++
++const applyHandoffBudget = (
++  sections: readonly BudgetSectionInput[],
++  limits: HandoffBudgetLimits,
++): { readonly sections: readonly BudgetSectionInput[]; readonly budget: HandoffBudget } => {
++  const omittedItems: Record<string, number> = {};
++  const truncatedItems: Record<string, number> = {};
++  const omittedChars: Record<string, number> = {};
++  const bump = (record: Record<string, number>, key: string, delta: number): void => {
++    record[key] = (record[key] ?? 0) + delta;
++  };
++
++  interface WorkingSection {
++    readonly key: string;
++    readonly priority: number;
++    items: BudgetItem[];
++    dropped: number;
++  }
++
++  // 1. Per-item truncation (redaction-marker safe).
++  const state: WorkingSection[] = sections.map((section) => ({
++    key: section.key,
++    priority: section.priority,
++    items: section.items.map((item) => {
++      const truncated = truncateBudgetItem(item.text, limits.itemChars);
++      if (truncated.omitted > 0) {
++        bump(truncatedItems, section.key, 1);
++        bump(omittedChars, section.key, truncated.omitted);
++        return { ...item, text: truncated.text };
++      }
++      return item;
++    }),
++    dropped: 0,
++  }));
++
++  // 2. Per-section budget: keep the most recent items, drop the oldest first.
++  for (const section of state) {
++    while (budgetSectionSize(section.items) > limits.sectionChars && section.items.length > 1) {
++      const removed = section.items[0];
++      if (removed === undefined) break;
++      section.items = section.items.slice(1);
++      section.dropped += 1;
++      bump(omittedChars, section.key, removed.text.length + 1);
++    }
++    if (section.dropped > 0) bump(omittedItems, section.key, section.dropped);
++  }
++
++  // 3. Total budget: drop whole sections lowest-priority first. Protected
++  // priorities (uncertainty/unresolved work and goal) are never dropped.
++  // A section emptied here renders as its marker alone (no item separator).
++  const markerSize = (section: WorkingSection): number =>
++    section.dropped > 0
++      ? (formatOmittedMarker(section.dropped)?.length ?? 0) + (section.items.length > 0 ? 1 : 0)
++      : 0;
++  const measure = (): number =>
++    state.reduce((sum, section) => sum + budgetSectionSize(section.items) + markerSize(section), 0);
++  let total = measure();
++  const droppable = state
++    .filter((section) => section.priority > HANDOFF_PROTECTED_PRIORITY && section.items.length > 0)
++    .sort((a, b) => b.priority - a.priority);
++  for (const section of droppable) {
++    if (total <= limits.totalChars) break;
++    const removedSize = budgetSectionSize(section.items);
++    if (removedSize === 0) continue;
++    const previousMarker = markerSize(section);
++    bump(omittedItems, section.key, section.items.length);
++    bump(omittedChars, section.key, removedSize);
++    section.dropped += section.items.length;
++    section.items = [];
++    total = total - removedSize - previousMarker + markerSize(section);
++  }
++
++  const finalSections = state.map((section) => {
++    const marker = formatOmittedMarker(section.dropped);
++    const items = marker ? [...section.items, { text: marker }] : section.items;
++    return { key: section.key, priority: section.priority, items };
++  });
++
++  const boundedChars = finalSections.reduce((sum, section) => sum + budgetSectionSize(section.items), 0);
++
++  return {
++    sections: finalSections,
++    budget: {
++      limits,
++      omittedItems,
++      truncatedItems,
++      omittedChars,
++      boundedChars,
++      withinBudget: boundedChars <= limits.totalChars,
++    },
++  };
++};
++
++const claimItems = (
++  claims: readonly { text?: string; evidence?: readonly string[] }[] | undefined,
++): readonly BudgetItem[] =>
++  (claims ?? []).flatMap((claim) => {
++    const text = present(claim.text);
++    if (!text) return [];
++    const refs = evidenceIds(claim.evidence);
++    return [refs ? { text, refs } : { text }];
++  });
++
++const continuationItems = (work: Work, continuation: readonly string[]): readonly BudgetItem[] => {
++  const stepsBranch = work.nextSteps !== undefined && work.nextSteps.length > 0;
++  const stepRefs: (readonly string[] | undefined)[] = [];
++  if (stepsBranch) {
++    for (const step of work.nextSteps ?? []) {
++      if (!present(step.description)) continue;
++      stepRefs.push(evidenceIds(step.evidence));
++    }
++  }
++  const pendingRefs = pendingEvidenceRefs(work);
++  return continuation.map((text, index) => {
++    const refs = stepsBranch ? stepRefs[index] : pendingRefs[index];
++    return refs ? { text, refs } : { text };
++  });
++};
++
++const pendingEvidenceRefs = (work: Work): readonly (readonly string[] | undefined)[] => {
++  const operations = work.operations ?? extractToolOperations(work);
++  return operations
++    .filter((operation) => operation.status === "pending")
++    .map((operation) => evidenceIds(operation.evidence));
++};
++
++const evidenceIds = (ids: readonly string[] | undefined): readonly string[] | undefined => {
++  const clean = (ids ?? []).filter(isPresent);
++  return clean.length > 0 ? clean : undefined;
++};
++
++const redactItems = (items: readonly BudgetItem[]): readonly BudgetItem[] =>
++  items.map((item) => ({ ...item, text: redactLine(item.text) }));
++
++const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
++
+ const toHandoffExecution = (execution: Execution | undefined): HandoffExecution | undefined => {
+   if (!execution) return undefined;
+   const provider = present(execution.provider);
+@@ -144,6 +531,7 @@ const resolveCurrentState = (
+   nextSteps: readonly string[],
+   diagnosticCodes: readonly string[],
+   operations: readonly ObservedOperation[],
++  verification: string | undefined,
+ ): string | undefined => {
+   const pending = operations.filter((operation) => operation.status === "pending");
+   const pendingHint = formatPendingHint(pending[0]);
+@@ -154,19 +542,21 @@ const resolveCurrentState = (
+ 
+   const succeededEditPaths = uniquePaths(
+     operations.filter((operation) =>
+-      (operation.toolName === "edit" || operation.toolName === "write") &&
++      ["edit", "write", "apply_patch", "str_replace"].includes(operation.toolName?.toLowerCase() ?? "") &&
+       operation.status === "succeeded"
+     ),
+   );
+   if (succeededEditPaths.length > 0) {
+-    return `Edits reported success on ${succeededEditPaths.join(", ")}. Verification not recorded.`;
++    return `Edits reported success on ${succeededEditPaths.join(", ")}. ${verification ?? "Verification not recorded"}.`;
+   }
+ 
++  if (verification) return `${verification}.`;
++
+   if (nextSteps.length > 0) {
+     return `Unresolved: ${nextSteps.join("; ")}`;
+   }
+ 
+-  if (diagnosticCodes.includes("missing_tool_result")) return "Unresolved: pending tool activity";
++  if (operations.length === 0 && diagnosticCodes.includes("missing_tool_result")) return "Unresolved: pending tool activity";
+   return undefined;
+ };
+ 
+@@ -223,12 +613,7 @@ const parseOperationLine = (line: string, workspacePath: string | undefined): re
+ };
+ 
+ const operationsFromEvents = (work: Work): readonly ObservedOperation[] => {
+-  const results = new Map<string, WorkEvent>();
+-  for (const event of work.events) {
+-    if (event.kind !== "tool_result") continue;
+-    const callId = asString(event.payload.toolCallId);
+-    if (callId && !results.has(callId)) results.set(callId, event);
+-  }
++  const results = indexToolResults(work);
+ 
+   const operations: ObservedOperation[] = [];
+   for (const event of work.events) {
+@@ -238,7 +623,7 @@ const operationsFromEvents = (work: Work): readonly ObservedOperation[] => {
+     const path = pathFromArguments(args);
+     const command = args ? asString(args.command) : undefined;
+     const callId = asString(event.payload.toolCallId);
+-    const result = callId ? results.get(callId) : undefined;
++    const result = callId ? results.get(toolResultKey(event.executionId, callId)) : undefined;
+     const display = path ? displayPath(path, work.workspace?.path) : undefined;
+     const shownCommand = command ? displayCommand(command, work.workspace?.path) : undefined;
+     if (!toolName && !display && !shownCommand) continue;
+@@ -379,11 +764,18 @@ const uniqueDiagnosticCodes = (work: Work): readonly string[] => {
+   for (const event of work.events) {
+     for (const diagnostic of event.diagnostics) add(diagnostic.code);
+   }
+-  return codes;
++  return codes.sort();
+ };
+ 
+-const compact = (values: readonly (string | undefined)[] | undefined): readonly string[] =>
+-  (values ?? []).filter(isPresent);
++const redactLine = (value: string): string => redactOutputText(value).text;
++
++const redactExecution = (execution: HandoffExecution): HandoffExecution => ({
++  harness: execution.harness,
++  ...(execution.provider ? { provider: redactLine(execution.provider) } : {}),
++  ...(execution.model ? { model: redactLine(execution.model) } : {}),
++  ...(execution.sourceId ? { sourceId: redactLine(execution.sourceId) } : {}),
++  ...(execution.sourceFormat ? { sourceFormat: redactLine(execution.sourceFormat) } : {}),
++});
+ 
+ const present = (value: string | undefined): string | undefined =>
+   isPresent(value) ? value : undefined;
+diff --git a/src/work/observe.ts b/src/work/observe.ts
+index 2876631..8d0d7e0 100644
+--- a/src/work/observe.ts
++++ b/src/work/observe.ts
+@@ -1,5 +1,6 @@
+ import { diagnostic } from "../diagnostics.js";
+ import type { Diagnostic } from "../types.js";
++import { redactJsonValue, secretRedactedDiagnostic, summarizeRedactions } from "./redact.js";
+ import type { Execution, ObservedWorkInput, Work, WorkEvent, Workspace } from "./types.js";
+ 
+ export const reconstructObservedWork = (input: ObservedWorkInput): Work => {
+@@ -26,16 +27,59 @@ export const reconstructObservedWork = (input: ObservedWorkInput): Work => {
+     ));
+   }
+ 
+-  const events: WorkEvent[] = input.events.map((event) => ({
+-    id: event.id,
+-    workId,
+-    executionId,
+-    kind: event.kind,
+-    ...(event.timestamp ? { timestamp: event.timestamp } : {}),
+-    payload: event.payload,
+-    provenance: event.provenance,
+-    diagnostics: event.diagnostics,
+-  }));
++  const events: WorkEvent[] = input.events.map((event) => {
++    // Ingestion choke point: obvious secrets are redacted from every observed
++    // payload before the Work can reach SQLite. Per-event diagnostics carry
++    // the kind, field path, and source provenance (never the secret value).
++    const redacted = redactJsonValue(event.payload, "payload");
++    if (redacted.redactions.length === 0) {
++      return {
++        id: event.id,
++        workId,
++        executionId,
++        kind: event.kind,
++        ...(event.timestamp ? { timestamp: event.timestamp } : {}),
++        payload: event.payload,
++        provenance: event.provenance,
++        diagnostics: event.diagnostics,
++      };
++    }
++    const summary = summarizeRedactions(redacted.redactions);
++    return {
++      id: event.id,
++      workId,
++      executionId,
++      kind: event.kind,
++      ...(event.timestamp ? { timestamp: event.timestamp } : {}),
++      payload: redacted.value as typeof event.payload,
++      provenance: event.provenance,
++      diagnostics: [
++        ...event.diagnostics,
++        secretRedactedDiagnostic(
++          summary,
++          `Redacted ${summary.count} secret value(s) (${summary.kinds.join(", ")}) from ingested session text.`,
++          {
++            ...(event.provenance.sourceLocation ? { path: event.provenance.sourceLocation } : {}),
++            line: event.provenance.line,
++            ...(event.provenance.sourceEntry ? { entryId: event.provenance.sourceEntry } : {}),
++            ...(event.provenance.contentIndex !== undefined ? { contentIndex: event.provenance.contentIndex } : {}),
++            ...(event.provenance.toolCallId ? { toolCallId: event.provenance.toolCallId } : {}),
++          },
++        ),
++      ],
++    };
++  });
++
++  if (events.some((event) => event.diagnostics.some((item) => item.code === "secret_redacted"))) {
++    const affected = events.filter((event) =>
++      event.diagnostics.some((item) => item.code === "secret_redacted")).length;
++    diagnostics.push(diagnostic(
++      "secret_redacted",
++      "info",
++      `Redacted obvious secrets from ${affected} ingested event(s). Secret values replaced with markers; see event diagnostics for kinds and provenance.`,
++      location(input),
++    ));
++  }
+ 
+   const execution: Execution = {
+     id: executionId,
+@@ -77,23 +121,35 @@ export const attachObservedWork = (existing: Work, incoming: Work): Work => {
+     if (executions.some((known) => known.id === execution.id)) continue;
+     executions.push({ ...execution, workId: existing.id });
+   }
++  const incomingById = new Map(incoming.events.map((event) => [event.id, event]));
++  const refreshedDiagnostics = new Set<string>();
+   const knownEventIds = new Set(existing.events.map((event) => event.id));
+-  const events: WorkEvent[] = [...existing.events];
++  const events: WorkEvent[] = existing.events.map((event) => {
++    const refreshed = incomingById.get(event.id);
++    if (!refreshed || refreshed.executionId !== event.executionId) return event;
++    for (const item of event.diagnostics) refreshedDiagnostics.add(JSON.stringify(item));
++    // Source records stay immutable; correlation diagnostics reflect the latest snapshot.
++    return { ...event, diagnostics: refreshed.diagnostics };
++  });
+   for (const event of incoming.events) {
+     if (knownEventIds.has(event.id)) continue;
+     knownEventIds.add(event.id);
+     events.push({ ...event, workId: existing.id });
+   }
+-  const diagnostics: Diagnostic[] = [...existing.diagnostics];
++  const diagnostics: Diagnostic[] = existing.diagnostics.filter((item) =>
++    !refreshedDiagnostics.has(JSON.stringify(item))
++  );
+   for (const item of incoming.diagnostics) {
+     if (diagnostics.some((known) => JSON.stringify(known) === JSON.stringify(item))) continue;
+     diagnostics.push(item);
+   }
++  const updatedAt = [existing.updatedAt, incoming.updatedAt]
++    .filter((value): value is string => value !== undefined).sort().at(-1);
+   return {
+     id: existing.id,
+     ...(existing.workspace ?? incoming.workspace ? { workspace: (existing.workspace ?? incoming.workspace) as Workspace } : {}),
+     ...(existing.createdAt ?? incoming.createdAt ? { createdAt: (existing.createdAt ?? incoming.createdAt) as string } : {}),
+-    ...(incoming.updatedAt ?? existing.updatedAt ? { updatedAt: (incoming.updatedAt ?? existing.updatedAt) as string } : {}),
++    ...(updatedAt ? { updatedAt } : {}),
+     executions,
+     events,
+     diagnostics,
+@@ -111,3 +167,35 @@ const lastTimestamp = (events: readonly WorkEvent[]): string | undefined => {
+ const location = (input: ObservedWorkInput) => ({
+   ...(input.sourceLocation ? { path: input.sourceLocation } : {}),
+ });
++
++// Reconcile against this view's event boundary, so live work and checkpoints agree
++// with their own evidence without rewriting historical source records.
++export const reconcileToolDiagnostics = (work: Work): Work => {
++  const results = new Set(work.events.filter((event) => event.kind === "tool_result")
++    .map((event) => JSON.stringify([event.executionId, event.payload.toolCallId])));
++  const resolved = new Set<string>();
++  const events = work.events.map((event) => {
++    if (event.kind !== "tool_call" || typeof event.payload.toolCallId !== "string" ||
++        !results.has(JSON.stringify([event.executionId, event.payload.toolCallId]))) return event;
++    return { ...event, diagnostics: event.diagnostics.filter((item) => {
++      if (item.code !== "missing_tool_result") return true;
++      resolved.add(JSON.stringify([event.executionId, item]));
++      return false;
++    }) };
++  });
++  const reconciled = events.map((event) => ({
++    ...event,
++    diagnostics: event.diagnostics.filter((item) => !resolved.has(JSON.stringify([event.executionId, item]))),
++  }));
++  const retainedDiagnostics = new Set(reconciled.flatMap((event) => event.diagnostics.map((item) => JSON.stringify(item))));
++  const removedDiagnostics = new Set(work.events.flatMap((event) => event.diagnostics
++    .filter((item) => resolved.has(JSON.stringify([event.executionId, item])))
++    .map((item) => JSON.stringify(item))));
++  return {
++    ...work,
++    events: reconciled,
++    diagnostics: work.diagnostics.filter((item) =>
++      !removedDiagnostics.has(JSON.stringify(item)) || retainedDiagnostics.has(JSON.stringify(item))
++    ),
++  };
++};
+diff --git a/src/work/operations.ts b/src/work/operations.ts
+index bceb063..1786af8 100644
+--- a/src/work/operations.ts
++++ b/src/work/operations.ts
+@@ -16,7 +16,7 @@ export const extractToolOperations = (work: Work): ToolOperation[] => {
+     if (!toolName && !path && !command) continue;
+ 
+     const toolCallId = asString(event.payload.toolCallId);
+-    const result = toolCallId ? resultsByCallId.get(toolCallId) : undefined;
++    const result = toolCallId ? resultsByCallId.get(toolResultKey(event.executionId, toolCallId)) : undefined;
+     const note = result ? resultNote(result) : undefined;
+     const evidence = result ? [event.id, result.id] : [event.id];
+ 
+@@ -25,7 +25,7 @@ export const extractToolOperations = (work: Work): ToolOperation[] => {
+       ...(toolName ? { toolName } : {}),
+       ...(path ? { path } : {}),
+       ...(command ? { command } : {}),
+-      status: operationStatus(event, result),
++      status: operationStatus(result),
+       ...(note ? { note } : {}),
+       evidence,
+       provenance: {
+@@ -39,19 +39,23 @@ export const extractToolOperations = (work: Work): ToolOperation[] => {
+   return operations;
+ };
+ 
+-const indexToolResults = (work: Work): Map<string, WorkEvent> => {
++export const toolResultKey = (executionId: string, toolCallId: string): string =>
++  JSON.stringify([executionId, toolCallId]);
++
++export const indexToolResults = (work: Work): Map<string, WorkEvent> => {
+   const results = new Map<string, WorkEvent>();
+   for (const event of work.events) {
+     if (event.kind !== "tool_result") continue;
+     const toolCallId = asString(event.payload.toolCallId);
+-    if (!toolCallId || results.has(toolCallId)) continue;
+-    results.set(toolCallId, event);
++    if (!toolCallId) continue;
++    const key = toolResultKey(event.executionId, toolCallId);
++    if (!results.has(key)) results.set(key, event);
+   }
+   return results;
+ };
+ 
+-const operationStatus = (call: WorkEvent, result: WorkEvent | undefined): ToolOperationStatus => {
+-  if (!result || call.diagnostics.some((diagnostic) => diagnostic.code === "missing_tool_result")) {
++const operationStatus = (result: WorkEvent | undefined): ToolOperationStatus => {
++  if (!result) {
+     return "pending";
+   }
+   if (result.payload.isError === true) return "failed";
+diff --git a/tests/cli-fork.test.ts b/tests/cli-fork.test.ts
+index b6678d2..cce869b 100644
+--- a/tests/cli-fork.test.ts
++++ b/tests/cli-fork.test.ts
+@@ -309,7 +309,7 @@ describe("harnie fork", () => {
+     expect(missingStderr.toString()).toBe("Work id is required.\n");
+   });
+ 
+-  it("migrates a pre-existing old-shape database", async () => {
++  it.each([false, true])("migrates a pre-existing old-shape database (checkpoints: %s)", async (withCheckpoints) => {
+     const home = await makeHome();
+     const raw = new DatabaseSync(databasePath(home));
+     try {
+@@ -381,10 +381,40 @@ describe("harnie fork", () => {
+         1,
+         0,
+       );
++      if (withCheckpoints) {
++        raw.exec(`CREATE TABLE checkpoints (
++          id TEXT PRIMARY KEY,
++          work_id TEXT NOT NULL REFERENCES works(id),
++          execution_id TEXT REFERENCES executions(id),
++          message TEXT NOT NULL DEFAULT '',
++          created_at TEXT NOT NULL,
++          event_ordinal_watermark INTEGER NOT NULL,
++          event_count INTEGER NOT NULL,
++          goal_json TEXT,
++          decisions_json TEXT NOT NULL DEFAULT '[]',
++          findings_json TEXT NOT NULL DEFAULT '[]',
++          next_steps_json TEXT NOT NULL DEFAULT '[]',
++          operations_json TEXT NOT NULL DEFAULT '[]'
++        )`);
++        for (const [id, date] of [["checkpoint:old:1", "2026-01-03"], ["checkpoint:old:2", "2026-01-02"]]) {
++          raw.prepare(`INSERT INTO checkpoints
++            (id, work_id, execution_id, message, created_at, event_ordinal_watermark, event_count,
++             goal_json, decisions_json, findings_json, next_steps_json, operations_json)
++            VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?)`).run(
++              id!, "work:old:1", "execution:old:1", "frozen history", date!,
++              JSON.stringify({ statement: "Original goal", evidence: ["event:old:1"] }),
++              '[{"summary":"Original decision"}]', '[{"statement":"Original finding"}]',
++              '[{"description":"Original next step"}]', '[{"status":"pending"}]',
++            );
++        }
++      }
+     } finally {
+       raw.close();
+     }
+ 
++    const original = new DatabaseSync(databasePath(home));
++    const snapshots = withCheckpoints ? original.prepare("SELECT * FROM checkpoints ORDER BY rowid").all() : [];
++    original.close();
+     const store = initHarnieStore({ home });
+     try {
+       const loaded = loadWork(store, "work:old:1");
+@@ -404,8 +434,26 @@ describe("harnie fork", () => {
+         db.prepare("SELECT sql FROM sqlite_master WHERE name = 'events'").get() as unknown as { sql: string }
+       ).sql;
+       expect(eventsSql).toContain("PRIMARY KEY (work_id");
++      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
++      expect(db.prepare("PRAGMA foreign_keys").get()?.foreign_keys).toBe(1);
++      if (withCheckpoints) {
++        expect(db.prepare("SELECT * FROM checkpoints ORDER BY rowid").all()).toEqual(snapshots);
++        expect(listCheckpoints(store, "work:old:1").map((checkpoint) => checkpoint.id))
++          .toEqual(["checkpoint:old:1", "checkpoint:old:2"]);
++        expect(db.prepare("PRAGMA index_info(idx_checkpoints_work_seq)").all().map((row) => row.name))
++          .toEqual(["work_id"]);
++      }
+     } finally {
+       store.close();
+     }
++    const reopened = initHarnieStore({ home });
++    try {
++      expect(loadWork(reopened, "work:old:1")?.events).toHaveLength(1);
++      if (withCheckpoints) {
++        expect(storeDatabase(reopened).prepare("SELECT * FROM checkpoints ORDER BY rowid").all()).toEqual(snapshots);
++      }
++    } finally {
++      reopened.close();
++    }
+   });
+ });
+diff --git a/tests/cli-import-codex.test.ts b/tests/cli-import-codex.test.ts
+index d73559b..35ad854 100644
+--- a/tests/cli-import-codex.test.ts
++++ b/tests/cli-import-codex.test.ts
+@@ -160,7 +160,7 @@ describe("harnie import codex", () => {
+ 
+     const listed = capture();
+     const shown = capture();
+-    expect(await runList({ home, stdout: listed, stderr: capture() })).toBe(0);
++    expect(await runList([], { home, stdout: listed, stderr: capture() })).toBe(0);
+     expect(await runShow([WORK_ID], { home, stdout: shown, stderr: capture() })).toBe(0);
+     expect(listed.toString()).toContain(WORK_ID);
+     expect(shown.toString()).toContain(WORK_ID);
+diff --git a/tests/cli-import-opencode.test.ts b/tests/cli-import-opencode.test.ts
+index 1841d6c..1167291 100644
+--- a/tests/cli-import-opencode.test.ts
++++ b/tests/cli-import-opencode.test.ts
+@@ -111,7 +111,7 @@ describe("harnie import opencode", () => {
+ 
+     const listed = capture();
+     const shown = capture();
+-    expect(await runList({ home, stdout: listed, stderr: capture() })).toBe(0);
++    expect(await runList([], { home, stdout: listed, stderr: capture() })).toBe(0);
+     expect(await runShow([workId], { home, stdout: shown, stderr: capture() })).toBe(0);
+     expect(listed.toString()).toContain(workId);
+     expect(shown.toString()).toContain(workId);
+diff --git a/tests/cli-inspect.test.ts b/tests/cli-inspect.test.ts
+index 854d613..c8ae2c0 100644
+--- a/tests/cli-inspect.test.ts
++++ b/tests/cli-inspect.test.ts
+@@ -61,7 +61,7 @@ describe("harnie list and show", () => {
+     const stdout = capture();
+     const stderr = capture();
+ 
+-    const code = await runList({ home, stdout, stderr });
++    const code = await runList([], { home, stdout, stderr });
+ 
+     expect(code).toBe(0);
+     expect(stderr.toString()).toBe("");
+@@ -122,7 +122,7 @@ describe("harnie list and show", () => {
+     const stdout = capture();
+     const stderr = capture();
+ 
+-    const code = await runList({ home, stdout, stderr });
++    const code = await runList([], { home, stdout, stderr });
+ 
+     expect(code).toBe(0);
+     expect(stderr.toString()).toBe("");
+diff --git a/tests/import.test.ts b/tests/import.test.ts
+index 620213a..352ce46 100644
+--- a/tests/import.test.ts
++++ b/tests/import.test.ts
+@@ -1,9 +1,12 @@
+-import { mkdtemp, rm, writeFile } from "node:fs/promises";
++import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { afterEach, describe, expect, it } from "vitest";
+-import { importPiSessionFile } from "../src/engine/import.js";
++import { importCodexSessionFile, importPiSessionFile } from "../src/engine/import.js";
+ import { initHarnieStore } from "../src/store/database.js";
++import { createCheckpoint } from "../src/store/checkpoints.js";
++import { loadWorkAtCheckpoint } from "../src/store/fork.js";
++import { buildHandoffFromWork } from "../src/work/handoff.js";
+ import { loadWork } from "../src/store/persist.js";
+ 
+ describe("Pi observed import", () => {
+@@ -37,6 +40,51 @@ describe("Pi observed import", () => {
+     }
+   });
+ 
++  it("preserves attached claims on an ordinary refresh", async () => {
++    const store = await makeStore();
++    try {
++      const first = await importPiSessionFile(store, "tests/fixtures/pi/trace-b-unfinished.jsonl");
++      await importCodexSessionFile(store, "tests/fixtures/codex/unfinished-read.jsonl", { workId: first.workId });
++      const before = loadWork(store, first.workId);
++      expect(before?.operations?.some((operation) => operation.provenance.harness === "codex")).toBe(true);
++      const refresh = await importPiSessionFile(store, "tests/fixtures/pi/trace-b-unfinished.jsonl");
++      const after = loadWork(store, first.workId);
++      expect(refresh.eventsInserted).toBe(0);
++      expect(after).toEqual(before);
++    } finally {
++      store.close();
++    }
++  });
++
++  it.each([false, true])("clears resolved pending diagnostics on refresh (explicit attach: %s)", async (attach) => {
++    const store = await makeStore();
++    const dir = await mkdtemp(join(tmpdir(), "harnie-pending-"));
++    homes.push(dir);
++    try {
++      const path = join(dir, "session.jsonl");
++      const prefix = await readFile("tests/fixtures/pi/trace-b-unfinished.jsonl", "utf8");
++      await writeFile(path, prefix);
++      const first = await importPiSessionFile(store, path);
++      expect(loadWork(store, first.workId)?.nextSteps?.length).toBeGreaterThan(0);
++      const checkpoint = createCheckpoint(store, first.workId, "pending read");
++      const frozen = buildHandoffFromWork(loadWorkAtCheckpoint(store, first.workId, checkpoint.id));
++      await writeFile(path, prefix.trimEnd() + "\n" + JSON.stringify({
++        type: "message", id: "resolved", parentId: "harnie-tb-92ee92f6",
++        message: { role: "toolResult", toolCallId: "harnie-call-0006", toolName: "read", content: [{ type: "text", text: "config" }], isError: false },
++      }) + "\n");
++      const result = await importPiSessionFile(store, path, attach ? { workId: first.workId } : undefined);
++      const loaded = loadWork(store, first.workId);
++      expect(result.eventsInserted).toBe(1);
++      expect(buildHandoffFromWork(loadWorkAtCheckpoint(store, first.workId, checkpoint.id))).toEqual(frozen);
++      expect(loaded?.nextSteps ?? []).toEqual([]);
++      expect(loaded?.diagnostics.some((item) => item.code === "missing_tool_result")).toBe(false);
++      expect(loaded?.events.flatMap((event) => event.diagnostics).some((item) => item.code === "missing_tool_result")).toBe(false);
++      expect(loaded?.operations?.find((operation) => operation.path === ".git/config")?.status).toBe("succeeded");
++    } finally {
++      store.close();
++    }
++  });
++
+   it("appends only new events when a session file grows", async () => {
+     const store = await makeStore();
+     const dir = await mkdtemp(join(tmpdir(), "harnie-session-"));
+[0m
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/package.json
+[0m
+[0m$ [0mgit status --short scripts/prepare-bin.mjs; git diff scripts/prepare-bin.mjs; git log --oneline -3 -- scripts/prepare-bin.mjs
+?? scripts/prepare-bin.mjs
+[0m
+[0m$ [0mnpm run build && node scripts/prepare-bin.mjs; echo "EXIT=$?"
+> harnie@0.0.0 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.0.0 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+
+EXIT=0
+[0m
+[0m$ [0mnode -e "const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\n/,''))" && head -c 60 dist/cli.js; echo; node scripts/prepare-bin.mjs; echo "EXIT=$?"
+import { readFileSync, realpathSync } from "node:fs";
+import
+error: dist/cli.js is missing its '#!' shebang line. Rebuild dist so the published bin stays executable.
+EXIT=1
+[0m
+[0m$ [0mmv dist/cli.js dist/cli.js.bak && node scripts/prepare-bin.mjs; echo "EXIT=$?"; rm dist/cli.js.bak
+error: dist/cli.js not found. Run the build first; dist/cli.js must begin with a '#!' shebang.
+EXIT=1
+[0m
+[0m$ [0mnpm run build >/dev/null 2>&1; echo "BUILD_EXIT=$?"; head -1 dist/cli.js; ls -l dist/cli.js | awk '{print $1}'; npm run test:package; echo "TEST_EXIT=$?"
+BUILD_EXIT=0
+#!/usr/bin/env node
+-rwxr-xr-x@
+
+> harnie@0.0.0 test:package
+> node scripts/smoke-package.mjs
+
+Packed CLI smoke passed on v22.23.0: --help, init, fixture import, handoff.
+TEST_EXIT=0
+[0m

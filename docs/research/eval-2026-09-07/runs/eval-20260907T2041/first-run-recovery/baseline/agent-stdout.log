@@ -1,0 +1,11 @@
+Done.
+
+Report:
+1. Files edited: `docs/internal/FIRST-RUN.md`
+2. Commands run:
+   - `grep -n '^## Recovery' docs/internal/FIRST-RUN.md`
+   - `git diff --stat`
+3. Verification: **pass**
+   - `## Recovery` found at line 495.
+   - `git diff --stat` shows only `docs/internal/FIRST-RUN.md` modified (16 insertions).
+4. Task complete: **yes** — only `docs/internal/FIRST-RUN.md` was edited, and the new Recovery section documents `harnie backup <path>` (consistent SQLite snapshot, `0600` permissions), `harnie restore <path> --force` (validates then overwrites the live store), and the no-undo caveat.

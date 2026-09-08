@@ -1,0 +1,84 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260907T2041",
+  "taskId": "first-run-recovery",
+  "condition": "handoff",
+  "recordedAt": "2026-09-08T00:54:44.236682+00:00",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "3cfc04502aa9db3f846f534441342f011a0781a1",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/handoff/clone"
+  },
+  "handoff": {
+    "path": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/driver/harnie-home/handoffs/work_opencode_ses_drv_00000soa2fkk.md",
+    "chars": 1697,
+    "sha256": "91aadd6ce463a8e63b1eb3398d51e0a945af415bfe92fb5f369344c01a48f93c"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: first-run-recovery\n\nA previous agent session already worked on this task in this repository. The Harnie handoff package produced from that session appears at the bottom of this message. Use it as your context; do not re-investigate from scratch.\n\n## Task\nDocument backup/restore recovery in the first-run walkthrough.\n\nAdd a short '## Recovery' section to docs/internal/FIRST-RUN.md covering: `harnie backup <path>` writes a consistent SQLite snapshot (0600), `harnie restore <path> --force` validates the backup and then overwrites the live store, and restore has no undo. Edit only that file; no code changes.\n\n## Required verification\n- grep -n '^## Recovery' docs/internal/FIRST-RUN.md   # section exists\n- git diff --stat   # only docs/internal/FIRST-RUN.md modified\n\n## Expected end state\ndocs/internal/FIRST-RUN.md has a Recovery section with backup/restore usage and the no-undo caveat; no other file is modified.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n\n## Continuation handoff (from prior session)\n# Harnie handoff\n\nContinue this work. Do not re-investigate from scratch. Use the state below.\n\n## Goal\nDocument backup/restore recovery in the first-run walkthrough.\n\n## Workspace\n/workspace/harnie-clone\n\n## Relevant files\n- docs/internal/FIRST-RUN.md\n\n## Read yields\n- docs/internal/FIRST-RUN.md — completed\n\n## Execution\nopencode / anthropic / claude-sonnet-4-6\nopencode-session-v1\nses_drv_00000soa2fkk\n\n## Decisions\n- I will append a '## Recovery' section to docs/internal/FIRST-RUN.md covering: harnie backup <path> writes a consistent SQLite snapshot with 0600 permissions, harnie restore <path> --force validates the backup and then overwrites the live st… [+29 chars omitted] (evidence: opencode:ses_drv_00000soa2fkk:prt_000010wq51bf:message)\n\n## Findings\n- Confirmed from the source: backup produces a consistent snapshot file; restore validates the backup before overwriting; there is no undo of a restore, so the section must warn users to keep backups (evidence: opencode:ses_drv_00000soa2fkk:prt_000012jrk83l:message)\n- Docs-only change; no code edits. (evidence: opencode:ses_drv_00000soa2fkk:prt_000012jrk83l:message)\n\n## Operations\n- read docs/internal/FIRST-RUN.md — succeeded\n- bash grep -n 'backup\\|restore' src/cli.ts — succeeded\n\n## Event summary\n- message: 4\n- tool_call: 2\n- tool_result: 2\n\n## Provenance\nWork work:opencode:ses_drv_00000soa2fkk\nSource opencode session ses_drv_00000soa2fkk\n\n## Receiver instructions\n- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n- Handing this artifact to another agent may transmit its contents through that agent's provider.\n\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 21183,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/handoff/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/handoff/agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "read docs/internal/FIRST-RUN.md",
+      "purpose": "file named in handoff"
+    },
+    {
+      "cmd": "edit docs/internal/FIRST-RUN.md (append ## Recovery)",
+      "purpose": "implement task"
+    },
+    {
+      "cmd": "grep -n '^## Recovery' docs/internal/FIRST-RUN.md",
+      "purpose": "verify section exists (line 495)"
+    },
+    {
+      "cmd": "git diff --stat",
+      "purpose": "verify only that file changed (26 insertions)"
+    }
+  ],
+  "edits": {
+    "files": [
+      "docs/internal/FIRST-RUN.md"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 1164,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/handoff/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "grep -n '^## Recovery' docs/internal/FIRST-RUN.md",
+      "git diff --stat"
+    ],
+    "passed": true,
+    "details": "Receiver-reported verification cross-checked: the evaluator independently re-ran the task's verification commands in the clone after the run; all pass. Receiver's completion claim is supported by the recorded diff and re-run results."
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": 1697
+  },
+  "notes": "Single read, single edit, minimal verification — smallest run of the eight. Content matches task requirements (backup 0600, restore --force validates then overwrites, no-undo caveat). Evaluator re-ran grep + diff --stat: pass. Tool-call census from receiver session trace: bash×2, edit×1, read×1."
+}

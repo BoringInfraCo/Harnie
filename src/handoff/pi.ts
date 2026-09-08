@@ -1,4 +1,9 @@
-import type { Handoff } from "../work/handoff.js";
+import {
+  applyOutputRedaction,
+  formatEvidenceReference,
+  RECEIVER_INSTRUCTION_SECTION,
+  type Handoff,
+} from "../work/handoff.js";
 
 const EVENT_KINDS = ["message", "tool_call", "tool_result", "command", "unknown"] as const;
 
@@ -19,18 +24,19 @@ export const renderPiHandoff = (handoff: Handoff): string => {
   pushSection(sections, "Test state", handoff.testState);
   pushSection(sections, "Read yields", formatList(handoff.readYields ?? []));
   pushSection(sections, "Execution", formatExecutions(handoff));
-  pushSection(sections, "Decisions", formatList(handoff.decisions));
-  pushSection(sections, "Findings", formatList(handoff.findings));
+  pushSection(sections, "Decisions", formatList(handoff.decisions, handoff.evidenceRefs?.decisions));
+  pushSection(sections, "Findings", formatList(handoff.findings, handoff.evidenceRefs?.findings));
   if (!hasRoleFiles(handoff)) {
     pushSection(sections, "Files touched", formatList(handoff.filesTouched));
   }
   pushSection(sections, "Operations", formatList(handoff.operations));
-  pushSection(sections, "Next steps", formatList(handoff.nextSteps));
+  pushSection(sections, "Next steps", formatList(handoff.nextSteps, handoff.evidenceRefs?.nextSteps));
   pushSection(sections, "Event summary", formatEventCounts(handoff.eventCounts));
   pushSection(sections, "Evidence", formatList(handoff.evidence ?? []));
   pushSection(sections, "Provenance", formatProvenance(handoff));
+  sections.push(RECEIVER_INSTRUCTION_SECTION);
 
-  return `${sections.join("\n\n")}\n`;
+  return applyOutputRedaction(`${sections.join("\n\n")}\n`);
 };
 
 const unresolvedBody = (handoff: Handoff): string | undefined => {
@@ -86,8 +92,15 @@ const formatProvenance = (handoff: Handoff): string | undefined => {
   return lines.length > 0 ? lines.join("\n") : undefined;
 };
 
-const formatList = (items: readonly string[]): string | undefined => {
-  const lines = items.filter(present).map((item) => `- ${item}`);
+const formatList = (
+  items: readonly string[],
+  refs?: readonly (readonly string[] | undefined)[],
+): string | undefined => {
+  const lines = items.flatMap((item, index) => {
+    if (!present(item)) return [];
+    const reference = formatEvidenceReference(refs?.[index]);
+    return [reference ? `- ${item} ${reference}` : `- ${item}`];
+  });
   return lines.length > 0 ? lines.join("\n") : undefined;
 };
 

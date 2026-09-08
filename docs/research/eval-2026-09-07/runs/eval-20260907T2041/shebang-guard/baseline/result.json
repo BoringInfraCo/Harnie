@@ -1,0 +1,101 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260907T2041",
+  "taskId": "shebang-guard",
+  "condition": "baseline",
+  "recordedAt": "2026-09-08T00:54:44.236682+00:00",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "3cfc04502aa9db3f846f534441342f011a0781a1",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/baseline/clone"
+  },
+  "handoff": {
+    "path": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/driver/harnie-home/handoffs/work_opencode_ses_drv_00000g0z0zz2.md",
+    "chars": 1686,
+    "sha256": "688a54c6e604c37f4c8225afc52073144cfe67bc42cf2b59c454218b9d6bd817"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: shebang-guard\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nMake scripts/prepare-bin.mjs fail with a clear message when dist/cli.js lacks a shebang.\n\nBefore chmodding dist/cli.js, the script must check that dist/cli.js exists and begins with '#!'. If the file is missing or lacks the shebang, print a clear error to stderr naming dist/cli.js and the missing shebang, and exit non-zero. Otherwise chmod 0o755 and exit 0 as today. Edit only scripts/prepare-bin.mjs.\n\n## Required verification\n- npm run build && node scripts/prepare-bin.mjs   # exits 0 (shebang present)\n- node -e \"const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\\n/,''))\" && node scripts/prepare-bin.mjs   # exits non-zero with the shebang error\n- npm run build   # restores dist/cli.js\n- npm run test:package   # still green\n\n## Expected end state\nprepare-bin.mjs exits 0 when dist/cli.js has a shebang and exits non-zero with a clear stderr message when it does not; the normal build and package smoke test still pass.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 58624,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/baseline/agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "read scripts/prepare-bin.mjs",
+      "purpose": "locate chmod"
+    },
+    {
+      "cmd": "read package.json",
+      "purpose": "understand build chain"
+    },
+    {
+      "cmd": "edit scripts/prepare-bin.mjs (exists+shebang guard)",
+      "purpose": "implement task"
+    },
+    {
+      "cmd": "npm run build && node scripts/prepare-bin.mjs",
+      "purpose": "verify exit 0"
+    },
+    {
+      "cmd": "strip shebang; node scripts/prepare-bin.mjs",
+      "purpose": "verify failure path"
+    },
+    {
+      "cmd": "npm run build; npm run test:package",
+      "purpose": "verify restore + smoke"
+    },
+    {
+      "cmd": "strip shebang again; node scripts/prepare-bin.mjs",
+      "purpose": "re-confirm failure path after rebuild"
+    },
+    {
+      "cmd": "git diff scripts/prepare-bin.mjs",
+      "purpose": "review own edit"
+    }
+  ],
+  "edits": {
+    "files": [
+      "scripts/prepare-bin.mjs"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 705,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "npm run build && node scripts/prepare-bin.mjs",
+      "npm run build; npm run test:package",
+      "git diff scripts/prepare-bin.mjs"
+    ],
+    "passed": true,
+    "details": "Receiver-reported verification cross-checked: the evaluator independently re-ran the task's verification commands in the clone after the run; all pass. Receiver's completion claim is supported by the recorded diff and re-run results."
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": 1686
+  },
+  "notes": "Independent discovery; slightly more verification (ran the shebang-strip check twice). Edit made once — the re-run strip check re-verified, did not re-edit. All verifications independently confirmed by the evaluator. Tool-call census from receiver session trace: bash×7, edit×1, read×2."
+}

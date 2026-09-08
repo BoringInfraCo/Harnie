@@ -16,7 +16,7 @@ export const extractToolOperations = (work: Work): ToolOperation[] => {
     if (!toolName && !path && !command) continue;
 
     const toolCallId = asString(event.payload.toolCallId);
-    const result = toolCallId ? resultsByCallId.get(toolCallId) : undefined;
+    const result = toolCallId ? resultsByCallId.get(toolResultKey(event.executionId, toolCallId)) : undefined;
     const note = result ? resultNote(result) : undefined;
     const evidence = result ? [event.id, result.id] : [event.id];
 
@@ -25,7 +25,7 @@ export const extractToolOperations = (work: Work): ToolOperation[] => {
       ...(toolName ? { toolName } : {}),
       ...(path ? { path } : {}),
       ...(command ? { command } : {}),
-      status: operationStatus(event, result),
+      status: operationStatus(result),
       ...(note ? { note } : {}),
       evidence,
       provenance: {
@@ -39,19 +39,23 @@ export const extractToolOperations = (work: Work): ToolOperation[] => {
   return operations;
 };
 
-const indexToolResults = (work: Work): Map<string, WorkEvent> => {
+export const toolResultKey = (executionId: string, toolCallId: string): string =>
+  JSON.stringify([executionId, toolCallId]);
+
+export const indexToolResults = (work: Work): Map<string, WorkEvent> => {
   const results = new Map<string, WorkEvent>();
   for (const event of work.events) {
     if (event.kind !== "tool_result") continue;
     const toolCallId = asString(event.payload.toolCallId);
-    if (!toolCallId || results.has(toolCallId)) continue;
-    results.set(toolCallId, event);
+    if (!toolCallId) continue;
+    const key = toolResultKey(event.executionId, toolCallId);
+    if (!results.has(key)) results.set(key, event);
   }
   return results;
 };
 
-const operationStatus = (call: WorkEvent, result: WorkEvent | undefined): ToolOperationStatus => {
-  if (!result || call.diagnostics.some((diagnostic) => diagnostic.code === "missing_tool_result")) {
+const operationStatus = (result: WorkEvent | undefined): ToolOperationStatus => {
+  if (!result) {
     return "pending";
   }
   if (result.payload.isError === true) return "failed";

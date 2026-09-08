@@ -1,0 +1,15 @@
+**Report**
+
+1. **Files edited**
+   - `docs/internal/FIRST-RUN.md` — appended a `## Recovery` section.
+
+2. **Commands run**
+   - `grep -n '^## Recovery' docs/internal/FIRST-RUN.md` → `495:## Recovery`
+   - `git diff --stat` → `docs/internal/FIRST-RUN.md | 26 ++++++++++++++++++++++++++` / `1 file changed, 26 insertions(+)`
+
+3. **Verification**
+   - Section exists: **pass**
+   - Only `docs/internal/FIRST-RUN.md` modified: **pass**
+
+4. **Task complete**
+   - Yes. The Recovery section documents `harnie backup <path>` (consistent SQLite snapshot, `0600`), `harnie restore <path> --force` (validation then overwrite), and the no-undo caveat. No other files were changed and the working tree remains dirty.

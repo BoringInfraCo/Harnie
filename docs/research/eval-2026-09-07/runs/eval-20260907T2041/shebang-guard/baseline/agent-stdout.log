@@ -1,0 +1,16 @@
+Done.
+
+## Report
+
+1. **Files edited**
+   - `scripts/prepare-bin.mjs`
+
+2. **Commands run**
+   - `npm run build && node scripts/prepare-bin.mjs` — exited `0` (shebang present)
+   - `node -e "..." && node scripts/prepare-bin.mjs` — exited `1` with `error: dist/cli.js is missing a shebang`
+   - `npm run build` — restored `dist/cli.js`
+   - `npm run test:package` — passed
+
+3. **Verification**: all required checks pass.
+
+4. **Task complete**: yes.

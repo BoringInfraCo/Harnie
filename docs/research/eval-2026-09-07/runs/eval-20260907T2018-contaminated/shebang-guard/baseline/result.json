@@ -1,0 +1,60 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260907T2018",
+  "taskId": "shebang-guard",
+  "condition": "baseline",
+  "recordedAt": "2026-09-08T00:37:48.650475+00:00",
+  "status": "not-run",
+  "notRunReason": "INVALID RUN (containment failure): the receiver escaped its clone — the harness passed env PWD=<repo> while cwd was the clone, and `opencode run` resolved its project from PWD, so the agent worked in the real repo (session directory = /Users/sergio/Documents/Developer/BoringInfraCo/Harnie, model fell back to opencode-go/omen-alpha because -m was not parsed). The real repo was edited (src/cli.ts, scripts/prepare-bin.mjs); reverted from snapshot 1f8f80f. Re-run with the fixed harness: run eval-20260907T2039.",
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": null,
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "1f8f80fd4710c871c8145d723cc83a3b2a2d7ff3",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/shebang-guard/baseline/clone"
+  },
+  "handoff": {
+    "path": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/driver/harnie-home/handoffs/work_opencode_ses_drv_00000g0z0zz2.md",
+    "chars": 1686,
+    "sha256": "688a54c6e604c37f4c8225afc52073144cfe67bc42cf2b59c454218b9d6bd817"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: shebang-guard\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nMake scripts/prepare-bin.mjs fail with a clear message when dist/cli.js lacks a shebang.\n\nBefore chmodding dist/cli.js, the script must check that dist/cli.js exists and begins with '#!'. If the file is missing or lacks the shebang, print a clear error to stderr naming dist/cli.js and the missing shebang, and exit non-zero. Otherwise chmod 0o755 and exit 0 as today. Edit only scripts/prepare-bin.mjs.\n\n## Required verification\n- npm run build && node scripts/prepare-bin.mjs   # exits 0 (shebang present)\n- node -e \"const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\\n/,''))\" && node scripts/prepare-bin.mjs   # exits non-zero with the shebang error\n- npm run build   # restores dist/cli.js\n- npm run test:package   # still green\n\n## Expected end state\nprepare-bin.mjs exits 0 when dist/cli.js has a shebang and exits non-zero with a clear stderr message when it does not; the normal build and package smoke test still pass.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 60020,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/shebang-guard/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/shebang-guard/baseline/agent-stderr.log"
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [],
+    "outOfScopeFiles": [],
+    "diffChars": 0,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/shebang-guard/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": null,
+    "commands": [],
+    "passed": null,
+    "details": "not attributable automatically — fill via record if observed"
+  },
+  "metrics": {
+    "developerReExplanation": "unknown",
+    "repeatedInvestigation": "unknown",
+    "repeatedFinishedEdits": "unknown",
+    "nextActionCorrect": "unknown",
+    "missingOrFalseContext": "unknown",
+    "taskCompleted": null,
+    "falseCompletion": null,
+    "packageSizeChars": null
+  },
+  "notes": "Original status was 'ran' — the agent DID execute (see logs), but outside the experimental clone; excluded from the preview gate. Handoff/baseline outputs below are from the escaped session, not a valid condition."
+}

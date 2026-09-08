@@ -1,0 +1,24 @@
+The `--version` handling already exists in `src/cli.ts:76-79`. Let me check git status and whether dist is up to date:
+The working tree is dirty from prior work, and `src/cli.ts` already contains `--version` handling. Let me check if the built `dist/cli.js` matches:
+The `--version` flag is already implemented in `src/cli.ts:61-79` (reads version from package.json, no hardcoding, handled before all other commands) and works in dist. Let me run the full verification suite:
+All verification passes. The working tree remains dirty; nothing committed.
+
+## Report
+
+**1. Files edited:** None. The `--version` flag was already present in the working tree (prior uncommitted changes): `src/cli.ts:61-69` (`readPackageVersion()` reads `version` from `package.json` via `readFileSync` — not hardcoded) and `src/cli.ts:76-79` (handles `--version`/`-v` as first argument, prints to stdout, returns 0, before all other dispatch).
+
+**2. Commands run:**
+- `git status --short` (working tree already dirty from prior session)
+- `grep -n "version" dist/cli.js`
+- `npm run build`
+- `node dist/cli.js --version` → `0.0.0`, exit 0
+- `node dist/cli.js -v` → `0.0.0`
+- `node dist/cli.js --help | head -1` → usage still intact
+- `npx vitest run tests/cli-init.test.ts`
+
+**3. Verification results:**
+- `npm run build` — pass
+- `node dist/cli.js --version` — prints `0.0.0`, exit 0 — pass
+- `npx vitest run tests/cli-init.test.ts` — 7/7 passed — pass
+
+**4. Task complete:** Yes. `--version`/`-v` reads the version from `package.json` and exits 0 before any other argument handling; existing CLI behavior and the cli-init tests are unchanged.

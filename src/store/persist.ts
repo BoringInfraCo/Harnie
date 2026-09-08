@@ -14,9 +14,10 @@ import type {
   WorkEvent,
   Workspace,
 } from "../work/types.js";
+import { reconcileToolDiagnostics } from "../work/observe.js";
 import { isJsonObject } from "../types.js";
 import { storeDatabase, type HarnieStore } from "./database.js";
-import { CHECKPOINTS_SCHEMA_SQL, DERIVED_SCHEMA_SQL } from "./schema.js";
+import { CHECKPOINTS_INDEX_SQL, CHECKPOINTS_SCHEMA_SQL, CURRENT_SCHEMA_VERSION, DERIVED_SCHEMA_SQL, SCHEMA_MIGRATIONS_SQL } from "./schema.js";
 
 export interface PersistObservedWorkResult {
   readonly workId: string;
@@ -226,7 +227,7 @@ export const persistObservedWork = (store: HarnieStore, work: Work): PersistObse
   };
 };
 
-export const loadWork = (store: HarnieStore, workId: string): Work | undefined => {
+export const loadWork = (store: HarnieStore, workId: string, options?: { readonly rawDiagnostics?: boolean }): Work | undefined => {
   const db = storeDatabase(store);
   ensureDerivedSchema(db);
   const workRow = db.prepare(
@@ -291,7 +292,7 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
       }
     : undefined;
 
-  return {
+  const work: Work = {
     id: workRow.id,
     ...(workspace ? { workspace } : {}),
     ...(workRow.created_at ? { createdAt: workRow.created_at } : {}),
@@ -306,17 +307,14 @@ export const loadWork = (store: HarnieStore, workId: string): Work | undefined =
     ...(nextSteps.length > 0 ? { nextSteps } : {}),
     ...(operations.length > 0 ? { operations } : {}),
   };
+  return options?.rawDiagnostics ? work : reconcileToolDiagnostics(work);
 };
 
 const ensureDerivedSchema = (db: DatabaseSync): void => {
+  db.exec(SCHEMA_MIGRATIONS_SQL);
   migratePerWorkIdentity(db);
   db.exec(DERIVED_SCHEMA_SQL);
-  try {
-    db.exec(CHECKPOINTS_SCHEMA_SQL);
-  } catch (error) {
-    if (!isRowidIndexError(error)) throw error;
-    db.exec(CHECKPOINTS_SCHEMA_SQL.slice(0, CHECKPOINTS_SCHEMA_SQL.indexOf("CREATE INDEX")));
-  }
+  db.exec(CHECKPOINTS_SCHEMA_SQL);
   for (const column of [
     "ALTER TABLE works ADD COLUMN goal_json TEXT",
     "ALTER TABLE works ADD COLUMN forked_from_work_id TEXT",
@@ -329,6 +327,94 @@ const ensureDerivedSchema = (db: DatabaseSync): void => {
       if (!isDuplicateColumnError(error)) throw error;
     }
   }
+  // Any database that passes through current-code schema setup conforms to
+  // every migration up to CURRENT_SCHEMA_VERSION; stamp idempotently so
+  // reopening a healthy database is a no-op.
+  stampSchemaVersions(db, allSchemaVersions());
+};
+
+const allSchemaVersions = (): readonly number[] =>
+  Array.from({ length: CURRENT_SCHEMA_VERSION }, (_, index) => index + 1);
+
+// Columns each migration rebuild SELECTs from the legacy table. A legacy table
+// missing any of these would fail mid-migration with a bare SQLite error, so
+// report the exact table and columns up front instead.
+const LEGACY_REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  executions: ["id", "work_id", "harness", "model", "provider", "started_at"],
+  source_sessions: ["execution_id", "harness", "source_id", "source_format", "source_location"],
+  events: [
+    "id",
+    "work_id",
+    "execution_id",
+    "kind",
+    "timestamp",
+    "payload",
+    "provenance",
+    "diagnostics",
+    "harness",
+    "source_session_id",
+    "source_event_id",
+    "provenance_line",
+    "ordinal",
+  ],
+  checkpoints: [
+    "id",
+    "work_id",
+    "execution_id",
+    "message",
+    "created_at",
+    "event_ordinal_watermark",
+    "event_count",
+    "goal_json",
+    "decisions_json",
+    "findings_json",
+    "next_steps_json",
+    "operations_json",
+  ],
+};
+
+const validateMigrationShapes = (
+  db: DatabaseSync,
+  sqlByName: ReadonlyMap<string, string>,
+  needsCheckpointMigration: boolean,
+): void => {
+  const problems: string[] = [];
+  for (const name of ["executions", "source_sessions", "events"]) {
+    const sql = sqlByName.get(name) ?? "";
+    if (sql === "" || sql.includes("PRIMARY KEY (work_id")) continue;
+    const missing = missingColumns(db, name, LEGACY_REQUIRED_COLUMNS[name] ?? []);
+    if (missing.length > 0) problems.push(`'${name}' is missing columns: ${missing.join(", ")}`);
+  }
+  if (needsCheckpointMigration) {
+    const missing = missingColumns(db, "checkpoints", LEGACY_REQUIRED_COLUMNS["checkpoints"] ?? []);
+    if (missing.length > 0) problems.push(`'checkpoints' is missing columns: ${missing.join(", ")}`);
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      `Unsupported legacy store shape — migration aborted without changes (${problems.join("; ")}). ` +
+        `Back up the store file before upgrading or hand-editing it.`,
+    );
+  }
+};
+
+const missingColumns = (db: DatabaseSync, table: string, required: readonly string[]): readonly string[] => {
+  let actual: Set<string>;
+  try {
+    actual = new Set(
+      (db.prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`).all() as unknown as { name: string }[]).map(
+        (row) => row.name,
+      ),
+    );
+  } catch {
+    return [...required];
+  }
+  return required.filter((column) => !actual.has(column));
+};
+
+const stampSchemaVersions = (db: DatabaseSync, versions: readonly number[]): void => {
+  const stmt = db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)");
+  const appliedAt = new Date().toISOString();
+  for (const version of versions) stmt.run(version, appliedAt);
 };
 
 const migratePerWorkIdentity = (db: DatabaseSync): void => {
@@ -345,9 +431,14 @@ const migratePerWorkIdentity = (db: DatabaseSync): void => {
   ).get() as unknown as { sql: string | null } | undefined;
   const needsCheckpointMigration = checkpointRow?.sql?.includes("REFERENCES executions") === true;
   if (!needsMigration && !needsCheckpointMigration) return;
+  // Fail fast on legacy tables whose column set the rebuild SELECTs cannot
+  // serve, naming the offending table before anything is touched. The
+  // migration below stays rollback-safe for unexpected mid-flight failures.
+  validateMigrationShapes(db, sqlByName, needsCheckpointMigration);
   db.exec("PRAGMA foreign_keys = OFF");
   db.exec("BEGIN IMMEDIATE");
   try {
+    let migratedCore = false;
     const executionsSql = sqlByName.get("executions") ?? "";
     if (executionsSql !== "" && !executionsSql.includes("PRIMARY KEY (work_id")) {
       db.exec(`CREATE TABLE executions_new (
@@ -363,6 +454,7 @@ const migratePerWorkIdentity = (db: DatabaseSync): void => {
         SELECT id, work_id, harness, model, provider, started_at FROM executions`);
       db.exec("DROP TABLE executions");
       db.exec("ALTER TABLE executions_new RENAME TO executions");
+      migratedCore = true;
     }
     const sessionsSql = sqlByName.get("source_sessions") ?? "";
     if (sessionsSql !== "" && !sessionsSql.includes("PRIMARY KEY (work_id")) {
@@ -377,12 +469,20 @@ const migratePerWorkIdentity = (db: DatabaseSync): void => {
         UNIQUE (work_id, harness, source_id),
         FOREIGN KEY (work_id, execution_id) REFERENCES executions(work_id, id)
       )`);
+      // Legacy executions.id was globally unique so the join was 1:1, but the v1
+      // executions shape keys by (work_id, id): an already-migrated executions
+      // table (or any odd legacy shape) may repeat one execution id across
+      // works and fan the join out into duplicate source_sessions rows. Group
+      // by the legacy primary key so the backfill inserts exactly one row per
+      // source session, deterministically attributed.
       db.exec(`INSERT INTO source_sessions_new (work_id, execution_id, harness, source_id, source_format, source_location)
-        SELECT executions.work_id, source_sessions.execution_id, source_sessions.harness,
+        SELECT MIN(executions.work_id), source_sessions.execution_id, source_sessions.harness,
           source_sessions.source_id, source_sessions.source_format, source_sessions.source_location
-        FROM source_sessions JOIN executions ON executions.id = source_sessions.execution_id`);
+        FROM source_sessions JOIN executions ON executions.id = source_sessions.execution_id
+        GROUP BY source_sessions.execution_id`);
       db.exec("DROP TABLE source_sessions");
       db.exec("ALTER TABLE source_sessions_new RENAME TO source_sessions");
+      migratedCore = true;
     }
     const eventsSql = sqlByName.get("events") ?? "";
     if (eventsSql !== "" && !eventsSql.includes("PRIMARY KEY (work_id")) {
@@ -410,6 +510,7 @@ const migratePerWorkIdentity = (db: DatabaseSync): void => {
           diagnostics, harness, source_session_id, source_event_id, provenance_line, ordinal FROM events`);
       db.exec("DROP TABLE events");
       db.exec("ALTER TABLE events_new RENAME TO events");
+      migratedCore = true;
     }
     const checkpointNeedsRebuild = needsCheckpointMigration;
     if (checkpointNeedsRebuild) {
@@ -432,11 +533,15 @@ const migratePerWorkIdentity = (db: DatabaseSync): void => {
           next_steps_json, operations_json)
         SELECT id, work_id, execution_id, message, created_at,
           event_ordinal_watermark, event_count, goal_json, decisions_json, findings_json,
-          next_steps_json, operations_json FROM checkpoints`);
+          next_steps_json, operations_json FROM checkpoints ORDER BY rowid ASC`);
       db.exec("DROP TABLE checkpoints");
       db.exec("ALTER TABLE checkpoints_new RENAME TO checkpoints");
-      db.exec("CREATE INDEX IF NOT EXISTS idx_checkpoints_work_seq ON checkpoints(work_id, rowid)");
+      db.exec(CHECKPOINTS_INDEX_SQL);
     }
+    // Stamp applied versions inside the migration transaction so a failed
+    // migration rolls back its version record along with the table rebuilds.
+    const applied = [...(migratedCore ? [1] : []), ...(checkpointNeedsRebuild ? [2] : [])];
+    if (applied.length > 0) stampSchemaVersions(db, applied);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -647,11 +752,6 @@ const hasEvidence = (claim: { readonly evidence?: readonly unknown[] | JsonValue
 const isDuplicateColumnError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error);
   return /duplicate column name/i.test(message);
-};
-
-const isRowidIndexError = (error: unknown): boolean => {
-  const message = error instanceof Error ? error.message : String(error);
-  return /no such column: rowid/i.test(message);
 };
 
 const parseObject = (text: string): JsonObject => {

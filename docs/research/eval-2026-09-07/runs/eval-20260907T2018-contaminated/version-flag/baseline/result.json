@@ -1,0 +1,64 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260907T2018",
+  "taskId": "version-flag",
+  "condition": "baseline",
+  "recordedAt": "2026-09-08T00:37:48.560318+00:00",
+  "status": "not-run",
+  "notRunReason": "INVALID RUN (containment failure): the receiver escaped its clone — the harness passed env PWD=<repo> while cwd was the clone, and `opencode run` resolved its project from PWD, so the agent worked in the real repo (session directory = /Users/sergio/Documents/Developer/BoringInfraCo/Harnie, model fell back to opencode-go/omen-alpha because -m was not parsed). The real repo was edited (src/cli.ts, scripts/prepare-bin.mjs); reverted from snapshot 1f8f80f. Re-run with the fixed harness: run eval-20260907T2039.",
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": null,
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "1f8f80fd4710c871c8145d723cc83a3b2a2d7ff3",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/version-flag/baseline/clone"
+  },
+  "handoff": {
+    "path": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/driver/harnie-home/handoffs/work_opencode_ses_drv_000003vsvk0l.md",
+    "chars": 1654,
+    "sha256": "6dd1eade2ea6d4e6ae36ced1e2219961c09df09dc59bb87015c5dea91c40113c"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: version-flag\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nAdd a --version flag to the Harnie CLI that prints the package version.\n\nWhen the CLI is invoked with --version (or -v) as its first argument, print the version declared in package.json (read it, do not hardcode) to stdout and exit with code 0, before any other argument handling. All other flags and commands must behave exactly as before.\n\n## Required verification\n- npm run build\n- node dist/cli.js --version   # prints 0.0.0, exit 0\n- npx vitest run tests/cli-init.test.ts   # still green\n\n## Expected end state\n`node dist/cli.js --version` prints 0.0.0 and exits 0; existing CLI behavior and the cli-init tests are unchanged.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 24282,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/version-flag/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/version-flag/baseline/agent-stderr.log"
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [
+      "node_modules"
+    ],
+    "outOfScopeFiles": [
+      "node_modules"
+    ],
+    "diffChars": 0,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2018/version-flag/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": null,
+    "commands": [],
+    "passed": null,
+    "details": "not attributable automatically — fill via record if observed"
+  },
+  "metrics": {
+    "developerReExplanation": "unknown",
+    "repeatedInvestigation": "unknown",
+    "repeatedFinishedEdits": "unknown",
+    "nextActionCorrect": "unknown",
+    "missingOrFalseContext": "unknown",
+    "taskCompleted": null,
+    "falseCompletion": null,
+    "packageSizeChars": null
+  },
+  "notes": "Original status was 'ran' — the agent DID execute (see logs), but outside the experimental clone; excluded from the preview gate. Handoff/baseline outputs below are from the escaped session, not a valid condition."
+}

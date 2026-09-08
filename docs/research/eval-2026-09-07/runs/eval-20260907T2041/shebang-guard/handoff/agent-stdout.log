@@ -1,0 +1,18 @@
+Done. Here is the report:
+
+**Files edited**
+- `scripts/prepare-bin.mjs`
+
+**Commands run**
+1. `npm run build && node scripts/prepare-bin.mjs` → exit 0
+2. `node -e "strip shebang" && node scripts/prepare-bin.mjs` → exit 1 with stderr `Error: dist/cli.js is missing the shebang`
+3. `npm run build && npm run test:package` → exit 0
+
+**Verification pass/fail**
+- Pass: exits 0 when `dist/cli.js` has a shebang
+- Pass: exits non-zero with clear stderr message when shebang is missing
+- Pass: build restores `dist/cli.js`
+- Pass: `test:package` still green
+
+**Task complete**
+Yes. `scripts/prepare-bin.mjs` now checks that `dist/cli.js` exists and starts with `#!` before chmodding, and fails with a clear stderr message otherwise.

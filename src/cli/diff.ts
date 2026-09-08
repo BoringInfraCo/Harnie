@@ -1,6 +1,9 @@
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
 import { diffExecutions } from "../work/diff.js";
+import { classifyErrorText, type CliErrorCode } from "../contract/errors.js";
+import { emitJsonFailure, emitJsonSuccess } from "../contract/envelope.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface CliIo {
   readonly home?: string;
@@ -8,38 +11,73 @@ export interface CliIo {
   readonly stderr: { write(chunk: string): unknown };
 }
 
+const usage = "Usage: harnie diff <work> <execution-a> <execution-b>\n";
+
 const EVENT_KINDS = ["message", "tool_call", "tool_result", "command", "unknown"] as const;
 
 export const runDiff = async (argv: string[], options: CliIo): Promise<number> => {
-  const workId = argv[0];
-  const fromId = argv[1];
-  const toId = argv[2];
-  if (workId === undefined || workId === "" || fromId === undefined || fromId === "" || toId === undefined || toId === "") {
-    options.stderr.write("Usage: harnie diff <work> <execution-a> <execution-b>\n");
-    return 1;
-  }
-
+  // JSON mode is decided by the presence of --json so that a failure early in
+  // parsing (unknown flag, duplicate flag) still produces a JSON envelope.
+  const json = argv.includes("--json");
   try {
-    const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
-    const store = initHarnieStore({ home });
+    const parsed = parseFlags(argv, { "--json": { kind: "switch" } });
+    if (parsed.positionals.length < 3 || parsed.positionals.some((arg) => arg === "")) {
+      return fail(options, json, "missing_argument", usage.trimEnd());
+    }    if (parsed.positionals.length > 3) {
+      return fail(options, json, "usage", "harnie diff takes exactly three arguments.");
+    }
+    const [workId, fromId, toId] = parsed.positionals;
+
     try {
-      const work = loadWork(store, workId);
-      if (work === undefined) {
-        options.stderr.write(`Work not found: ${workId}\n`);
-        return 1;
+      const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
+      const store = initHarnieStore({ home });
+      try {
+        const work = loadWork(store, workId ?? "");
+        if (work === undefined) {
+          return fail(options, json, "not_found", `Work not found: ${workId}`);
+        }
+        const diff = diffExecutions(work, fromId ?? "", toId ?? "");
+        if (json) {
+          return emitJsonSuccess(options.stdout, "diff", {
+            workId: diff.workId,
+            fromId: diff.fromId,
+            toId: diff.toId,
+            fromCounts: diff.fromCounts,
+            toCounts: diff.toCounts,
+            decisions: diffGroup(diff.keptDecisions, diff.addedDecisions, diff.removedDecisions),
+            findings: diffGroup(diff.keptFindings, diff.addedFindings, diff.removedFindings),
+            nextSteps: diffGroup(diff.keptNextSteps, diff.addedNextSteps, diff.removedNextSteps),
+            operations: diffGroup(diff.keptOperations, diff.addedOperations, diff.removedOperations),
+          });
+        }
+        options.stdout.write(formatDiff(diff));
+        return 0;
+      } finally {
+        store.close();
       }
-      const diff = diffExecutions(work, fromId, toId);
-      options.stdout.write(formatDiff(diff));
-      return 0;
-    } finally {
-      store.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return fail(options, json, classifyErrorText(message), message);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    options.stderr.write(`${message}\n`);
-    return 1;
+    if (error instanceof FlagParseError) {
+      return fail(options, json, error.code, error.message);
+    }
+    throw error;
   }
 };
+
+const fail = (options: CliIo, json: boolean, code: CliErrorCode, message: string): number => {
+  if (json) return emitJsonFailure(options.stdout, "diff", code, message);
+  options.stderr.write(`${message}\n`);
+  return 1;
+};
+
+const diffGroup = (
+  kept: readonly string[],
+  added: readonly string[],
+  removed: readonly string[],
+) => ({ kept, added, removed });
 
 interface DiffLike {
   readonly workId: string;

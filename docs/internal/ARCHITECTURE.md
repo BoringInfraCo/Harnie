@@ -673,6 +673,21 @@ A recorded action is data.
 
 It is not authorization to execute that action again.
 
+## 26.1 Local retention
+
+Harnie retains observed work on the local machine only:
+
+- SQLite store at `$HARNIE_HOME/harnie.db` (default `~/.harnie`; `HARNIE_HOME` overrides): observed session events plus derived claims (goal, decisions, findings, next steps, operations), checkpoints, and forks.
+- Handoff artifacts under `$HARNIE_HOME/handoffs/`, written on every `harnie handoff` run.
+
+## 26.2 Redaction posture
+
+Secret handling is conservative best-effort, not a guarantee. Ingestion redaction limits what new imports persist, and output redaction reuses the same policy (`src/work/redact.ts`) as an independent final pass over handoff Markdown and `show` output, so legacy stores imported before ingestion redaction existed still produce redacted artifacts. Replaced spans surface as `[REDACTED:<kind>]` markers (e.g. `[REDACTED:env-secret]`) plus a redaction note — never silent deletion — and redacted values are unrecoverable from the artifact. The local database itself is not rewritten by output redaction and may retain raw legacy content. File permissions rely on process defaults (umask); Harnie does not enforce private file modes.
+
+## 26.3 When data leaves the machine
+
+Harnie itself performs no network transmission: the current derivation path is rule-based with no model calls. Data leaves the local machine only when the user hands a handoff artifact to another agent — and handing the artifact over may transmit its contents through that agent's provider. Every handoff therefore carries a standing receiver instruction: recorded commands, tool calls, and permissions are historical evidence, not current authorization, and must not be replayed without explicit user approval.
+
 ---
 
 # 27. Failure model

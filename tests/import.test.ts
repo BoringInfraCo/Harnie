@@ -1,9 +1,12 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { importPiSessionFile } from "../src/engine/import.js";
+import { importCodexSessionFile, importPiSessionFile } from "../src/engine/import.js";
 import { initHarnieStore } from "../src/store/database.js";
+import { createCheckpoint } from "../src/store/checkpoints.js";
+import { loadWorkAtCheckpoint } from "../src/store/fork.js";
+import { buildHandoffFromWork } from "../src/work/handoff.js";
 import { loadWork } from "../src/store/persist.js";
 
 describe("Pi observed import", () => {
@@ -32,6 +35,51 @@ describe("Pi observed import", () => {
       expect(second.eventsInserted).toBe(0);
       expect(loaded?.events).toHaveLength(first.eventsInserted);
       expect(loaded?.diagnostics.map((diag) => diag.code)).toContain("missing_tool_result");
+    } finally {
+      store.close();
+    }
+  });
+
+  it("preserves attached claims on an ordinary refresh", async () => {
+    const store = await makeStore();
+    try {
+      const first = await importPiSessionFile(store, "tests/fixtures/pi/trace-b-unfinished.jsonl");
+      await importCodexSessionFile(store, "tests/fixtures/codex/unfinished-read.jsonl", { workId: first.workId });
+      const before = loadWork(store, first.workId);
+      expect(before?.operations?.some((operation) => operation.provenance.harness === "codex")).toBe(true);
+      const refresh = await importPiSessionFile(store, "tests/fixtures/pi/trace-b-unfinished.jsonl");
+      const after = loadWork(store, first.workId);
+      expect(refresh.eventsInserted).toBe(0);
+      expect(after).toEqual(before);
+    } finally {
+      store.close();
+    }
+  });
+
+  it.each([false, true])("clears resolved pending diagnostics on refresh (explicit attach: %s)", async (attach) => {
+    const store = await makeStore();
+    const dir = await mkdtemp(join(tmpdir(), "harnie-pending-"));
+    homes.push(dir);
+    try {
+      const path = join(dir, "session.jsonl");
+      const prefix = await readFile("tests/fixtures/pi/trace-b-unfinished.jsonl", "utf8");
+      await writeFile(path, prefix);
+      const first = await importPiSessionFile(store, path);
+      expect(loadWork(store, first.workId)?.nextSteps?.length).toBeGreaterThan(0);
+      const checkpoint = createCheckpoint(store, first.workId, "pending read");
+      const frozen = buildHandoffFromWork(loadWorkAtCheckpoint(store, first.workId, checkpoint.id));
+      await writeFile(path, prefix.trimEnd() + "\n" + JSON.stringify({
+        type: "message", id: "resolved", parentId: "harnie-tb-92ee92f6",
+        message: { role: "toolResult", toolCallId: "harnie-call-0006", toolName: "read", content: [{ type: "text", text: "config" }], isError: false },
+      }) + "\n");
+      const result = await importPiSessionFile(store, path, attach ? { workId: first.workId } : undefined);
+      const loaded = loadWork(store, first.workId);
+      expect(result.eventsInserted).toBe(1);
+      expect(buildHandoffFromWork(loadWorkAtCheckpoint(store, first.workId, checkpoint.id))).toEqual(frozen);
+      expect(loaded?.nextSteps ?? []).toEqual([]);
+      expect(loaded?.diagnostics.some((item) => item.code === "missing_tool_result")).toBe(false);
+      expect(loaded?.events.flatMap((event) => event.diagnostics).some((item) => item.code === "missing_tool_result")).toBe(false);
+      expect(loaded?.operations?.find((operation) => operation.path === ".git/config")?.status).toBe("succeeded");
     } finally {
       store.close();
     }

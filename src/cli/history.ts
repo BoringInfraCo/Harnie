@@ -3,6 +3,9 @@ import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
 import { executionEventCounts } from "../work/diff.js";
 import type { Work } from "../work/types.js";
+import { classifyErrorText, type CliErrorCode } from "../contract/errors.js";
+import { emitJsonFailure, emitJsonSuccess } from "../contract/envelope.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface CliIo {
   readonly home?: string;
@@ -11,34 +14,96 @@ export interface CliIo {
 }
 
 export const runHistory = async (argv: string[], options: CliIo): Promise<number> => {
-  const workId = argv[0];
-  if (workId === undefined || workId === "") {
-    options.stderr.write("Work id is required.\n");
-    return 1;
-  }
-
+  // JSON mode is decided by the presence of --json so that a failure early in
+  // parsing (unknown flag, duplicate flag) still produces a JSON envelope.
+  const json = argv.includes("--json");
   try {
-    const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
-    const store = initHarnieStore({ home });
+    const parsed = parseFlags(argv, { "--json": { kind: "switch" } });
+    if (parsed.positionals.length === 0 || parsed.positionals[0] === "") {
+      return fail(options, json, "missing_argument", "Work id is required.");
+    }
+    if (parsed.positionals.length > 1) {
+      return fail(options, json, "usage", "harnie history takes exactly one work id.");
+    }
+    const workId = parsed.positionals[0] ?? "";
+
     try {
-      const work = loadWork(store, workId);
-      if (work === undefined) {
-        options.stderr.write(`Work not found: ${workId}\n`);
-        return 1;
+      const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
+      const store = initHarnieStore({ home });
+      try {
+        const work = loadWork(store, workId);
+        if (work === undefined) {
+          return fail(options, json, "not_found", `Work not found: ${workId}`);
+        }
+        const checkpoints = listCheckpoints(store, work.id);
+        const composed: Work = checkpoints.length > 0 ? { ...work, checkpoints } : work;
+        if (json) {
+          return emitJsonSuccess(options.stdout, "history", buildHistoryData(composed));
+        }
+        options.stdout.write(formatHistory(composed));
+        return 0;
+      } finally {
+        store.close();
       }
-      const checkpoints = listCheckpoints(store, work.id);
-      const composed: Work = checkpoints.length > 0 ? { ...work, checkpoints } : work;
-      options.stdout.write(formatHistory(composed));
-      return 0;
-    } finally {
-      store.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return fail(options, json, classifyErrorText(message), message);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    options.stderr.write(`${message}\n`);
-    return 1;
+    if (error instanceof FlagParseError) {
+      return fail(options, json, error.code, error.message);
+    }
+    throw error;
   }
 };
+
+const fail = (options: CliIo, json: boolean, code: CliErrorCode, message: string): number => {
+  if (json) return emitJsonFailure(options.stdout, "history", code, message);
+  options.stderr.write(`${message}\n`);
+  return 1;
+};
+
+const buildHistoryData = (work: Work) => ({
+  workId: work.id,
+  ...(work.forkedFrom !== undefined
+    ? {
+        forkedFrom: {
+          workId: work.forkedFrom.workId,
+          ...(work.forkedFrom.checkpointId !== undefined
+            ? { checkpointId: work.forkedFrom.checkpointId }
+            : {}),
+          ...(work.forkedFrom.message !== undefined ? { message: work.forkedFrom.message } : {}),
+        },
+      }
+    : {}),
+  ...(work.workspace !== undefined ? { workspacePath: work.workspace.path } : {}),
+  ...(work.goal?.statement ? { goal: work.goal.statement } : {}),
+  executions: work.executions.map((execution) => ({
+    id: execution.id,
+    harness: execution.harness,
+    ...(execution.provider !== undefined ? { provider: execution.provider } : {}),
+    ...(execution.model !== undefined ? { model: execution.model } : {}),
+    sourceSessionId: execution.sourceSession.sourceId,
+    ...(execution.startedAt !== undefined ? { startedAt: execution.startedAt } : {}),
+    eventCounts: executionEventCounts(work, execution.id),
+  })),
+  checkpoints: (work.checkpoints ?? []).map((checkpoint) => ({
+    id: checkpoint.id,
+    ...(checkpoint.executionId !== undefined ? { executionId: checkpoint.executionId } : {}),
+    message: checkpoint.message,
+    createdAt: checkpoint.createdAt,
+    eventCount: checkpoint.eventCount,
+  })),
+  decisions: (work.decisions ?? [])
+    .map((decision) => decision.summary)
+    .filter((summary) => summary.length > 0),
+  findings: (work.findings ?? [])
+    .map((finding) => finding.statement)
+    .filter((statement) => statement.length > 0),
+  nextSteps: (work.nextSteps ?? [])
+    .map((step) => step.description)
+    .filter((description) => description.length > 0),
+});
 
 const formatHistory = (work: Work): string => {
   const sections: string[] = [`Work\n${work.id}`];

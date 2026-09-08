@@ -1,11 +1,13 @@
 import { asString, isJsonObject } from "../types.js";
-import { extractToolOperations } from "./operations.js";
+import { redactText, secretRedactedDiagnostic, summarizeRedactions, type SecretRedaction } from "./redact.js";
+import { extractToolOperations, indexToolResults, toolResultKey } from "./operations.js";
 import type {
   Decision,
   DerivedGoal,
   Finding,
   NextStep,
   Provenance,
+  ToolOperation,
   Work,
   WorkEvent,
 } from "./types.js";
@@ -22,6 +24,21 @@ export const deriveObservedWork = (work: Work): Work => {
   const nextSteps = deriveNextSteps(work);
   const operations = extractToolOperations(work);
 
+  // Derived claims quote session text (goal is the first user message), so
+  // redact them as well. On the normal path events are already redacted at
+  // observation and this is a no-op; it is defense-in-depth for Work built
+  // without the ingestion choke point.
+  const redactor = new ClaimRedactor();
+  const safeGoal = goal ? redactor.goal(goal) : undefined;
+  const safeDecisions = decisions.map((decision, index) => redactor.decision(decision, index));
+  const safeFindings = findings.map((finding, index) => redactor.finding(finding, index));
+  const safeNextSteps = nextSteps.map((step, index) => redactor.nextStep(step, index));
+  const safeOperations = operations.map((operation, index) => redactor.operation(operation, index));
+
+  const diagnostics = redactor.redactions.length === 0
+    ? work.diagnostics
+    : [...work.diagnostics, redactor.diagnostic()];
+
   return {
     id: work.id,
     ...(work.workspace ? { workspace: work.workspace } : {}),
@@ -29,14 +46,71 @@ export const deriveObservedWork = (work: Work): Work => {
     ...(work.updatedAt ? { updatedAt: work.updatedAt } : {}),
     executions: work.executions,
     events: work.events,
-    diagnostics: work.diagnostics,
-    ...(goal ? { goal } : {}),
-    ...(decisions.length > 0 ? { decisions } : {}),
-    ...(findings.length > 0 ? { findings } : {}),
-    ...(nextSteps.length > 0 ? { nextSteps } : {}),
-    ...(operations.length > 0 ? { operations } : {}),
+    diagnostics,
+    ...(safeGoal ? { goal: safeGoal } : {}),
+    ...(safeDecisions.length > 0 ? { decisions: safeDecisions } : {}),
+    ...(safeFindings.length > 0 ? { findings: safeFindings } : {}),
+    ...(safeNextSteps.length > 0 ? { nextSteps: safeNextSteps } : {}),
+    ...(safeOperations.length > 0 ? { operations: safeOperations } : {}),
   };
 };
+
+class ClaimRedactor {
+  redactions: SecretRedaction[] = [];
+
+  text(value: string, field: string): string {
+    const redacted = redactText(value, field);
+    if (redacted.text === value) return value;
+    this.redactions.push(...redacted.redactions);
+    return redacted.text;
+  }
+
+  goal(value: DerivedGoal): DerivedGoal {
+    const statement = this.text(value.statement, "goal.statement");
+    return statement === value.statement ? value : { ...value, statement };
+  }
+
+  decision(value: Decision, index: number): Decision {
+    const summary = this.text(value.summary, `decisions[${index}].summary`);
+    return summary === value.summary ? value : { ...value, summary };
+  }
+
+  finding(value: Finding, index: number): Finding {
+    const statement = this.text(value.statement, `findings[${index}].statement`);
+    return statement === value.statement ? value : { ...value, statement };
+  }
+
+  nextStep(value: NextStep, index: number): NextStep {
+    const description = this.text(value.description, `nextSteps[${index}].description`);
+    return description === value.description ? value : { ...value, description };
+  }
+
+  operation(value: ToolOperation, index: number): ToolOperation {
+    let next = value;
+    if (value.path !== undefined) {
+      const path = this.text(value.path, `operations[${index}].path`);
+      if (path !== value.path) next = { ...next, path };
+    }
+    if (value.command !== undefined) {
+      const command = this.text(value.command, `operations[${index}].command`);
+      if (command !== value.command) next = { ...next, command };
+    }
+    if (value.note !== undefined) {
+      const note = this.text(value.note, `operations[${index}].note`);
+      if (note !== value.note) next = { ...next, note };
+    }
+    return next;
+  }
+
+  diagnostic() {
+    const summary = summarizeRedactions(this.redactions);
+    return secretRedactedDiagnostic(
+      summary,
+      `Redacted ${summary.count} secret value(s) (${summary.kinds.join(", ")}) from derived claims.`,
+      {},
+    );
+  }
+}
 
 const deriveGoal = (work: Work): DerivedGoal | undefined => {
   for (const event of work.events) {
@@ -99,12 +173,12 @@ const deriveFindings = (work: Work): readonly Finding[] => {
 };
 
 const deriveNextSteps = (work: Work): readonly NextStep[] => {
-  if (!hasMissingToolResult(work)) return [];
-
-  const pending = work.events.filter((event) =>
-    event.kind === "tool_call" && event.diagnostics.some((diag) => diag.code === "missing_tool_result"),
-  );
-  const events = pending.length > 0 ? pending : lastUnmatchedToolCall(work);
+  const results = indexToolResults(work);
+  const events = work.events.filter((event) => {
+    if (event.kind !== "tool_call") return false;
+    const callId = asString(event.payload.toolCallId);
+    return !callId || !results.has(toolResultKey(event.executionId, callId));
+  });
   const nextSteps: NextStep[] = [];
 
   for (const event of events) {
@@ -135,24 +209,6 @@ const pendingToolCallDescription = (toolName: string | undefined, path: string |
   if (path) parts.push(path);
   return parts.join(" ");
 };
-
-const lastUnmatchedToolCall = (work: Work): readonly WorkEvent[] => {
-  for (let index = work.events.length - 1; index >= 0; index -= 1) {
-    const event = work.events[index];
-    if (!event || event.kind !== "tool_call") continue;
-    const toolCallId = asString(event.payload.toolCallId);
-    if (!toolCallId) continue;
-    const matched = work.events.slice(index + 1).some((later) =>
-      later.kind === "tool_result" && asString(later.payload.toolCallId) === toolCallId
-    );
-    if (!matched) return [event];
-  }
-  return [];
-};
-
-const hasMissingToolResult = (work: Work): boolean =>
-  work.diagnostics.some((diag) => diag.code === "missing_tool_result") ||
-  work.events.some((event) => event.diagnostics.some((diag) => diag.code === "missing_tool_result"));
 
 const extractText = (event: WorkEvent): string => {
   const content = event.payload.content;

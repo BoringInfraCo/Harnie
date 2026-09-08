@@ -1,0 +1,18 @@
+## Report
+
+### Files edited
+- `src/cli.ts` — added `--version`/`-v` handling and a runtime `package.json` reader.
+
+### Commands run
+1. `npm run build` — passed.
+2. `node dist/cli.js --version` — printed `0.0.0`, exited 0.
+3. `node dist/cli.js -v` — printed `0.0.0`, exited 0.
+4. `npx vitest run tests/cli-init.test.ts` — 7/7 tests passed.
+
+### Verification
+- Build: **pass**
+- `--version` output: **pass** (`0.0.0`)
+- `cli-init.test.ts`: **pass**
+
+### Task complete
+Yes. The `--version` and `-v` flags now print the package version from `package.json` and exit 0 before any other argument handling, and existing CLI behavior/tests remain unchanged.

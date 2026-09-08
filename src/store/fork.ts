@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { reconcileToolDiagnostics } from "../work/observe.js";
 import { deriveObservedWork } from "../work/derive.js";
-import type { Checkpoint } from "../work/types.js";
+import type { Checkpoint, Work } from "../work/types.js";
 import { createCheckpoint, listCheckpoints } from "./checkpoints.js";
 import { storeDatabase, type HarnieStore } from "./database.js";
 import { loadWork, persistObservedWork } from "./persist.js";
@@ -11,6 +12,41 @@ export interface CreateForkResult {
 }
 
 const BASE32_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567";
+
+export const loadWorkAtCheckpoint = (
+  store: HarnieStore,
+  workId: string,
+  checkpointId: string,
+): Work => {
+  const parent = loadWork(store, workId, { rawDiagnostics: true });
+  if (parent === undefined) {
+    throw new Error(`Work not found: ${workId}`);
+  }
+  const checkpoint = checkpointForWork(store, workId, checkpointId);
+  const db = storeDatabase(store);
+  const eventRows = db
+    .prepare("SELECT id FROM events WHERE work_id = ? AND ordinal <= ? ORDER BY ordinal ASC")
+    .all(workId, checkpoint.eventOrdinalWatermark) as unknown as { id: string }[];
+  const eventIds = new Set(eventRows.map((row) => row.id));
+  const events = parent.events.filter((event) => eventIds.has(event.id));
+  const executionIds = new Set(events.map((event) => event.executionId));
+  const executions = parent.executions.filter((execution) => executionIds.has(execution.id));
+
+  return reconcileToolDiagnostics({
+    id: parent.id,
+    ...(parent.workspace ? { workspace: parent.workspace } : {}),
+    ...(parent.createdAt ? { createdAt: parent.createdAt } : {}),
+    updatedAt: checkpoint.createdAt,
+    executions,
+    events,
+    diagnostics: [],
+    ...(checkpoint.goal ? { goal: checkpoint.goal } : {}),
+    ...(checkpoint.decisions.length > 0 ? { decisions: checkpoint.decisions } : {}),
+    ...(checkpoint.findings.length > 0 ? { findings: checkpoint.findings } : {}),
+    ...(checkpoint.nextSteps.length > 0 ? { nextSteps: checkpoint.nextSteps } : {}),
+    ...(checkpoint.operations.length > 0 ? { operations: checkpoint.operations } : {}),
+  });
+};
 
 export const createFork = (
   store: HarnieStore,
@@ -27,10 +63,7 @@ export const createFork = (
   }
   let checkpoint: Checkpoint | undefined;
   if (checkpointId !== undefined) {
-    checkpoint = listCheckpoints(store, workId).find((entry) => entry.id === checkpointId);
-    if (checkpoint === undefined) {
-      throw new Error(`Checkpoint not found: ${checkpointId}`);
-    }
+    checkpoint = checkpointForWork(store, workId, checkpointId);
   } else {
     const checkpoints = listCheckpoints(store, workId);
     checkpoint = checkpoints[checkpoints.length - 1] ?? createCheckpoint(store, workId, "pre-fork");
@@ -91,6 +124,14 @@ export const createFork = (
   }
   persistObservedWork(store, deriveObservedWork(child));
   return { workId: childId, checkpointId: checkpoint.id };
+};
+
+const checkpointForWork = (store: HarnieStore, workId: string, checkpointId: string): Checkpoint => {
+  const checkpoint = listCheckpoints(store, workId).find((entry) => entry.id === checkpointId);
+  if (checkpoint === undefined) {
+    throw new Error(`Checkpoint not found: ${checkpointId}`);
+  }
+  return checkpoint;
 };
 
 const encodeBase32 = (bytes: Uint8Array): string => {

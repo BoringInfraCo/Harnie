@@ -1,5 +1,5 @@
 import { extractToolOperations } from "./operations.js";
-import type { Work } from "./types.js";
+import type { ToolOperation, Work } from "./types.js";
 
 export interface ObservedContext {
   readonly revision?: string;
@@ -7,6 +7,7 @@ export interface ObservedContext {
   readonly changedFiles: readonly string[];
   readonly failedApproaches: readonly string[];
   readonly testState?: string;
+  readonly verification?: string;
   readonly readYields: readonly string[];
   readonly unresolved?: string;
   readonly continuation: readonly string[];
@@ -39,9 +40,16 @@ export const extractObservedContext = (work: Work): ObservedContext => {
   const seenChanged = new Set<string>();
   const pendingOps: CitedOperation[] = [];
   const changedOps: CitedOperation[] = [];
+  const changedExecutions = new Set<string>();
   let revision: string | undefined;
   let revisionEvidence: readonly string[] | undefined;
   let testState: string | undefined;
+  let latestEdit: ToolOperation | undefined;
+  let latestTest: ToolOperation | undefined;
+  const positions = new Map(work.events.map((event, index) => [event.id, index]));
+  const events = new Map(work.events.map((event) => [event.id, event]));
+  const start = (operation: ToolOperation): number => positions.get(operation.evidence[0] ?? "") ?? -1;
+  const end = (operation: ToolOperation): number => Math.max(-1, ...operation.evidence.map((id) => positions.get(id) ?? -1));
 
   for (const operation of operations) {
     const toolName = present(operation.toolName);
@@ -65,9 +73,12 @@ export const extractObservedContext = (work: Work): ObservedContext => {
       }
     }
 
-    if (operation.status === "succeeded" && tool && CHANGED_TOOLS.has(tool) && path) {
-      pushUnique(changedFiles, seenChanged, path);
-      changedOps.push({ ...(toolName ? { toolName } : {}), path, evidence: operation.evidence });
+    if (operation.status === "succeeded" && tool && CHANGED_TOOLS.has(tool)) {
+      if (path) pushUnique(changedFiles, seenChanged, path);
+      changedOps.push({ ...(toolName ? { toolName } : {}), ...(path ? { path } : {}), evidence: operation.evidence });
+      const executionId = events.get(operation.evidence[0] ?? "")?.executionId;
+      changedExecutions.add(executionId ?? "");
+      if (!latestEdit || end(operation) >= end(latestEdit)) latestEdit = operation;
     }
 
     if (operation.status === "pending") {
@@ -84,8 +95,40 @@ export const extractObservedContext = (work: Work): ObservedContext => {
 
     if (command && TEST_COMMAND.test(command)) {
       const shown = truncateCommand(command);
-      if (shown) testState = `${shown} — ${operation.status}`;
+      if (shown && (!latestTest || start(operation) >= start(latestTest))) {
+        latestTest = operation;
+        testState = `${shown} — ${operation.status}`;
+      }
     }
+  }
+
+  let verification: string | undefined;
+  let verified = false;
+  if (latestEdit) {
+    const editEvent = events.get(latestEdit.evidence[0] ?? "");
+    const testEvent = events.get(latestTest?.evidence[0] ?? "");
+    const currentTest = latestTest && editEvent && testEvent &&
+      changedExecutions.size === 1 && changedExecutions.has(testEvent.executionId) &&
+      editEvent.executionId === testEvent.executionId && end(latestEdit) >= 0 &&
+      start(latestTest) > end(latestEdit);
+    if (!latestTest) {
+      verification = "Verification not recorded";
+    } else if (!currentTest) {
+      const reason = changedExecutions.size > 1
+        ? "edits span executions; revision equivalence unknown"
+        : editEvent && testEvent && editEvent.executionId !== testEvent.executionId
+          ? "different execution from latest edit" : "before latest edit or ordering unavailable";
+      testState = `${testState} (${reason}; current edits unverified)`;
+      verification = "Verification not recorded after latest edit";
+    } else {
+      verified = latestTest.status === "succeeded";
+      verification = verified ? "Verification succeeded after latest edit"
+        : latestTest.status === "failed" ? "Verification failed after latest edit" : "Verification pending after latest edit";
+    }
+  } else if (latestTest && latestTest.status === "failed") {
+    // A failed test with no edits still needs attention: surface the failure
+    // instead of leaving status and next steps empty.
+    verification = "Verification failed";
   }
 
   const continuation: string[] = [];
@@ -101,6 +144,8 @@ export const extractObservedContext = (work: Work): ObservedContext => {
   };
 
   cite(revisionEvidence);
+  cite(latestTest?.evidence);
+  cite(latestEdit?.evidence);
 
   if (work.nextSteps && work.nextSteps.length > 0) {
     for (const step of work.nextSteps) {
@@ -115,9 +160,17 @@ export const extractObservedContext = (work: Work): ObservedContext => {
     }
   }
 
-  if (changedFiles.length > 0 && pendingOps.length === 0 && !testState) {
-    continuation.push(`Verify the edits on ${changedFiles.join(", ")}. Do not re-edit.`);
+  if (latestEdit && pendingOps.length === 0 && !verified) {
+    const target = changedFiles.length > 0 ? ` on ${changedFiles.join(", ")}` : "";
+    continuation.push(verification === "Verification failed after latest edit"
+      ? `Investigate the failed verification and rerun tests for the edits${target}.`
+      : `Verify the edits${target}. Do not re-edit.`);
     for (const operation of changedOps) cite(operation.evidence);
+  }
+
+  if (!latestEdit && latestTest?.status === "failed" && pendingOps.length === 0) {
+    continuation.push("Investigate the failed verification and rerun tests.");
+    cite(latestTest.evidence);
   }
 
   const propose = work.goal?.statement.match(PROPOSE_CLAUSE)?.[0];
@@ -131,8 +184,10 @@ export const extractObservedContext = (work: Work): ObservedContext => {
     const first = pendingOps[0];
     unresolved = ["pending", first?.toolName, first?.path].filter(isPresent).join(" ");
     cite(first?.evidence);
-  } else if (changedFiles.length > 0 && !testState) {
-    unresolved = "Verification not recorded";
+  } else if (latestEdit && !verified) {
+    unresolved = verification;
+  } else if (!latestEdit && verification) {
+    unresolved = verification;
   }
 
   return {
@@ -141,6 +196,7 @@ export const extractObservedContext = (work: Work): ObservedContext => {
     changedFiles,
     failedApproaches,
     ...(testState ? { testState } : {}),
+    ...(verification ? { verification } : {}),
     readYields,
     ...(unresolved ? { unresolved } : {}),
     continuation,

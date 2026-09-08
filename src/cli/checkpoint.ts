@@ -1,5 +1,6 @@
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { createCheckpoint } from "../store/checkpoints.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface CliIo {
   readonly home?: string;
@@ -8,12 +9,22 @@ export interface CliIo {
 }
 
 export const runCheckpoint = async (argv: string[], options: CliIo): Promise<number> => {
-  const workId = argv[0];
+  let positional: readonly string[];
+  try {
+    positional = parseFlags(argv, {}).positionals;
+  } catch (error) {
+    if (error instanceof FlagParseError) {
+      options.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+    throw error;
+  }
+  const workId = positional[0];
   if (workId === undefined || workId === "") {
     options.stderr.write("Work id is required.\n");
     return 1;
   }
-  const message = argv.slice(1).join(" ");
+  const message = positional.slice(1).join(" ");
 
   try {
     const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);

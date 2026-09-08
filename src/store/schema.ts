@@ -97,6 +97,22 @@ CREATE TABLE IF NOT EXISTS operations (
 );
 `;
 
+// Store schema version history:
+// v1 — per-work identity keys for executions/source_sessions/events.
+// v2 — legacy checkpoint rebuild (drop REFERENCES executions, explicit index).
+export const CURRENT_SCHEMA_VERSION = 2;
+
+export const SCHEMA_MIGRATIONS_SQL = `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version INTEGER PRIMARY KEY,
+  applied_at TEXT NOT NULL
+);
+`;
+
+// SQLite indexes include the rowid implicitly; explicitly naming it is invalid.
+export const CHECKPOINTS_INDEX_SQL =
+  "CREATE INDEX IF NOT EXISTS idx_checkpoints_work_seq ON checkpoints(work_id);";
+
 export const CHECKPOINTS_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS checkpoints (
   id TEXT PRIMARY KEY,
@@ -112,5 +128,5 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   next_steps_json TEXT NOT NULL DEFAULT '[]',
   operations_json TEXT NOT NULL DEFAULT '[]'
 );
-CREATE INDEX IF NOT EXISTS idx_checkpoints_work_seq ON checkpoints(work_id, rowid);
+${CHECKPOINTS_INDEX_SQL}
 `;

@@ -1,0 +1,147 @@
+{
+ "harness": "opencode",
+ "format": "opencode-session-v1",
+ "session": {
+  "id": "ses_drv_00000soa2fkk",
+  "directory": "/workspace/harnie-clone",
+  "title": "document backup/restore recovery",
+  "agent": "build",
+  "model": {
+   "id": "claude-sonnet-4-6",
+   "providerID": "anthropic"
+  },
+  "version": "1.18.29",
+  "time_created": 1788823013299,
+  "time_updated": 1788823025799
+ },
+ "messages": [
+  {
+   "id": "msg_00000tmw4zib",
+   "time_created": 1788823013299,
+   "data": {
+    "role": "user",
+    "time": {
+     "created": 1788823013299
+    }
+   }
+  },
+  {
+   "id": "msg_00000vzj5mur",
+   "time_created": 1788823015299,
+   "data": {
+    "role": "assistant",
+    "parentID": "msg_00000tmw4zib",
+    "path": {
+     "cwd": "/workspace/harnie-clone"
+    },
+    "modelID": "claude-sonnet-4-6",
+    "providerID": "anthropic",
+    "time": {
+     "created": 1788823015299
+    }
+   }
+  },
+  {
+   "id": "msg_00000ze8zdya",
+   "time_created": 1788823020399,
+   "data": {
+    "role": "assistant",
+    "parentID": "msg_00000tmw4zib",
+    "path": {
+     "cwd": "/workspace/harnie-clone"
+    },
+    "modelID": "claude-sonnet-4-6",
+    "providerID": "anthropic",
+    "time": {
+     "created": 1788823020399
+    }
+   }
+  },
+  {
+   "id": "msg_000011l9mxko",
+   "time_created": 1788823023099,
+   "data": {
+    "role": "assistant",
+    "parentID": "msg_00000tmw4zib",
+    "path": {
+     "cwd": "/workspace/harnie-clone"
+    },
+    "modelID": "claude-sonnet-4-6",
+    "providerID": "anthropic",
+    "time": {
+     "created": 1788823023099
+    }
+   }
+  }
+ ],
+ "parts": [
+  {
+   "id": "prt_00000u8tzh8v",
+   "message_id": "msg_00000tmw4zib",
+   "time_created": 1788823013300,
+   "data": {
+    "type": "text",
+    "text": "Document backup/restore recovery in the first-run walkthrough."
+   }
+  },
+  {
+   "id": "prt_00000wkuzpev",
+   "message_id": "msg_00000vzj5mur",
+   "time_created": 1788823016799,
+   "data": {
+    "type": "text",
+    "text": "Reading the first-run walkthrough and the backup/restore CLI implementation."
+   }
+  },
+  {
+   "id": "prt_00000xlrvhef",
+   "message_id": "msg_00000vzj5mur",
+   "time_created": 1788823017999,
+   "data": {
+    "type": "tool",
+    "tool": "read",
+    "callID": "call_x00000q183l3e",
+    "state": {
+     "status": "completed",
+     "input": {
+      "filePath": "docs/internal/FIRST-RUN.md"
+     }
+    }
+   }
+  },
+  {
+   "id": "prt_00000yfzaomk",
+   "message_id": "msg_00000vzj5mur",
+   "time_created": 1788823019199,
+   "data": {
+    "type": "tool",
+    "tool": "bash",
+    "callID": "call_x00000r7vnwvs",
+    "state": {
+     "status": "completed",
+     "input": {
+      "command": "grep -n 'backup\\|restore' src/cli.ts"
+     }
+    }
+   }
+  },
+  {
+   "id": "prt_000010wq51bf",
+   "message_id": "msg_00000ze8zdya",
+   "time_created": 1788823021899,
+   "data": {
+    "type": "text",
+    "text": "I will append a '## Recovery' section to docs/internal/FIRST-RUN.md covering: harnie backup <path> writes a consistent SQLite snapshot with 0600 permissions, harnie restore <path> --force validates the backup and then overwrites the live store, and restore has no undo."
+   }
+  },
+  {
+   "id": "prt_000012jrk83l",
+   "message_id": "msg_000011l9mxko",
+   "time_created": 1788823024599,
+   "data": {
+    "type": "text",
+    "text": "Confirmed from the source: backup produces a consistent snapshot file; restore validates the backup before overwriting; there is no undo of a restore, so the section must warn users to keep backups. Docs-only change; no code edits."
+   }
+  }
+ ]
+}

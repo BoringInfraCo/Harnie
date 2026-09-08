@@ -1,0 +1,63 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m→ [0mRead scripts/prepare-bin.mjs
+[0m
+[0m← [0mEdit scripts/prepare-bin.mjs
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/handoff/clone/scripts/prepare-bin.mjs
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/handoff/clone/scripts/prepare-bin.mjs
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/shebang-guard/handoff/clone/scripts/prepare-bin.mjs
+@@ -1,3 +1,16 @@
+-import { chmodSync } from "node:fs";
++import { chmodSync, existsSync, readFileSync } from "node:fs";
+ 
+-chmodSync(new URL("../dist/cli.js", import.meta.url), 0o755);
++const cliPath = new URL("../dist/cli.js", import.meta.url);
++
++if (!existsSync(cliPath)) {
++	console.error(`Error: dist/cli.js does not exist`);
++	process.exit(1);
++}
++
++const contents = readFileSync(cliPath, "utf8");
++if (!contents.startsWith("#!")) {
++	console.error(`Error: dist/cli.js is missing the shebang`);
++	process.exit(1);
++}
++
++chmodSync(cliPath, 0o755);
+
+[0m
+[0m$ [0mnpm run build && node scripts/prepare-bin.mjs && echo "EXIT:$?"
+> harnie@0.0.0 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.0.0 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+
+EXIT:0
+[0m
+[0m$ [0mnode -e "const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\n/,''))" && node scripts/prepare-bin.mjs; echo "EXIT:$?"
+Error: dist/cli.js is missing the shebang
+EXIT:1
+[0m
+[0m$ [0mnpm run build && npm run test:package
+> harnie@0.0.0 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.0.0 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+
+
+> harnie@0.0.0 test:package
+> node scripts/smoke-package.mjs
+
+Packed CLI smoke passed on v22.23.0: --help, init, fixture import, handoff.
+[0m
+[0m$ [0mgit status --short
+M scripts/prepare-bin.mjs
+?? node_modules
+[0m

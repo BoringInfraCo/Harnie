@@ -309,7 +309,7 @@ describe("harnie fork", () => {
     expect(missingStderr.toString()).toBe("Work id is required.\n");
   });
 
-  it("migrates a pre-existing old-shape database", async () => {
+  it.each([false, true])("migrates a pre-existing old-shape database (checkpoints: %s)", async (withCheckpoints) => {
     const home = await makeHome();
     const raw = new DatabaseSync(databasePath(home));
     try {
@@ -381,10 +381,40 @@ describe("harnie fork", () => {
         1,
         0,
       );
+      if (withCheckpoints) {
+        raw.exec(`CREATE TABLE checkpoints (
+          id TEXT PRIMARY KEY,
+          work_id TEXT NOT NULL REFERENCES works(id),
+          execution_id TEXT REFERENCES executions(id),
+          message TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          event_ordinal_watermark INTEGER NOT NULL,
+          event_count INTEGER NOT NULL,
+          goal_json TEXT,
+          decisions_json TEXT NOT NULL DEFAULT '[]',
+          findings_json TEXT NOT NULL DEFAULT '[]',
+          next_steps_json TEXT NOT NULL DEFAULT '[]',
+          operations_json TEXT NOT NULL DEFAULT '[]'
+        )`);
+        for (const [id, date] of [["checkpoint:old:1", "2026-01-03"], ["checkpoint:old:2", "2026-01-02"]]) {
+          raw.prepare(`INSERT INTO checkpoints
+            (id, work_id, execution_id, message, created_at, event_ordinal_watermark, event_count,
+             goal_json, decisions_json, findings_json, next_steps_json, operations_json)
+            VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?)`).run(
+              id!, "work:old:1", "execution:old:1", "frozen history", date!,
+              JSON.stringify({ statement: "Original goal", evidence: ["event:old:1"] }),
+              '[{"summary":"Original decision"}]', '[{"statement":"Original finding"}]',
+              '[{"description":"Original next step"}]', '[{"status":"pending"}]',
+            );
+        }
+      }
     } finally {
       raw.close();
     }
 
+    const original = new DatabaseSync(databasePath(home));
+    const snapshots = withCheckpoints ? original.prepare("SELECT * FROM checkpoints ORDER BY rowid").all() : [];
+    original.close();
     const store = initHarnieStore({ home });
     try {
       const loaded = loadWork(store, "work:old:1");
@@ -404,8 +434,26 @@ describe("harnie fork", () => {
         db.prepare("SELECT sql FROM sqlite_master WHERE name = 'events'").get() as unknown as { sql: string }
       ).sql;
       expect(eventsSql).toContain("PRIMARY KEY (work_id");
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(db.prepare("PRAGMA foreign_keys").get()?.foreign_keys).toBe(1);
+      if (withCheckpoints) {
+        expect(db.prepare("SELECT * FROM checkpoints ORDER BY rowid").all()).toEqual(snapshots);
+        expect(listCheckpoints(store, "work:old:1").map((checkpoint) => checkpoint.id))
+          .toEqual(["checkpoint:old:1", "checkpoint:old:2"]);
+        expect(db.prepare("PRAGMA index_info(idx_checkpoints_work_seq)").all().map((row) => row.name))
+          .toEqual(["work_id"]);
+      }
     } finally {
       store.close();
+    }
+    const reopened = initHarnieStore({ home });
+    try {
+      expect(loadWork(reopened, "work:old:1")?.events).toHaveLength(1);
+      if (withCheckpoints) {
+        expect(storeDatabase(reopened).prepare("SELECT * FROM checkpoints ORDER BY rowid").all()).toEqual(snapshots);
+      }
+    } finally {
+      reopened.close();
     }
   });
 });

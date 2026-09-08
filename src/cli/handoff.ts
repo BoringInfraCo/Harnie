@@ -4,8 +4,12 @@ import { renderCodexHandoff } from "../handoff/codex.js";
 import { renderOpenCodeHandoff } from "../handoff/opencode.js";
 import { renderPiHandoff } from "../handoff/pi.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
+import { loadWorkAtCheckpoint } from "../store/fork.js";
 import { loadWork } from "../store/persist.js";
-import { buildHandoffFromWork } from "../work/handoff.js";
+import { buildHandoffFromWork, applyOutputRedaction } from "../work/handoff.js";
+import { classifyErrorText, type CliErrorCode } from "../contract/errors.js";
+import { emitJsonFailure, emitJsonSuccess } from "../contract/envelope.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface RunHandoffOptions {
   readonly home?: string;
@@ -15,19 +19,28 @@ export interface RunHandoffOptions {
 
 type HandoffTarget = "opencode" | "pi" | "codex";
 
-const usage = "Usage: harnie handoff <work> --to <target>\n";
+const usage = "Usage: harnie handoff <work> [--checkpoint <id>] --to <target> [--json]\n";
 
 export const runHandoff = async (argv: string[], options: RunHandoffOptions): Promise<number> => {
-  const workId = firstNonFlag(argv);
-  const target = flagValue(argv, "--to");
+  // JSON mode is decided by the presence of --json so that a failure early in
+  // parsing (unknown flag, duplicate flag) still produces a JSON envelope.
+  const json = argv.includes("--json");
+  const parsed = parseHandoffArgs(argv);
 
-  if (workId === undefined || workId === "" || target === undefined) {
+  if (!("target" in parsed)) {
+    if (json) {
+      return emitJsonFailure(options.stdout, "handoff", parsed.code, parsed.message);
+    }
+    // Text behavior preserved: argument-shape failures print usage.
     options.stderr.write(usage);
     return 1;
   }
+  const { workId, target, checkpointId } = parsed;
 
   if (!isHandoffTarget(target)) {
-    options.stderr.write(`Target "${target}" is not implemented.\n`);
+    const message = `Target "${target}" is not implemented.`;
+    if (json) return emitJsonFailure(options.stdout, "handoff", "unsupported", message);
+    options.stderr.write(`${message}\n`);
     return 1;
   }
 
@@ -35,27 +48,43 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
     const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
     const store = initHarnieStore({ home });
     try {
-      const work = loadWork(store, workId);
+      const work = checkpointId === undefined
+        ? loadWork(store, workId)
+        : loadWorkAtCheckpoint(store, workId, checkpointId);
       if (work === undefined) {
-        options.stderr.write(`Work not found: ${workId}\n`);
+        const message = `Work not found: ${workId}`;
+        if (json) return emitJsonFailure(options.stdout, "handoff", "not_found", message);
+        options.stderr.write(`${message}\n`);
         return 1;
       }
 
       const handoff = buildHandoffFromWork(work);
-      const markdown =
+      const rendered =
         target === "pi"
           ? renderPiHandoff(handoff)
           : target === "codex"
             ? renderCodexHandoff(handoff)
             : renderOpenCodeHandoff(handoff);
+      // Renderers already redact; this final pass is an idempotent backstop
+      // so CLI/file output stays redacted even if a renderer path changes.
+      const markdown = applyOutputRedaction(rendered);
+      const file = writeHandoffFile(home, work.id, markdown, target, checkpointId);
+      if (json) {
+        return emitJsonSuccess(options.stdout, "handoff", buildHandoffData(handoff, {
+          target,
+          ...(checkpointId !== undefined ? { checkpointId } : {}),
+          file,
+        }));
+      }
       options.stdout.write(markdown);
-      writeHandoffFile(home, work.id, markdown, target);
       return 0;
     } finally {
       store.close();
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const code = classifyErrorText(message);
+    if (json) return emitJsonFailure(options.stdout, "handoff", code, message);
     options.stderr.write(`${message}\n`);
     return 1;
   }
@@ -64,34 +93,105 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
 const isHandoffTarget = (value: string): value is HandoffTarget =>
   value === "opencode" || value === "pi" || value === "codex";
 
-const firstNonFlag = (argv: readonly string[]): string | undefined => {
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === undefined || arg.startsWith("-")) {
-      if (arg === "--to") index += 1;
-      continue;
+interface ParsedHandoffArgs {
+  readonly workId: string;
+  readonly target: string;
+  readonly checkpointId?: string;
+}
+
+interface FailedHandoffParse {
+  readonly code: CliErrorCode;
+  readonly message: string;
+}
+
+/**
+ * On success returns the parsed arguments. On failure returns a stable error
+ * code plus message (text mode prints usage for any of them; JSON mode
+ * surfaces the code).
+ */
+const parseHandoffArgs = (argv: readonly string[]): ParsedHandoffArgs | FailedHandoffParse => {
+  try {
+    const parsed = parseFlags(argv, {
+      "--to": { kind: "value" },
+      "--checkpoint": { kind: "value" },
+      "--json": { kind: "switch" },
+    });
+    const workId = parsed.positionals[0];
+    const target = parsed.values["--to"];
+    const checkpointId = parsed.values["--checkpoint"];
+    if (parsed.positionals.length > 1) {
+      return { code: "invalid_input", message: "harnie handoff takes exactly one work id." };
     }
-    return arg;
+    if (workId === undefined || workId === "") {
+      return { code: "missing_argument", message: "harnie handoff requires a work id." };
+    }
+    if (target === undefined) {
+      return { code: "missing_argument", message: "harnie handoff requires --to <target>." };
+    }
+    return {
+      workId,
+      target,
+      ...(checkpointId !== undefined ? { checkpointId } : {}),
+    };
+  } catch (error) {
+    if (error instanceof FlagParseError) {
+      return { code: error.code, message: error.message };
+    }
+    throw error;
   }
-  return undefined;
 };
 
-const flagValue = (argv: readonly string[], flag: string): string | undefined => {
-  const index = argv.indexOf(flag);
-  if (index === -1) return undefined;
-  return argv[index + 1];
-};
+const buildHandoffData = (
+  handoff: ReturnType<typeof buildHandoffFromWork>,
+  meta: { target: HandoffTarget; checkpointId?: string; file: string },
+) => ({
+  workId: handoff.workId,
+  target: meta.target,
+  ...(meta.checkpointId !== undefined ? { checkpointId: meta.checkpointId } : {}),
+  file: meta.file,
+  sections: {
+    ...(handoff.goal !== undefined ? { goal: handoff.goal } : {}),
+    ...(handoff.currentState !== undefined ? { currentState: handoff.currentState } : {}),
+    decisions: handoff.decisions,
+    findings: handoff.findings,
+    nextSteps: handoff.nextSteps,
+    operations: handoff.operations,
+    filesTouched: handoff.filesTouched,
+    ...(handoff.revision !== undefined ? { revision: handoff.revision } : {}),
+    ...(handoff.relevantFiles !== undefined ? { relevantFiles: handoff.relevantFiles } : {}),
+    ...(handoff.changedFiles !== undefined ? { changedFiles: handoff.changedFiles } : {}),
+    ...(handoff.failedApproaches !== undefined
+      ? { failedApproaches: handoff.failedApproaches }
+      : {}),
+    ...(handoff.testState !== undefined ? { testState: handoff.testState } : {}),
+    ...(handoff.verification !== undefined ? { verification: handoff.verification } : {}),
+    ...(handoff.readYields !== undefined ? { readYields: handoff.readYields } : {}),
+    ...(handoff.unresolved !== undefined ? { unresolved: handoff.unresolved } : {}),
+    ...(handoff.evidence !== undefined ? { evidence: handoff.evidence } : {}),
+  },
+  // Truncation is explicit: budget.limits exposes the caps and
+  // budget.omittedItems/omittedChars/truncatedItems count what was hidden.
+  ...(handoff.budget !== undefined ? { budget: handoff.budget } : {}),
+  ...(handoff.evidenceRefs !== undefined ? { evidenceRefs: handoff.evidenceRefs } : {}),
+  eventCounts: handoff.eventCounts,
+  diagnosticCodes: handoff.diagnosticCodes,
+  provenance: handoff.provenance,
+});
 
 const writeHandoffFile = (
   home: string,
   workId: string,
   markdown: string,
   target: HandoffTarget,
-): void => {
+  checkpointId?: string,
+): string => {
   const directory = join(home, "handoffs");
   mkdirSync(directory, { recursive: true });
   const suffix = target === "pi" ? ".pi.md" : target === "codex" ? ".codex.md" : ".md";
-  writeFileSync(join(directory, `${safeWorkId(workId)}${suffix}`), markdown);
+  const checkpointSuffix = checkpointId === undefined ? "" : `.${safeWorkId(checkpointId)}`;
+  const path = join(directory, `${safeWorkId(workId)}${checkpointSuffix}${suffix}`);
+  writeFileSync(path, markdown);
+  return path;
 };
 
 const safeWorkId = (workId: string): string => {

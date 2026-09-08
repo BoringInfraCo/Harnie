@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repository = fileURLToPath(new URL("../", import.meta.url));
+const temporary = mkdtempSync(join(tmpdir(), "harnie-package-"));
+const installation = join(temporary, "installation");
+const home = join(temporary, "home");
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const env = { ...process.env, HARNIE_HOME: home, npm_config_cache: join(temporary, "npm-cache") };
+const run = (command, args, cwd) => execFileSync(command, args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+try {
+  mkdirSync(installation);
+  run(npm, ["pack", "--pack-destination", temporary], repository);
+  const { name, version } = JSON.parse(readFileSync(join(repository, "package.json"), "utf8"));
+  const tarball = join(temporary, `${name.replace(/^@/, "").replaceAll("/", "-")}-${version}.tgz`);
+  run(npm, ["install", "--prefix", installation, "--offline", "--ignore-scripts", "--no-audit", "--no-fund", tarball], installation);
+  const installedPackage = join(installation, "node_modules", name);
+  assert.ok(existsSync(join(installedPackage, "dist", "cli.js")));
+  assert.equal(existsSync(join(installedPackage, "src")), false, "The installed CLI must not rely on TypeScript sources");
+  const executable = join(installation, "node_modules", ".bin", process.platform === "win32" ? "harnie.cmd" : "harnie");
+  const cli = (...args) => run(executable, args, installation);
+  assert.match(cli("--help"), /Usage: harnie/);
+  assert.match(cli("init"), /Initialized Harnie/);
+  assert.ok(existsSync(join(home, "harnie.db")));
+  const fixture = join(temporary, "session.jsonl");
+  copyFileSync(join(repository, "tests", "fixtures", "pi", "coding.jsonl"), fixture);
+  const imported = cli("import", "pi", fixture);
+  const workId = /\nWork\n([^\n]+)/.exec(imported)?.[1];
+  assert.ok(workId, "Import must return a work ID");
+  const handoff = cli("handoff", workId, "--to", "opencode");
+  assert.match(handoff, /\S/);
+  assert.ok(handoff.includes(workId), "Handoff must identify the imported work");
+  const artifacts = readdirSync(join(home, "handoffs"));
+  assert.equal(artifacts.length, 1, "Handoff must write one discoverable artifact");
+  assert.equal(readFileSync(join(home, "handoffs", artifacts[0]), "utf8"), handoff);
+  console.log(`Packed CLI smoke passed on ${process.version}: --help, init, fixture import, handoff.`);
+} catch (error) {
+  if (error.stdout) process.stderr.write(error.stdout);
+  if (error.stderr) process.stderr.write(error.stderr);
+  throw error;
+} finally {
+  rmSync(temporary, { recursive: true, force: true });
+}

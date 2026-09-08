@@ -2,8 +2,11 @@ import { listCheckpoints } from "../store/checkpoints.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
 import { loadWork } from "../store/persist.js";
 import type { NormalizedEventKind } from "../types.js";
-import { buildHandoffFromWork } from "../work/handoff.js";
+import { buildHandoffFromWork, applyOutputRedaction, redactOutputText } from "../work/handoff.js";
 import type { Execution, Work } from "../work/types.js";
+import { classifyErrorText, type CliErrorCode } from "../contract/errors.js";
+import { emitJsonFailure, emitJsonSuccess } from "../contract/envelope.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface CliIo {
   readonly home?: string;
@@ -20,34 +23,174 @@ const EVENT_KINDS: readonly NormalizedEventKind[] = [
 ];
 
 export const runShow = async (argv: string[], options: CliIo): Promise<number> => {
-  const workId = argv[0];
-  if (workId === undefined || workId === "") {
-    options.stderr.write("Work id is required.\n");
-    return 1;
-  }
-
+  // JSON mode is decided by the presence of --json so that a failure early in
+  // parsing (unknown flag, duplicate flag) still produces a JSON envelope.
+  const json = argv.includes("--json");
   try {
-    const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
-    const store = initHarnieStore({ home });
+    const parsed = parseFlags(argv, { "--json": { kind: "switch" } });
+    if (parsed.positionals.length === 0 || parsed.positionals[0] === "") {
+      return fail(options, json, "missing_argument", "Work id is required.");
+    }
+    if (parsed.positionals.length > 1) {
+      return fail(options, json, "usage", "harnie show takes exactly one work id.");
+    }
+    const workId = parsed.positionals[0] ?? "";
+
     try {
-      const work = loadWork(store, workId);
-      if (work === undefined) {
-        options.stderr.write(`Work not found: ${workId}\n`);
-        return 1;
+      const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
+      const store = initHarnieStore({ home });
+      try {
+        const work = loadWork(store, workId);
+        if (work === undefined) {
+          return fail(options, json, "not_found", `Work not found: ${workId}`);
+        }
+        const checkpoints = listCheckpoints(store, work.id);
+        const composed: Work = checkpoints.length > 0 ? { ...work, checkpoints } : work;
+        if (json) {
+          return emitJsonSuccess(options.stdout, "show", buildShowData(composed));
+        }
+        // Final output pass: show renders some Work fields directly (not via
+        // the redacted handoff builder), so redact here for legacy stores.
+        options.stdout.write(applyOutputRedaction(formatShow(composed)));
+        return 0;
+      } finally {
+        store.close();
       }
-      const checkpoints = listCheckpoints(store, work.id);
-      const composed: Work = checkpoints.length > 0 ? { ...work, checkpoints } : work;
-      options.stdout.write(formatShow(composed));
-      return 0;
-    } finally {
-      store.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return fail(options, json, classifyErrorText(message), message);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    options.stderr.write(`${message}\n`);
-    return 1;
+    if (error instanceof FlagParseError) {
+      return fail(options, json, error.code, error.message);
+    }
+    throw error;
   }
 };
+
+const fail = (options: CliIo, json: boolean, code: CliErrorCode, message: string): number => {
+  if (json) return emitJsonFailure(options.stdout, "show", code, message);
+  options.stderr.write(`${message}\n`);
+  return 1;
+};
+
+const buildShowData = (work: Work) => {
+  const handoff = buildHandoffFromWork(work);
+  let redactions = 0;
+  const redact = (value: string): string => {
+    const result = redactOutputText(value);
+    redactions += result.redactions;
+    return result.text;
+  };
+  const data = {
+    work: {
+      id: work.id,
+      ...(work.createdAt !== undefined ? { createdAt: work.createdAt } : {}),
+      ...(work.updatedAt !== undefined ? { updatedAt: work.updatedAt } : {}),
+      ...(work.workspace !== undefined ? { workspacePath: redact(work.workspace.path) } : {}),
+      ...(work.forkedFrom !== undefined
+        ? {
+            forkedFrom: {
+              workId: work.forkedFrom.workId,
+              ...(work.forkedFrom.checkpointId !== undefined
+                ? { checkpointId: work.forkedFrom.checkpointId }
+                : {}),
+              ...(work.forkedFrom.message !== undefined
+                ? { message: redact(work.forkedFrom.message) }
+                : {}),
+            },
+          }
+        : {}),
+      executions: work.executions.map((execution) => ({
+        id: execution.id,
+        harness: execution.harness,
+        ...(execution.provider !== undefined ? { provider: execution.provider } : {}),
+        ...(execution.model !== undefined ? { model: execution.model } : {}),
+        sourceSession: {
+          sourceId: execution.sourceSession.sourceId,
+          ...(execution.sourceSession.sourceFormat !== undefined
+            ? { sourceFormat: execution.sourceSession.sourceFormat }
+            : {}),
+        },
+        ...(execution.startedAt !== undefined ? { startedAt: execution.startedAt } : {}),
+      })),
+      ...(work.goal !== undefined
+        ? {
+            goal: {
+              statement: redact(work.goal.statement),
+              evidence: work.goal.evidence,
+              rule: work.goal.rule,
+            },
+          }
+        : {}),
+      decisions: (work.decisions ?? []).map((decision) => ({
+        id: decision.id,
+        summary: redact(decision.summary),
+        evidence: decision.evidence,
+      })),
+      findings: (work.findings ?? []).map((finding) => ({
+        id: finding.id,
+        statement: redact(finding.statement),
+        evidence: finding.evidence,
+      })),
+      nextSteps: (work.nextSteps ?? []).map((step) => ({
+        id: step.id,
+        description: redact(step.description),
+        evidence: step.evidence,
+      })),
+      ...(work.operations !== undefined && work.operations.length > 0
+        ? { operations: work.operations.map(toOperationData) }
+        : {}),
+    },
+    derived: {
+      ...(handoff.goal !== undefined ? { goal: handoff.goal } : {}),
+      ...(handoff.currentState !== undefined ? { currentState: handoff.currentState } : {}),
+      decisions: handoff.decisions,
+      findings: handoff.findings,
+      nextSteps: handoff.nextSteps,
+      operations: handoff.operations,
+      filesTouched: handoff.filesTouched,
+      ...(handoff.revision !== undefined ? { revision: handoff.revision } : {}),
+      ...(handoff.relevantFiles !== undefined ? { relevantFiles: handoff.relevantFiles } : {}),
+      ...(handoff.changedFiles !== undefined ? { changedFiles: handoff.changedFiles } : {}),
+      ...(handoff.failedApproaches !== undefined
+        ? { failedApproaches: handoff.failedApproaches }
+        : {}),
+      ...(handoff.testState !== undefined ? { testState: handoff.testState } : {}),
+      ...(handoff.verification !== undefined ? { verification: handoff.verification } : {}),
+      ...(handoff.readYields !== undefined ? { readYields: handoff.readYields } : {}),
+      ...(handoff.unresolved !== undefined ? { unresolved: handoff.unresolved } : {}),
+      ...(handoff.evidence !== undefined ? { evidence: handoff.evidence } : {}),
+      // Truncation is explicit: budget.limits exposes the caps and
+      // budget.omittedItems/omittedChars/truncatedItems count what was hidden.
+      ...(handoff.budget !== undefined ? { budget: handoff.budget } : {}),
+      ...(handoff.evidenceRefs !== undefined ? { evidenceRefs: handoff.evidenceRefs } : {}),
+    },
+    checkpoints: (work.checkpoints ?? []).map((checkpoint) => ({
+      id: checkpoint.id,
+      ...(checkpoint.executionId !== undefined ? { executionId: checkpoint.executionId } : {}),
+      message: redact(checkpoint.message),
+      createdAt: checkpoint.createdAt,
+      eventCount: checkpoint.eventCount,
+    })),
+    eventCounts: handoff.eventCounts,
+    diagnosticCodes: handoff.diagnosticCodes,
+    redactions,
+    provenance: "observed" as const,
+  };
+  return data;
+};
+
+type WorkOperation = NonNullable<Work["operations"]>[number];
+
+const toOperationData = (operation: WorkOperation) => ({
+  ...(operation.toolName !== undefined ? { toolName: operation.toolName } : {}),
+  ...(operation.path !== undefined ? { path: operation.path } : {}),
+  ...(operation.command !== undefined ? { command: operation.command } : {}),
+  status: operation.status,
+  ...(operation.note !== undefined ? { note: operation.note } : {}),
+  evidence: operation.evidence,
+});
 
 const formatShow = (work: Work): string => {
   const handoff = buildHandoffFromWork(work);
@@ -114,6 +257,10 @@ const formatShow = (work: Work): string => {
 
   if (handoff.testState) {
     sections.push(`Test state\n${handoff.testState}`);
+  }
+
+  if (handoff.verification) {
+    sections.push(`Verification\n${handoff.verification}`);
   }
 
   const readYields = bulletSection(handoff.readYields, (line) => line);

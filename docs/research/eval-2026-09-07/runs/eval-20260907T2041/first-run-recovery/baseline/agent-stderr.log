@@ -1,0 +1,38 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m→ [0mRead docs/internal/FIRST-RUN.md
+[0m
+[0m← [0mEdit docs/internal/FIRST-RUN.md
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/clone/docs/internal/FIRST-RUN.md
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/clone/docs/internal/FIRST-RUN.md
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/first-run-recovery/baseline/clone/docs/internal/FIRST-RUN.md
+@@ -490,4 +490,20 @@
+ You have now completed the first-run journey: install → init → discover
+ (`harnie sessions`) → import (fixture and own session) → inspect →
+ checkpoint → handoff → continue from
+ the artifact alone.
++
++## Recovery
++
++Protect the Harnie store before risky operations. Use `harnie backup <path>`
++to write a consistent SQLite snapshot of the live store. The output file is
++created owner-read/write (`0600`).
++
++```sh
++harnie backup "$HARNIE_HOME/harnie.db.bak"
++```
++
++Use `harnie restore <path> --force` to return to a previous snapshot.
++Restore first validates the backup file (it must be a usable SQLite database
++with the expected Harnie schema), then overwrites the live store with the
++backup contents. Restore has no undo: anything written after the backup is
++discarded.
+
+[0m
+[0m$ [0mgrep -n '^## Recovery' docs/internal/FIRST-RUN.md && git diff --stat
+495:## Recovery
+ docs/internal/FIRST-RUN.md | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+[0m

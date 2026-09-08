@@ -1,0 +1,28 @@
+Now let me check the build scripts and tsconfig to understand how `dist/cli.js` is produced and whether package.json resolution will work from there.
+Now let me check the base tsconfig for strictness settings:
+The build outputs `src/cli.ts` → `dist/cli.js` (one directory deep in both dev and packed installs, with `package.json` one level up from the compiled file), so resolving the manifest relative to `import.meta.url` works in the repo, from `dist/`, and in the packed smoke install. Now I'll make the edit:
+Now run the verification commands — typecheck plus build, then the version check and the pinned test suite:
+`--version` works. Let me verify `-v` too and run the pinned test suite:
+All green. Quick sanity check on unchanged behavior and the working tree state:
+Done. The repo's working tree was already dirty with prior-session work; my change is confined to `src/cli.ts` (left uncommitted per instructions).
+
+## Report
+
+**1. Files edited**
+- `src/cli.ts` — added `readFileSync` import; added `readPackageVersion()` which reads `../package.json` relative to `import.meta.url` (resolves correctly from both `src/` and `dist/`, and in packed installs); added a `--version`/`-v` branch as the first argument check in `runCli`, printing the version to stdout and returning 0 before any other argument handling (src/cli.ts:74-77).
+
+**2. Commands run**
+- `npm run build`
+- `node dist/cli.js --version` (and `-v`)
+- `npx vitest run tests/cli-init.test.ts`
+- `node dist/cli.js --help` / no args / `not-a-command` (behavior spot checks)
+- `npm run typecheck`
+
+**3. Verification — all pass**
+- `npm run build` ✅
+- `node dist/cli.js --version` → prints `0.0.0`, exit 0 ✅ (also `-v` → `0.0.0`, exit 0)
+- `npx vitest run tests/cli-init.test.ts` → 1 file, 7/7 tests passed ✅
+- Existing behavior unchanged: `--help` exit 0, no command exit 1 with usage, unknown command exit 1 ✅
+- `npm run typecheck` clean ✅
+
+**4. Task complete:** Yes — `--version`/`-v` prints the package.json-declared version (never hardcoded) with exit 0, before any other argument handling; all other commands behave exactly as before.

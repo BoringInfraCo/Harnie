@@ -1,0 +1,22 @@
+# Release gate for the developer preview: mirrors the local `npm run check`.
+# The package smoke test (`npm run test:package`, part of `npm run check`)
+# runs offline: it packs the tarball and installs it with `npm install
+# --offline` into a temp prefix, so no external network access is needed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.0
+          cache: npm
+      - run: npm ci
+      - run: npm run check

@@ -1,0 +1,133 @@
+[0m
+> build · omen-alpha
+[0m
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/scripts/prepare-bin.mjs
+[0m
+[0m$ [0mgit status --short && git log --oneline -3
+M .gitignore
+ M README.md
+ M docs/internal/ARCHITECTURE.md
+ M docs/internal/IMPLEMENTATION.md
+ M package-lock.json
+ M package.json
+ M src/cli.ts
+ M src/cli/checkpoint.ts
+ M src/cli/diff.ts
+ M src/cli/executions.ts
+ M src/cli/fork.ts
+ M src/cli/handoff.ts
+ M src/cli/history.ts
+ M src/cli/import.ts
+ M src/cli/list.ts
+ M src/cli/show.ts
+ M src/engine/import.ts
+ M src/handoff/codex.ts
+ M src/handoff/opencode.ts
+ M src/handoff/pi.ts
+ M src/store/checkpoints.ts
+ M src/store/database.ts
+ M src/store/fork.ts
+ M src/store/persist.ts
+ M src/store/schema.ts
+ M src/work/context.ts
+ M src/work/derive.ts
+ M src/work/handoff.ts
+ M src/work/observe.ts
+ M src/work/operations.ts
+ M tests/cli-fork.test.ts
+ M tests/cli-import-codex.test.ts
+ M tests/cli-import-opencode.test.ts
+ M tests/cli-inspect.test.ts
+ M tests/import.test.ts
+?? docs/internal/BACKUP-RECOVERY.md
+?? docs/internal/EVALUATION-PROTOCOL.md
+?? docs/internal/FIRST-RUN.md
+?? docs/internal/LAUNCH-CHECKLIST.md
+?? docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md
+?? docs/internal/MACHINE-CONTRACT.md
+?? docs/internal/SUPPORT-MATRIX.md
+?? "docs/internal/Sprints/Sprint 025 \342\200\224 Checkpoint-Scoped Handoff.md"
+?? docs/research/eval-2026-09-07/
+?? scripts/
+?? src/cli/backup.ts
+?? src/cli/sessions.ts
+?? src/contract/
+?? src/discovery/
+?? src/opencode/import-db.ts
+?? src/store/backup.ts
+?? src/work/redact.ts
+?? tests/cli-backup-restore.test.ts
+?? tests/cli-handoff-checkpoint.test.ts
+?? tests/cli-sessions.test.ts
+?? tests/continuity-state.test.ts
+?? tests/contract-errors.test.ts
+?? tests/contract-json.test.ts
+?? tests/eval-harness.test.ts
+?? tests/finding-2-regression.test.ts
+?? tests/finding-3-regression.test.ts
+?? tests/finding-4-regression.test.ts
+?? tests/finding-5-regression.test.ts
+?? tests/finding-6-regression.test.ts
+?? tests/fixtures/redaction/
+?? tests/handoff-bounds.test.ts
+?? tests/redaction-ingest.test.ts
+?? tests/redaction-output.test.ts
+?? tests/store-migration-hardening.test.ts
+?? tests/store-permissions.test.ts
+?? tsconfig.build.json
+dee5af7 docs: simplify README.md - concise product description and 3-part technical explanation inspired by Pico format
+e79c7a0 Add distilled continuation context to handoffs
+9660c89 Add observed context from operations to handoff and show.
+[0m
+[0m$ [0mnode -e "const p=require('./package.json'); console.log(JSON.stringify(p.scripts,null,2))"
+{
+  "build": "tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs",
+  "typecheck": "tsc --noEmit",
+  "test": "vitest run",
+  "test:package": "node scripts/smoke-package.mjs",
+  "check": "npm run typecheck && npm test && npm run test:package",
+  "prepack": "npm run build",
+  "preharnie": "npm run build",
+  "harnie": "node dist/cli.js",
+  "prebuild": "node scripts/clean-dist.mjs"
+}
+[0m
+[0m$ [0mhead -1 src/cli.ts
+#!/usr/bin/env node
+[0m
+[0m← [0mWrite /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/scripts/prepare-bin.mjs
+Wrote file successfully.
+[0m
+[0m$ [0mnpm run build && node scripts/prepare-bin.mjs && echo "EXIT_OK"
+> harnie@0.0.0 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.0.0 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+
+EXIT_OK
+[0m
+[0m$ [0mnode -e "const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\n/,''))"; node scripts/prepare-bin.mjs; echo "exit=$?"
+error: dist/cli.js is missing its '#!' shebang line. Rebuild dist so the published bin stays executable.
+exit=1
+[0m
+[0m$ [0mmv dist/cli.js /tmp/cli.js.bak; node scripts/prepare-bin.mjs; echo "exit=$?"; mv /tmp/cli.js.bak dist/cli.js
+error: dist/cli.js not found. Run the build first; dist/cli.js must begin with a '#!' shebang.
+exit=1
+[0m
+[0m$ [0mnpm run build && npm run test:package && echo "ALL_GREEN"
+> harnie@0.0.0 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.0.0 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+
+
+> harnie@0.0.0 test:package
+> node scripts/smoke-package.mjs
+
+Packed CLI smoke passed on v22.23.0: --help, init, fixture import, handoff.
+ALL_GREEN
+[0m

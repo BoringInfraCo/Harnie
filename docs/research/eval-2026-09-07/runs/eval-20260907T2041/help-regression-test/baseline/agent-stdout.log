@@ -1,0 +1,16 @@
+## Report
+
+1. **Files edited/created**
+   - Created `tests/regression-help.test.ts`
+   - No existing files were modified.
+
+2. **Commands run**
+   - `npx vitest run tests/regression-help.test.ts`
+   - `npm run typecheck`
+
+3. **Verification pass/fail**
+   - `npx vitest run tests/regression-help.test.ts` — **PASS** (1 test passed)
+   - `npm run typecheck` — **PASS** (`tsc --noEmit` completed with no errors)
+
+4. **Task complete?**
+   - **Yes.** The new regression test pins the CLI help surface for `backup <path>`, `restore <path> [--force]`, `handoff <work>`, and `import pi <path>`, and both required verification checks pass.

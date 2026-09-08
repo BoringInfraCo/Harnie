@@ -1,0 +1,19 @@
+Report
+
+1. Files edited  
+   - `src/cli.ts`
+
+2. Commands run  
+   - `npm run build`  
+   - `node dist/cli.js --version`  
+   - `node dist/cli.js -v`  
+   - `npx vitest run tests/cli-init.test.ts`
+
+3. Verification results  
+   - `node dist/cli.js --version` → prints `0.0.0`, exits `0` ✅  
+   - `node dist/cli.js -v` → prints `0.0.0`, exits `0` ✅  
+   - `npx vitest run tests/cli-init.test.ts` → 7/7 tests passed ✅
+
+4. Task status: complete ✅
+
+The version is read from `package.json` at runtime (not hardcoded), and the `--version`/`-v` check happens before all other argument handling so existing CLI behavior is unchanged.

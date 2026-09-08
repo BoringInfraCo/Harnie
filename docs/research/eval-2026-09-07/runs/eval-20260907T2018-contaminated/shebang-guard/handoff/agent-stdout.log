@@ -1,0 +1,23 @@
+The prior session only read the file; no edit was made yet. Let me check the build scripts, then implement the guard.
+Confirmed: tsc preserves the shebang from `src/cli.ts:1` into `dist/cli.js`, and `prepare-bin.mjs` chmods unconditionally. Now adding the guard:
+Now running the required verification sequence:
+Step 1 passes. Now the failure path — strip the shebang and expect a non-zero exit with the shebang error:
+Failure path works. Quick check of the missing-file branch, then restore with a rebuild:
+## Report
+
+**1. Files edited**
+- `scripts/prepare-bin.mjs` — added guard: exits 1 with a stderr message if `dist/cli.js` is missing or doesn't start with `#!`; otherwise chmods `0o755` as before (only file touched).
+
+**2. Commands run**
+- `npm run build && node scripts/prepare-bin.mjs`
+- shebang-strip `node -e …` + `node scripts/prepare-bin.mjs` (checked `exit=$?`)
+- missing-file check (`mv dist/cli.js` aside, run, restore)
+- `npm run build && npm run test:package`
+
+**3. Verification — all pass**
+- Shebang present → exit 0 ✓
+- Shebang stripped → `error: dist/cli.js is missing its '#!' shebang line…`, exit 1 ✓
+- File missing → `error: dist/cli.js not found…`, exit 1 ✓
+- Build restores `dist/cli.js`; `test:package` green (`Packed CLI smoke passed on v22.23.0`) ✓
+
+**4. Task complete:** Yes. Working tree left dirty, nothing committed.

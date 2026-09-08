@@ -1,0 +1,39 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..d1c3d02 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
+-import { resolve } from "node:path";
++import { readFileSync, realpathSync } from "node:fs";
++import { dirname, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+@@ -16,6 +16,12 @@ import { runList } from "./cli/list.js";
+ import { runSessions } from "./cli/sessions.js";
+ import { runShow } from "./cli/show.js";
+ 
++const getVersion = (): string => {
++  const path = resolve(dirname(fileURLToPath(import.meta.url)), "../package.json");
++  const pkg = JSON.parse(readFileSync(path, "utf8")) as { version?: string };
++  return pkg.version ?? "0.0.0";
++};
++
+ export interface CliWriter {
+   write(chunk: string): unknown;
+ }
+@@ -63,6 +69,11 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
+   const stderr = options?.stderr ?? process.stderr;
+   const command = argv[0];
+ 
++  if (command === "--version" || command === "-v") {
++    stdout.write(`${getVersion()}\n`);
++    return 0;
++  }
++
+   if (command === undefined || command === "") {
+     stderr.write(usage);
+     return 1;

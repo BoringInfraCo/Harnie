@@ -1,0 +1,147 @@
+{
+ "harness": "opencode",
+ "format": "opencode-session-v1",
+ "session": {
+  "id": "ses_drv_00001558tnrf",
+  "directory": "/workspace/harnie-clone",
+  "title": "pin CLI help surface with a regression test",
+  "agent": "build",
+  "model": {
+   "id": "claude-sonnet-4-6",
+   "providerID": "anthropic"
+  },
+  "version": "1.18.29",
+  "time_created": 1788823013299,
+  "time_updated": 1788823025799
+ },
+ "messages": [
+  {
+   "id": "msg_000016e8cat4",
+   "time_created": 1788823013299,
+   "data": {
+    "role": "user",
+    "time": {
+     "created": 1788823013299
+    }
+   }
+  },
+  {
+   "id": "msg_000018cvnn1o",
+   "time_created": 1788823015299,
+   "data": {
+    "role": "assistant",
+    "parentID": "msg_000016e8cat4",
+    "path": {
+     "cwd": "/workspace/harnie-clone"
+    },
+    "modelID": "claude-sonnet-4-6",
+    "providerID": "anthropic",
+    "time": {
+     "created": 1788823015299
+    }
+   }
+  },
+  {
+   "id": "msg_00001cg9rvhq",
+   "time_created": 1788823020399,
+   "data": {
+    "role": "assistant",
+    "parentID": "msg_000016e8cat4",
+    "path": {
+     "cwd": "/workspace/harnie-clone"
+    },
+    "modelID": "claude-sonnet-4-6",
+    "providerID": "anthropic",
+    "time": {
+     "created": 1788823020399
+    }
+   }
+  },
+  {
+   "id": "msg_00001ejvns2j",
+   "time_created": 1788823023099,
+   "data": {
+    "role": "assistant",
+    "parentID": "msg_000016e8cat4",
+    "path": {
+     "cwd": "/workspace/harnie-clone"
+    },
+    "modelID": "claude-sonnet-4-6",
+    "providerID": "anthropic",
+    "time": {
+     "created": 1788823023099
+    }
+   }
+  }
+ ],
+ "parts": [
+  {
+   "id": "prt_000017pp003a",
+   "message_id": "msg_000016e8cat4",
+   "time_created": 1788823013300,
+   "data": {
+    "type": "text",
+    "text": "Add a regression test that pins the CLI help surface."
+   }
+  },
+  {
+   "id": "prt_000019c1nxue",
+   "message_id": "msg_000018cvnn1o",
+   "time_created": 1788823016799,
+   "data": {
+    "type": "text",
+    "text": "Looking at the existing CLI test capture pattern so the new test matches it."
+   }
+  },
+  {
+   "id": "prt_00001a7exun1",
+   "message_id": "msg_000018cvnn1o",
+   "time_created": 1788823017999,
+   "data": {
+    "type": "tool",
+    "tool": "read",
+    "callID": "call_x0000135041x3",
+    "state": {
+     "status": "completed",
+     "input": {
+      "filePath": "tests/cli-init.test.ts"
+     }
+    }
+   }
+  },
+  {
+   "id": "prt_00001bgwjcxp",
+   "message_id": "msg_000018cvnn1o",
+   "time_created": 1788823019199,
+   "data": {
+    "type": "tool",
+    "tool": "bash",
+    "callID": "call_x000014ru4lbl",
+    "state": {
+     "status": "completed",
+     "input": {
+      "command": "node dist/cli.js --help | head -40"
+     }
+    }
+   }
+  },
+  {
+   "id": "prt_00001d5euy9n",
+   "message_id": "msg_00001cg9rvhq",
+   "time_created": 1788823021899,
+   "data": {
+    "type": "text",
+    "text": "I will create tests/regression-help.test.ts importing runCli from ../src/cli.js, capturing stdout for a [\"--help\"] invocation with the same capture() pattern used in tests/cli-init.test.ts, and asserting the output includes 'backup <path>', 'restore <path> [--force]', 'handoff <work>', and 'import pi <path>'."
+   }
+  },
+  {
+   "id": "prt_00001fv2tc3g",
+   "message_id": "msg_00001ejvns2j",
+   "time_created": 1788823024599,
+   "data": {
+    "type": "text",
+    "text": "Confirmed: tests run with vitest; no existing file needs modification — the new test only reads runCli output. Verification: npx vitest run tests/regression-help.test.ts and npm run typecheck."
+   }
+  }
+ ]
+}

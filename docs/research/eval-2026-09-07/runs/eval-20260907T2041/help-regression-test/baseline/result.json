@@ -1,0 +1,104 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260907T2041",
+  "taskId": "help-regression-test",
+  "condition": "baseline",
+  "recordedAt": "2026-09-08T00:54:44.236682+00:00",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "3cfc04502aa9db3f846f534441342f011a0781a1",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/help-regression-test/baseline/clone"
+  },
+  "handoff": {
+    "path": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/driver/harnie-home/handoffs/work_opencode_ses_drv_00001558tnrf.md",
+    "chars": 1637,
+    "sha256": "c303e7a7b969c7e150b996a1980f4139bfb2f364cc304d8660f8075625c719da"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.opencode/bin/opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: help-regression-test\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nAdd a regression test that pins the CLI help surface.\n\nCreate tests/regression-help.test.ts importing runCli from ../src/cli.js, capturing stdout for a [\"--help\"] invocation (follow the capture() pattern in tests/cli-init.test.ts), and asserting the help output includes 'backup <path>', 'restore <path> [--force]', 'handoff <work>', and 'import pi <path>'. Do not modify any existing file.\n\n## Required verification\n- npx vitest run tests/regression-help.test.ts   # passes\n- npm run typecheck   # clean\n\n## Expected end state\nA new passing tests/regression-help.test.ts exists pinning the four help strings; no existing file is modified.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "wallMs": 63975,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/help-regression-test/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/help-regression-test/baseline/agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "todowrite (4 updates)",
+      "purpose": "plan tracking overhead"
+    },
+    {
+      "cmd": "read tests/cli-init.test.ts",
+      "purpose": "learn capture pattern"
+    },
+    {
+      "cmd": "read src/cli.js (does not exist)",
+      "purpose": "misread import path; wasted step"
+    },
+    {
+      "cmd": "glob src/cli*, tests/*.test.ts",
+      "purpose": "discover files"
+    },
+    {
+      "cmd": "read src/cli.ts",
+      "purpose": "find help strings"
+    },
+    {
+      "cmd": "write tests/regression-help.test.ts",
+      "purpose": "implement task"
+    },
+    {
+      "cmd": "npx vitest run tests/regression-help.test.ts",
+      "purpose": "verify"
+    },
+    {
+      "cmd": "npm run typecheck",
+      "purpose": "verify"
+    },
+    {
+      "cmd": "git status --short",
+      "purpose": "confirm scope"
+    }
+  ],
+  "edits": {
+    "files": [
+      "tests/regression-help.test.ts"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 0,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval/eval-20260907T2041/help-regression-test/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "npx vitest run tests/regression-help.test.ts",
+      "npm run typecheck"
+    ],
+    "passed": true,
+    "details": "Receiver-reported verification cross-checked: the evaluator independently re-ran the task's verification commands in the clone after the run; all pass. Receiver's completion claim is supported by the recorded diff and re-run results."
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "partial",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": 1637
+  },
+  "notes": "More overhead than the handoff condition (todo list, globs, one wrong-path read of src/cli.js). Still single-pass edit, correct four strings, no false completion. Evaluator re-ran vitest (1/1) and typecheck: pass. Tool-call census from receiver session trace: bash×3, glob×2, read×3, todowrite×6, write×1."
+}

@@ -1,0 +1,30 @@
+The script already appears to implement the check. Let me check git state and run verification.
+The script already contains the required checks — likely a prior session added them. Let me confirm the file's git state and then run the verification commands.
+The file is untracked (new from prior session work) and already contains the required guards: existence check (scripts/prepare-bin.mjs:5-10), shebang check (scripts/prepare-bin.mjs:12-17), then `chmodSync(cli, 0o755)` with implicit exit 0. Now I'll run the required verification sequence.
+Step 1 passes (exit 0). Now strip the shebang and verify the failure path.
+Failure path works — clear stderr message naming dist/cli.js and the shebang, exit 1. Let me also confirm the missing-file branch, then restore with a rebuild and run the package smoke test.
+All verification passes. The required guard was already implemented in the untracked scripts/prepare-bin.mjs from prior-session work; I verified it end-to-end and made no further edits.
+
+## Report
+
+**(1) Files edited**
+- `scripts/prepare-bin.mjs` — no further edits needed; file (untracked, from prior session) already implements exactly the required behavior:
+  - Missing-file check: scripts/prepare-bin.mjs:5-10 — stderr error naming dist/cli.js, exit 1
+  - Shebang check (`startsWith("#!")` before chmod): scripts/prepare-bin.mjs:12-17 — stderr error naming dist/cli.js and the missing `#!` shebang, exit 1
+  - Success path: `chmodSync(cli, 0o755)` then implicit exit 0 (scripts/prepare-bin.mjs:19)
+
+**(2) Commands run**
+- `npm run build && node scripts/prepare-bin.mjs`
+- node one-liner stripping the `#!` line from dist/cli.js, then `node scripts/prepare-bin.mjs`
+- `mv dist/cli.js dist/cli.js.bak && node scripts/prepare-bin.mjs` (extra check of the missing-file branch), then removed the backup
+- `npm run build` (restores dist/cli.js)
+- `npm run test:package`
+
+**(3) Verification results — all pass**
+- Build + prepare-bin with shebang present: exit 0; dist/cli.js restored with `#!/usr/bin/env node` and perms `-rwxr-xr-x`
+- Shebang stripped: exit 1 with stderr `error: dist/cli.js is missing its '#!' shebang line. Rebuild dist so the published bin stays executable.`
+- Missing file: exit 1 with stderr `error: dist/cli.js not found. Run the build first; dist/cli.js must begin with a '#!' shebang.`
+- Rebuild: exit 0, dist/cli.js back with shebang
+- `npm run test:package`: green ("Packed CLI smoke passed on v22.23.0")
+
+**(4) Task complete: yes.** Working tree left dirty as instructed (prior-session src/tests edits plus the untracked scripts/prepare-bin.mjs); nothing committed.

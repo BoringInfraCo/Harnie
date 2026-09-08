@@ -111,7 +111,7 @@ describe("harnie import opencode", () => {
 
     const listed = capture();
     const shown = capture();
-    expect(await runList({ home, stdout: listed, stderr: capture() })).toBe(0);
+    expect(await runList([], { home, stdout: listed, stderr: capture() })).toBe(0);
     expect(await runShow([workId], { home, stdout: shown, stderr: capture() })).toBe(0);
     expect(listed.toString()).toContain(workId);
     expect(shown.toString()).toContain(workId);

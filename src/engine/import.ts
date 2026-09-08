@@ -8,6 +8,7 @@ import type { HarnieStore } from "../store/database.js";
 import { loadWork, persistObservedWork, type PersistObservedWorkResult } from "../store/persist.js";
 import { deriveObservedWork } from "../work/derive.js";
 import { attachObservedWork } from "../work/observe.js";
+import { redactWork } from "../work/redact.js";
 import type { Work } from "../work/types.js";
 
 export interface ImportSessionOptions {
@@ -46,12 +47,12 @@ const persistWithOptionalAttach = (
   observed: Work,
   workId: string | undefined,
 ): PersistObservedWorkResult => {
-  if (workId === undefined) {
-    return persistObservedWork(store, deriveObservedWork(observed));
-  }
-  const existing = loadWork(store, workId);
-  if (!existing) {
+  const existing = loadWork(store, workId ?? observed.id);
+  if (!existing && workId !== undefined) {
     throw new Error(`Work not found: ${workId}`);
   }
-  return persistObservedWork(store, deriveObservedWork(attachObservedWork(existing, observed)));
+  // Final ingestion choke point: nothing reaches SQLite without passing the
+  // redaction safety net (idempotent when observe/derive already redacted).
+  // Covers fresh imports and attach/refresh merges alike.
+  return persistObservedWork(store, redactWork(deriveObservedWork(existing ? attachObservedWork(existing, observed) : observed)));
 };

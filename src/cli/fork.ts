@@ -1,5 +1,6 @@
 import { createFork } from "../store/fork.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface CliIo {
   readonly home?: string;
@@ -8,8 +9,19 @@ export interface CliIo {
 }
 
 export const runFork = async (argv: string[], options: CliIo): Promise<number> => {
-  const checkpointId = flagValue(argv, "--checkpoint");
-  const positional = nonFlagArgs(argv, "--checkpoint");
+  let checkpointId: string | undefined;
+  let positional: readonly string[];
+  try {
+    const parsed = parseFlags(argv, { "--checkpoint": { kind: "value" } });
+    checkpointId = parsed.values["--checkpoint"];
+    positional = parsed.positionals;
+  } catch (error) {
+    if (error instanceof FlagParseError) {
+      options.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+    throw error;
+  }
   const workId = positional[0];
   if (workId === undefined || workId === "") {
     options.stderr.write("Work id is required.\n");
@@ -38,24 +50,4 @@ export const runFork = async (argv: string[], options: CliIo): Promise<number> =
     options.stderr.write(`${text}\n`);
     return 1;
   }
-};
-
-const nonFlagArgs = (argv: readonly string[], flag: string): string[] => {
-  const args: string[] = [];
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === flag) {
-      index += 1;
-      continue;
-    }
-    if (arg === undefined || arg.startsWith("-")) continue;
-    args.push(arg);
-  }
-  return args;
-};
-
-const flagValue = (argv: readonly string[], flag: string): string | undefined => {
-  const index = argv.indexOf(flag);
-  if (index === -1) return undefined;
-  return argv[index + 1];
 };

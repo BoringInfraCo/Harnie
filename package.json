@@ -1,20 +1,31 @@
 {
   "name": "harnie",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.1",
   "private": true,
   "type": "module",
   "bin": {
-    "harnie": "./src/cli.ts"
+    "harnie": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run build && npm test",
-    "harnie": "node --experimental-strip-types src/cli.ts"
+    "test:package": "node scripts/smoke-package.mjs",
+    "check": "npm run typecheck && npm test && npm run test:package",
+    "prepack": "npm run build",
+    "preharnie": "npm run build",
+    "harnie": "node dist/cli.js",
+    "prebuild": "node scripts/clean-dist.mjs"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.23.0 <23"
   }
 }

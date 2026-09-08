@@ -61,7 +61,7 @@ describe("harnie list and show", () => {
     const stdout = capture();
     const stderr = capture();
 
-    const code = await runList({ home, stdout, stderr });
+    const code = await runList([], { home, stdout, stderr });
 
     expect(code).toBe(0);
     expect(stderr.toString()).toBe("");
@@ -122,7 +122,7 @@ describe("harnie list and show", () => {
     const stdout = capture();
     const stderr = capture();
 
-    const code = await runList({ home, stdout, stderr });
+    const code = await runList([], { home, stdout, stderr });
 
     expect(code).toBe(0);
     expect(stderr.toString()).toBe("");

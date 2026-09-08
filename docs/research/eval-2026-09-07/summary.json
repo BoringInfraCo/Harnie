@@ -1,0 +1,169 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260907T2041",
+  "ref": "3cfc04502aa9db3f846f534441342f011a0781a1",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "src/cli.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1654,
+      "notRunReason": null,
+      "notes": "Used the handoff's file pointers (src/cli.ts, package.json, tests/cli-init.test.ts) without extra exploration. Edit made once; no finished edit repeated. All four listed verifications re-run independently by the evaluator in the clone: --version prints 0.0.0 exit 0; cli-init 7/7 green. Tool-call census from receiver session trace: bash×4, edit×3, read×3."
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "src/cli.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1654,
+      "notRunReason": null,
+      "notes": "No prior context: explored the repo (glob, 6 file reads) before editing. Same single-pass edit; same verifications, all independently confirmed by the evaluator. Tool-call census from receiver session trace: bash×6, edit×2, glob×1, read×7."
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "scripts/prepare-bin.mjs"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1686,
+      "notRunReason": null,
+      "notes": "Went straight to the single file named in the handoff ('prior session only read the file; no edit was made yet'). Edit once. Evaluator re-ran all verification in the clone: exit 0 with shebang, stderr 'Error: dist/cli.js is missing the shebang' + non-zero without, test:package green. Tool-call census from receiver session trace: bash×4, edit×1, read×1."
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "scripts/prepare-bin.mjs"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1686,
+      "notRunReason": null,
+      "notes": "Independent discovery; slightly more verification (ran the shebang-strip check twice). Edit made once — the re-run strip check re-verified, did not re-edit. All verifications independently confirmed by the evaluator. Tool-call census from receiver session trace: bash×7, edit×1, read×2."
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "docs/internal/FIRST-RUN.md"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1697,
+      "notRunReason": null,
+      "notes": "Single read, single edit, minimal verification — smallest run of the eight. Content matches task requirements (backup 0600, restore --force validates then overwrites, no-undo caveat). Evaluator re-ran grep + diff --stat: pass. Tool-call census from receiver session trace: bash×2, edit×1, read×1."
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "docs/internal/FIRST-RUN.md"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1697,
+      "notRunReason": null,
+      "notes": "Same shape as the handoff condition here (task statement already names the file). Content covers all three required points. Evaluator re-ran verification: pass. Tool-call census from receiver session trace: bash×1, edit×1, read×1."
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "tests/regression-help.test.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1637,
+      "notRunReason": null,
+      "notes": "Followed the handoff's plan (import runCli from ../src/cli.js, capture() pattern, the four strings) without re-deriving it. Evaluator re-ran vitest (1/1 pass) and typecheck (exit 0) in the clone: pass. Tool-call census from receiver session trace: bash×4, read×2, write×1."
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "exitCode": 0,
+      "filesEdited": [
+        "tests/regression-help.test.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1637,
+      "notRunReason": null,
+      "notes": "More overhead than the handoff condition (todo list, globs, one wrong-path read of src/cli.js). Still single-pass edit, correct four strings, no false completion. Evaluator re-ran vitest (1/1) and typecheck: pass. Tool-call census from receiver session trace: bash×3, glob×2, read×3, todowrite×6, write×1."
+    }
+  ]
+}

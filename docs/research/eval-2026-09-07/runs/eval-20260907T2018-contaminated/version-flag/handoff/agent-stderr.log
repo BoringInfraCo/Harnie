@@ -1,0 +1,207 @@
+[0m
+> build · omen-alpha
+[0m
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/package.json
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/tests/cli-init.test.ts
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/scripts/prepare-bin.mjs
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/tsconfig.build.json
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/scripts/smoke-package.mjs
+[0m→ [0mRead /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/tsconfig.json
+[0m
+[0m← [0mEdit /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+Index: /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+===================================================================
+--- /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
++++ /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
++import { readFileSync, realpathSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+
+[0m
+[0m← [0mEdit /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+Index: /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+===================================================================
+--- /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
++++ /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/src/cli.ts
+@@ -57,13 +57,28 @@
+   restore <path> [--force]
+                      Restore the store from a backup file
+ `;
+ 
++const readPackageVersion = (): string => {
++  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
++    version?: unknown;
++  };
++  if (typeof manifest.version !== "string") {
++    throw new Error("package.json does not declare a version");
++  }
++  return manifest.version;
++};
++
+ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<number> => {
+   const stdout = options?.stdout ?? process.stdout;
+   const stderr = options?.stderr ?? process.stderr;
+   const command = argv[0];
+ 
++  if (command === "--version" || command === "-v") {
++    stdout.write(`${readPackageVersion()}\n`);
++    return 0;
++  }
++
+   if (command === undefined || command === "") {
+     stderr.write(usage);
+     return 1;
+   }
+
+[0m
+[0m$ [0mnpm run build
+> harnie@0.0.0 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.0.0 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+[0m
+[0m$ [0mnode dist/cli.js --version; echo "exit=$?"
+0.0.0
+exit=0
+[0m
+[0m$ [0mnode dist/cli.js -v; echo "exit=$?"
+0.0.0
+exit=0
+[0m
+[0m$ [0mnpx vitest run tests/cli-init.test.ts
+RUN  v4.1.11 /Users/sergio/Documents/Developer/BoringInfraCo/Harnie
+
+(node:33077) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  20:18:01
+   Duration  235ms (transform 132ms, setup 0ms, import 162ms, tests 7ms, environment 0ms)
+[0m
+[0m$ [0mgit status --short && git diff --stat
+M .gitignore
+ M README.md
+ M docs/internal/ARCHITECTURE.md
+ M docs/internal/IMPLEMENTATION.md
+ M package-lock.json
+ M package.json
+ M src/cli.ts
+ M src/cli/checkpoint.ts
+ M src/cli/diff.ts
+ M src/cli/executions.ts
+ M src/cli/fork.ts
+ M src/cli/handoff.ts
+ M src/cli/history.ts
+ M src/cli/import.ts
+ M src/cli/list.ts
+ M src/cli/show.ts
+ M src/engine/import.ts
+ M src/handoff/codex.ts
+ M src/handoff/opencode.ts
+ M src/handoff/pi.ts
+ M src/store/checkpoints.ts
+ M src/store/database.ts
+ M src/store/fork.ts
+ M src/store/persist.ts
+ M src/store/schema.ts
+ M src/work/context.ts
+ M src/work/derive.ts
+ M src/work/handoff.ts
+ M src/work/observe.ts
+ M src/work/operations.ts
+ M tests/cli-fork.test.ts
+ M tests/cli-import-codex.test.ts
+ M tests/cli-import-opencode.test.ts
+ M tests/cli-inspect.test.ts
+ M tests/import.test.ts
+?? docs/internal/BACKUP-RECOVERY.md
+?? docs/internal/EVALUATION-PROTOCOL.md
+?? docs/internal/FIRST-RUN.md
+?? docs/internal/LAUNCH-CHECKLIST.md
+?? docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md
+?? docs/internal/MACHINE-CONTRACT.md
+?? docs/internal/SUPPORT-MATRIX.md
+?? "docs/internal/Sprints/Sprint 025 \342\200\224 Checkpoint-Scoped Handoff.md"
+?? docs/research/eval-2026-09-07/
+?? scripts/
+?? src/cli/backup.ts
+?? src/cli/sessions.ts
+?? src/contract/
+?? src/discovery/
+?? src/opencode/import-db.ts
+?? src/store/backup.ts
+?? src/work/redact.ts
+?? tests/cli-backup-restore.test.ts
+?? tests/cli-handoff-checkpoint.test.ts
+?? tests/cli-sessions.test.ts
+?? tests/continuity-state.test.ts
+?? tests/contract-errors.test.ts
+?? tests/contract-json.test.ts
+?? tests/eval-harness.test.ts
+?? tests/finding-2-regression.test.ts
+?? tests/finding-3-regression.test.ts
+?? tests/finding-4-regression.test.ts
+?? tests/finding-5-regression.test.ts
+?? tests/finding-6-regression.test.ts
+?? tests/fixtures/redaction/
+?? tests/handoff-bounds.test.ts
+?? tests/redaction-ingest.test.ts
+?? tests/redaction-output.test.ts
+?? tests/store-migration-hardening.test.ts
+?? tests/store-permissions.test.ts
+?? tsconfig.build.json
+ .gitignore                        |   2 +
+ README.md                         | 253 ++++++++++++++++++++
+ docs/internal/ARCHITECTURE.md     |  15 ++
+ docs/internal/IMPLEMENTATION.md   |   7 +
+ package-lock.json                 |   6 +
+ package.json                      |  19 +-
+ src/cli.ts                        |  51 +++-
+ src/cli/checkpoint.ts             |  15 +-
+ src/cli/diff.ts                   |  82 +++++--
+ src/cli/executions.ts             |  82 +++++--
+ src/cli/fork.ts                   |  36 ++-
+ src/cli/handoff.ts                | 150 ++++++++++--
+ src/cli/history.ts                | 107 +++++++--
+ src/cli/import.ts                 | 139 ++++++++---
+ src/cli/list.ts                   |  40 +++-
+ src/cli/show.ts                   | 191 +++++++++++++--
+ src/engine/import.ts              |  13 +-
+ src/handoff/codex.ts              |  27 ++-
+ src/handoff/opencode.ts           |  27 ++-
+ src/handoff/pi.ts                 |  27 ++-
+ src/store/checkpoints.ts          |   8 +-
+ src/store/database.ts             |  65 +++++-
+ src/store/fork.ts                 |  51 +++-
+ src/store/persist.ts              | 136 +++++++++--
+ src/store/schema.ts               |  18 +-
+ src/work/context.ts               |  74 +++++-
+ src/work/derive.ts                | 118 +++++++---
+ src/work/handoff.ts               | 478 ++++++++++++++++++++++++++++++++++----
+ src/work/observe.ts               | 114 +++++++--
+ src/work/operations.ts            |  18 +-
+ tests/cli-fork.test.ts            |  50 +++-
+ tests/cli-import-codex.test.ts    |   2 +-
+ tests/cli-import-opencode.test.ts |   2 +-
+ tests/cli-inspect.test.ts         |   4 +-
+ tests/import.test.ts              |  52 ++++-
+ 35 files changed, 2127 insertions(+), 352 deletions(-)
+[0m
+[0m$ [0mnode dist/cli.js --help >/dev/null; echo "help=$?"; node dist/cli.js 2>/dev/null; echo "nocmd=$?"; node dist/cli.js not-a-command 2>/dev/null; echo "unknown=$?"; npm run typecheck
+help=0
+nocmd=1
+unknown=1
+
+> harnie@0.0.0 typecheck
+> tsc --noEmit
+[0m
