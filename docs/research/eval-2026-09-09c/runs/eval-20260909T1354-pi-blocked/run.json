@@ -1,0 +1,17 @@
+{
+  "schema": "harnie-eval-run/v2",
+  "runId": "eval-20260909T1354-pi-blocked",
+  "repo": "Harnie",
+  "ref": "6ac02e359b3b973c7fc4b4c603a6d2db38b665dc",
+  "refName": "v0.1.0-rc.5",
+  "tagSha": "6ac02e359b3b973c7fc4b4c603a6d2db38b665dc",
+  "refInput": "v0.1.0-rc.5",
+  "createdAt": "2026-09-09T13:58:37.834Z",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "tasks": [
+    "version-flag",
+    "shebang-guard"
+  ],
+  "note": "not-run manifest: pi receiver legs blocked by openrouter funding again on the rc.5 candidate probe pass (see result records + probes/); no receiver invocation spent"
+}

@@ -94,21 +94,24 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   How to verify: `node scripts/eval-continuation.mjs tasks --json`;
   inspect `docs/research/eval-2026-09-08/`.
 - Order 5 — Directed cross-harness matrix (2026-09-09, ref v0.1.0-rc.2/0231dd7,
-  plus funded rerun pass 2026-09-10 bound to v0.1.0-rc.3/cbe5399). Two-verdict
-  framing per `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A
-  is not a PASS on Verdict B):
+  plus funded rerun pass bound to v0.1.0-rc.3/cbe5399, plus final
+  candidate-bound pass bound to v0.1.0-rc.5/6ac02e3). Two-verdict framing per
+  `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A is not a PASS
+  on Verdict B):
 
-  - [x] Verdict A (safety among completed runs): PASS — 09-09 (7 runs, rc.2) + 09-10 (2 runs, rc.3)
-  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — do NOT claim the matrix met
+  - [x] Verdict A (safety among completed runs): PASS — 9 successful receiver runs total (rc.2: eval-2026-09-09, 7; rc.3: eval-2026-09-09b, 2); zero false completion / repeated finished edits / out-of-scope edits. The rc.5 candidate itself has no receiver runs (probe-gated).
+  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — confirmed for v0.1.0-rc.5 (tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc); release ships under an explicit waiver (docs/internal/RELEASE-0.1.0-rc.5.md)
     - [x] Pi → Harnie → OpenCode: met (09-09, rc.2; handoff+baseline verified)
-    - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials NOT RUN (provider)
-    - [ ] Codex → Harnie → Pi: NOT RUN — pi receiver provider-blocked (402 credits / 429 free tier; probes recorded 09-10)
+    - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials 2-3 NOT RUN — pi provider unfunded (402 openrouter_credits / 429 free-tier daily; re-probed 2026-09-09T13:54Z), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/
+    - [ ] Codex → Harnie → Pi: NOT RUN — same provider blocker (handoff + baseline recorded not-run, ready artifact sha-pinned), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/
     - [x] Codex → Harnie → OpenCode: met for transport/receiver compatibility ONLY
       - 09-09 leg: handoff context unrelated to the benchmark task → no semantic-continuation claim
-      - 09-10 leg D (rc.3, first-run-recovery, task-matching driver context): handoff + baseline PASS
+      - leg D (rc.3, first-run-recovery, task-matching driver context): handoff + baseline PASS
     - [x] Continuation semantics: met via OpenCode→Codex greeting-command leg (09-09; steps 1-2 → step 3 only)
-  - [x] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts are ready + sha-pinned in docs/research/eval-2026-09-{09,10}/driver/, records show not-run + reasons
-  - [x] Integrity: verify-evidence OK on docs/research/eval-2026-09-09 and eval-2026-09-09b (run after any new evidence)
+  - [x] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts ready + sha-pinned in docs/research/eval-2026-09-{09,09b}/driver/, all four missing legs recorded not-run with reasons in docs/research/eval-2026-09-09c/
+  - [x] Developer re-explanation threshold ("substantially less re-explanation"): NOT ESTABLISHED — 4 n=1 pairs, mean Δ ≈ −0.6s mixed sign, newest 35.1s vs 33.3s (docs/research/eval-2026-09-09c/{README,summary}.md); no productivity claim made
+  - [x] Release waiver (docs/internal/RELEASE-0.1.0-rc.5.md) accurate at re-verification 2026-09-09T13:54Z
+  - [x] Integrity: verify-evidence OK on eval-2026-09-09, eval-2026-09-09b, eval-2026-09-09c (run after any new evidence)
 - [x] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
   instructions, known limitations, recovery instructions.

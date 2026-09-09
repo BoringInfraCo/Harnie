@@ -1,0 +1,62 @@
+{
+  "schema": "harnie-eval-result/v2",
+  "runId": "eval-20260909T1354-pi-blocked",
+  "taskId": "version-flag",
+  "condition": "baseline",
+  "sourceHarness": null,
+  "targetHarness": "pi",
+  "tagSha": "6ac02e359b3b973c7fc4b4c603a6d2db38b665dc",
+  "refName": "v0.1.0-rc.5",
+  "handoffArtifactSha": null,
+  "patch": null,
+  "recordedAt": "2026-09-09T13:58:37.834Z",
+  "status": "not-run",
+  "notRunReason": "OpenCode->Pi baseline (leg a, bound to v0.1.0-rc.5 / 6ac02e3): NOT RUN - pi receiver provider unfunded, re-verified by cheap probes 2026-09-09T13:54Z (probes/): pi/openrouter moonshotai/kimi-k2.5 -> 402 openrouter_credits ('You requested up to 4096 tokens, but can only afford 2422'; credits do not reset); pi/openrouter cohere/north-mini-code:free -> 429 openrouter_free_tier_daily (X-RateLimit-Remaining: 0; account-wide 50/day key contested; X-RateLimit-Reset 2026-09-10T00:00Z). Per pass rule: probe failure -> no receiver invocation spent, no budget burned on retries.",
+  "environment": {
+    "agent": "pi",
+    "agentVersion": "0.84.4",
+    "model": null,
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "6ac02e359b3b973c7fc4b4c603a6d2db38b665dc",
+    "clonePath": null
+  },
+  "handoff": {
+    "path": null,
+    "chars": null,
+    "sha256": null
+  },
+  "execution": {
+    "invocation": null,
+    "exitCode": null,
+    "signal": null,
+    "timedOut": null,
+    "wallMs": null,
+    "stdoutLog": null,
+    "stderrLog": null
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [],
+    "outOfScopeFiles": [],
+    "diffChars": null,
+    "diffPath": null
+  },
+  "verification": {
+    "ran": null,
+    "commands": [],
+    "passed": null,
+    "details": null
+  },
+  "metrics": {
+    "developerReExplanation": "unknown",
+    "repeatedInvestigation": "unknown",
+    "repeatedFinishedEdits": "unknown",
+    "nextActionCorrect": "unknown",
+    "missingOrFalseContext": "unknown",
+    "taskCompleted": null,
+    "falseCompletion": null,
+    "packageSizeChars": null
+  },
+  "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); this is the still-missing baseline that would pair with the rc.2-bound trial-1 handoff PASS in eval-2026-09-09 (runs/eval-20260909T1700-legB)."
+}
