@@ -1,6 +1,6 @@
 # Continuation evaluation summary — run eval-20260909T1700-legB-m3
 
-Ref: `v0.1.0-rc.2` → `0231dd77ce909d04fcb60692ae48a47df04c9b68` · tagSha `0231dd77ce909d04fcb60692ae48a47df04c9b68` · Node: v22.23.0 · Platform: darwin · Repo: /Users/sergio/Documents/Developer/BoringInfraCo/Harnie
+Ref: `v0.1.0-rc.2` → `0231dd77ce909d04fcb60692ae48a47df04c9b68` · tagSha `0231dd77ce909d04fcb60692ae48a47df04c9b68` · Node: v22.23.0 · Platform: darwin · Repo: Harnie
 
 | Task | Condition | Source→Target | Status | Agent | Model | tagSha | Handoff sha256 (first 12) | Exit | Files edited | Out-of-scope | Verification | Repeated finished edits | False completion | Completed | Handoff chars |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

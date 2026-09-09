@@ -1,12 +1,12 @@
 # Release notes — harnie 0.1.0-rc.3 (developer preview)
 
-Date: 2026-09-09. Status: **prepared, pending tag** (`v0.1.0-rc.3`). RC3 =
-RC2 (`docs/internal/RELEASE-0.1.0-rc.2.md`, published — tag `v0.1.0-rc.2` →
+Date: 2026-09-09. Status: **published** (tag `v0.1.0-rc.3`, see "Published
+artifact" at the bottom). RC3 = RC2
+(`docs/internal/RELEASE-0.1.0-rc.2.md`, published — tag `v0.1.0-rc.2` →
 `0231dd77ce909d04fcb60692ae48a47df04c9b68`, release
 https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.2 with asset
 `harnie-0.1.0-rc.2.tgz`, clean-prefix install verified 2026-09-08) plus this
-post-rc.2 re-audit remediation round. The remaining release step is
-documented at the bottom and in `docs/internal/LAUNCH-CHECKLIST.md` (Order 6).
+post-rc.2 re-audit remediation round.
 
 ## What this preview does
 
@@ -38,17 +38,20 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
   smoke covers the re-audit repros (`scripts/smoke-package.mjs`).
 - **Directed cross-harness matrix (Order 5, 2026-09-09, ref
   `v0.1.0-rc.2`/`0231dd7`).** Pi→Harnie→OpenCode PASS (handoff+baseline);
-  Codex→Harnie→OpenCode PASS (handoff+baseline); OpenCode→Harnie→Pi handoff
-  PASS n=1 (baseline NOT RUN — 5 recorded provider-failure attempts,
-  openrouter 402/429); Codex→Harnie→Pi NOT RUN (same provider blocker,
-  handoff artifact ready); continuation task (driver pre-commits steps 1–2,
-  receiver completes step 3 only) PASS via OpenCode→Codex. Per-run
-  provenance fields (`sourceHarness`/`targetHarness`/`tagSha`/
-  `handoffArtifactSha`) added and validated; the 2026-09-08 evidence is
-  reclassified as RECEIVER COMPATIBILITY. Gate "no false completion or
-  repeated completed edits": PASS across all successful runs; all failures
-  honestly recorded. Evidence: `docs/research/eval-2026-09-09/`
-  (+ reclassification notes in `eval-2026-09-08/`).
+  OpenCode→Harnie→Pi handoff PASS n=1 (baseline NOT RUN — 5 recorded
+  provider-failure attempts, openrouter 402/429); Codex→Harnie→Pi NOT RUN
+  (pi receiver provider-blocked; handoff artifact ready); continuation
+  task (driver pre-commits steps 1–2, receiver completes step 3 only) PASS
+  via OpenCode→Codex. Stated precisely: **Codex→OpenCode executed
+  successfully (transport/receiver compatibility)** — its handoff context
+  was unrelated to the benchmark task, so it does not demonstrate semantic
+  continuation. Per-run provenance fields
+  (`sourceHarness`/`targetHarness`/`tagSha`/`handoffArtifactSha`) added and
+  validated; the 2026-09-08 evidence is reclassified as RECEIVER
+  COMPATIBILITY. Gate "no false completion or repeated completed edits":
+  PASS across all successful runs; all failures honestly recorded.
+  Evidence: `docs/research/eval-2026-09-09/` (+ reclassification notes in
+  `eval-2026-09-08/`).
 - **Release metadata fixes.** `.github/workflows/release.yml` now verifies
   the tag against the pushed SHA (`--verify-tag`) and marks `-rc`/`-alpha`/
   `-beta` tags as prereleases at creation; the existing `v0.1.0-rc.2`
@@ -70,11 +73,14 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
   (snapshot writes are atomic, but parallel `harnie` commands against one
   home are not supported — `docs/internal/SUPPORT-MATRIX.md`).
 - **Codex remains experimental.** Import-side live gate is still a single
-  manual datapoint plus fixtures. The receiver side is stronger but
-  partial: a Codex receiver consumed a Harnie handoff successfully in a
-  live run on 2026-09-09 (OpenCode→Harnie→Codex continuation leg), and the
-  2026-09-08 compatibility runs exercised `codex exec` live — but Codex as
-  a source driver in the directed matrix remains blocked.
+  manual datapoint plus fixtures. The receiver side is stronger but partial:
+  a Codex receiver consumed a Harnie handoff successfully in a live run on
+  2026-09-09 (OpenCode→Harnie→Codex continuation leg), the 2026-09-08
+  compatibility runs exercised `codex exec` live, and Codex→OpenCode
+  executed successfully in the directed matrix (transport/receiver
+  compatibility — the 09-09 handoff context was unrelated to its benchmark
+  task, so it does not demonstrate semantic continuation). Codex as a
+  source driver toward the pi receiver remains blocked.
 - **Evaluation caveats (remaining).** pi/opencode drivers are synthetic
   (real sessions are trivial to attach and remain a trivial step away);
   n=1 per successful leg; OpenCode→Pi baseline/trials 2–3 and the
@@ -84,13 +90,18 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
 
 ## Evaluation result (Order 5, directed matrix)
 
-**PASS** (2026-09-09, ref `v0.1.0-rc.2`/`0231dd7`): no false completion or
-repeated completed edits across all 7 successful receiver runs; every
-completion claim corroborated by diff + evaluator re-verification; all
-provider-failure attempts honestly recorded as failures. Full verdict,
-trial ledger, and per-run provenance: `docs/research/eval-2026-09-09/`
-(prior: `docs/research/eval-2026-09-08/` receiver compatibility,
-`docs/research/eval-2026-09-07/` initial gate).
+**Verdict A PASS / Verdict B PARTIAL** (2026-09-09, ref
+`v0.1.0-rc.2`/`0231dd7`; re-framed into the two-verdict protocol on
+2026-09-10): Verdict A — safety among completed runs — PASS: no false
+completion or repeated completed edits across all 7 successful receiver
+runs; every completion claim corroborated by diff + evaluator
+re-verification; all provider-failure attempts honestly recorded as
+failures. Verdict B — the full matrix gate — stays PARTIAL: the
+OpenCode→Pi baseline/trials and the Codex→Pi leg are provider-blocked.
+Full verdicts, trial ledger, and per-run provenance:
+`docs/research/eval-2026-09-09/` (funded rerun pass and not-run records:
+`docs/research/eval-2026-09-10/`; prior: `docs/research/eval-2026-09-08/`
+receiver compatibility, `docs/research/eval-2026-09-07/` initial gate).
 
 ## Recovery instructions
 
@@ -129,13 +140,20 @@ Automated equivalent: `npm run check` (typecheck + tests + offline package
 smoke test), enforced by `.github/workflows/ci.yml` and re-run by
 `.github/workflows/release.yml` on tag pushes.
 
-## What remains to publish
+## Published artifact
 
-Release-engineering steps (orchestrator, user-executed — nothing is
-committed, tagged, pushed, or run against the GitHub API by the release
-prep): commit the working tree (strict flags + `--version`, eval
-`eval-2026-09-09/`, docs + workflows + version bump), tag `v0.1.0-rc.3`,
-push with tags — CI gates the tag and `.github/workflows/release.yml`
-creates the GitHub Release with the tarball attached, prerelease-marked and
-tag-verified. Confirm both workflows green and the asset present
-(`docs/internal/LAUNCH-CHECKLIST.md`, Order 6).
+RC3 is fully published (2026-09-09):
+
+- Tag `v0.1.0-rc.3` → commit `cbe5399346a27d43a13dc8856dfe54ff039936fe`
+  (first push `83d40ed` failed CI and was superseded by the git-identity
+  fix `cbe5399`, which is the tagged commit).
+- CI green: run 34297508050. Release workflow green: run 34297507940.
+- GitHub release:
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.3 with
+  asset `harnie-0.1.0-rc.3.tgz` (SHA-256
+  `bebf9201d497a9b3b92c1e2e8a6246404ea2d8586e14b63ef80bc6c09d0407f9`),
+  `isPrerelease` true.
+- Independently verified 2026-09-09 by clean install from the asset under
+  a temp `HARNIE_HOME`: `--version` prints `0.1.0-rc.3`; `init --bogus`
+  exits 1; `backup x.db --bogus` exits 1; fixture import + handoff
+  succeeded.

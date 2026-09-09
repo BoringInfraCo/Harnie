@@ -1,0 +1,27 @@
+diff --git a/docs/internal/FIRST-RUN.md b/docs/internal/FIRST-RUN.md
+index d616314..0f827c3 100644
+--- a/docs/internal/FIRST-RUN.md
++++ b/docs/internal/FIRST-RUN.md
+@@ -491,3 +491,22 @@ You have now completed the first-run journey: install → init → discover
+ (`harnie sessions`) → import (fixture and own session) → inspect →
+ checkpoint → handoff → continue from
+ the artifact alone.
++
++## Recovery
++
++`harnie backup <path>` writes a consistent snapshot of the live SQLite
++store. The output file is created with owner-only permissions (`0600`) so
++it matches the store's own protection.
++
++```sh
++harnie backup /path/to/harnie.db.bak
++```
++
++`harnie restore <path> --force` validates the backup file first, then
++overwrites the live store with the snapshot. Restore is destructive: it
++has no undo, so make sure the backup is the state you want before passing
++`--force`.
++
++```sh
++harnie restore /path/to/harnie.db.bak --force
++```

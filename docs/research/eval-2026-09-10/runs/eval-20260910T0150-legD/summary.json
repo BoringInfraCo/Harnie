@@ -1,0 +1,109 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260910T0150-legD",
+  "ref": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "sourceHarness": "codex",
+      "targetHarness": "opencode",
+      "tagSha": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+      "refName": "v0.1.0-rc.3",
+      "handoffArtifactSha": "a6fe4003c09e6a3920fe4c2d517a0dcaaa2abc3c928a784108b095ece6c59cbd",
+      "timedOut": false,
+      "exitCode": 0,
+      "filesEdited": [
+        "docs/internal/FIRST-RUN.md"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 1907,
+      "notRunReason": null,
+      "notes": "funded rerun (2026-09-10) of the unrelated-task pair bound to v0.1.0-rc.3 (cbe5399); driver context MATCHES the explicit benchmark task (synthetic codex driver for first-run-recovery, declared synthetic), unlike the 2026-09-09 Codex->OpenCode leg whose handoff context was unrelated"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "sourceHarness": null,
+      "targetHarness": "opencode",
+      "tagSha": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+      "refName": "v0.1.0-rc.3",
+      "handoffArtifactSha": null,
+      "timedOut": false,
+      "exitCode": 0,
+      "filesEdited": [
+        "docs/internal/FIRST-RUN.md"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": null,
+      "notRunReason": null,
+      "notes": "funded rerun (2026-09-10): statement-only baseline paired with the handoff condition, ref v0.1.0-rc.3"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    }
+  ]
+}

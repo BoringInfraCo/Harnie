@@ -4,11 +4,11 @@ Date: 2026-09-08. Maps the audit's Orders 1–6
 (`docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md`, "Recommended launch
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
-on the `0.1.0-rc.3` tree on 2026-09-09 (typecheck clean, 62 test files /
-370 tests passed, package smoke passed on v22.23.0 including strict-flag and
-`--version` repros); the suite-green caveats
-below describe the state at the time each order was closed, superseded by
-that run.
+on the `0.1.0-rc.4` tree on 2026-09-10 (typecheck clean, 63 test files /
+396 tests passed, package smoke passed on v22.23.0 including strict-flag
+(help-mode parse-before-help) and `--version` repros); the suite-green
+caveats below describe the state at the time each order was closed,
+superseded by that run.
 
 Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
 
@@ -92,26 +92,50 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   baselines not run, n=1 per leg.
   How to verify: `node scripts/eval-continuation.mjs tasks --json`;
   inspect `docs/research/eval-2026-09-08/`.
-- [x] Order 5 — Directed cross-harness matrix (2026-09-09, ref v0.1.0-rc.2/0231dd7): Pi→Harnie→OpenCode PASS (handoff+baseline); Codex→Harnie→OpenCode PASS (handoff+baseline); OpenCode→Harnie→Pi handoff PASS n=1 (baseline NOT RUN — 5 recorded provider-failure attempts: openrouter 402/429); Codex→Harnie→Pi NOT RUN (same provider blocker, handoff artifact ready); continuation task (driver pre-commits steps 1-2, receiver completes step 3 only) PASS via OpenCode→Codex. Provenance fields (sourceHarness/targetHarness/tagSha/handoffArtifactSha) added + validated; 2026-09-08 evidence reclassified as RECEIVER COMPATIBILITY (header notes). Gate "no false completion or repeated completed edits": PASS across all successful runs; all failures honestly recorded. Evidence: docs/research/eval-2026-09-09/ (+reclassification notes in eval-2026-09-08). Caveats: OpenCode→Pi baseline/trials 2-3 and Codex→Pi blocked by provider funding (rerunnable once funded); pi/opencode drivers synthetic (real sessions trivial); n=1 per successful leg.
+- Order 5 — Directed cross-harness matrix (2026-09-09, ref v0.1.0-rc.2/0231dd7,
+  plus funded rerun pass 2026-09-10 bound to v0.1.0-rc.3/cbe5399). Two-verdict
+  framing per `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A
+  is not a PASS on Verdict B):
+
+  - [ ] Verdict A (safety among completed runs): PASS — 09-09 (7 runs, rc.2) + 09-10 (2 runs, rc.3)
+  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — do NOT claim the matrix met
+    - [ ] Pi → Harnie → OpenCode: met (09-09, rc.2; handoff+baseline verified)
+    - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials NOT RUN (provider)
+    - [ ] Codex → Harnie → Pi: NOT RUN — pi receiver provider-blocked (402 credits / 429 free tier; probes recorded 09-10)
+    - [ ] Codex → Harnie → OpenCode: met for transport/receiver compatibility ONLY
+      - 09-09 leg: handoff context unrelated to the benchmark task → no semantic-continuation claim
+      - 09-10 leg D (rc.3, first-run-recovery, task-matching driver context): handoff + baseline PASS
+    - [ ] Continuation semantics: met via OpenCode→Codex greeting-command leg (09-09; steps 1-2 → step 3 only)
+  - [ ] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts are ready + sha-pinned in docs/research/eval-2026-09-{09,10}/driver/, records show not-run + reasons
+  - [ ] Integrity: verify-evidence OK on docs/research/eval-2026-09-09 and eval-2026-09-10 (run after any new evidence)
 - [x] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
   instructions, known limitations, recovery instructions.
-  Status 2026-09-09: **done — RC2 fully published and verified.** Tag
-  `v0.1.0-rc.2` → commit `0231dd77ce909d04fcb60692ae48a47df04c9b68`; CI green
-  (run 34245576389), Release workflow green (run 34245576530); GitHub release
-  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.2 with asset
-  `harnie-0.1.0-rc.2.tgz` (~90 kB), verified by independent clean-prefix
-  install on 2026-09-08. Release notes with known limitations + recovery
-  pointer (`docs/internal/RELEASE-0.1.0-rc.2.md`); recovery source
-  `docs/internal/BACKUP-RECOVERY.md`; install instructions re-verified
-  (pack → install `./harnie-*.tgz` into an empty dir → `--help` / `init` /
-  fixture import / `handoff` under an isolated `HARNIE_HOME`); Orders 1–5
-  done as above.
-  The same gate re-applies to `v0.1.0-rc.3`: version bumped, docs refreshed
-  (strict flags on all commands + `--version`/`-V`, directed matrix with
-  honest caveats, prerelease marking + `--verify-tag` in
-  `.github/workflows/release.yml`); RC3 tag/publish is the orchestrator's
-  step (see `docs/internal/RELEASE-0.1.0-rc.3.md`).
+  Status 2026-09-09: **done — RC3 fully published and verified.** Tag
+  `v0.1.0-rc.3` → commit `cbe5399346a27d43a13dc8856dfe54ff039936fe`
+  (first push `83d40ed` failed CI, superseded by the git-identity fix
+  `cbe5399`); CI green (run 34297508050), Release workflow green (run
+  34297507940); GitHub release
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.3 with
+  asset `harnie-0.1.0-rc.3.tgz` (SHA-256
+  `bebf9201d497a9b3b92c1e2e8a6246404ea2d8586e14b63ef80bc6c09d0407f9`),
+  `isPrerelease` true; independently verified 2026-09-09 (clean install,
+  `--version`, `init --bogus` exit 1, `backup x.db --bogus` exit 1,
+  fixture import + handoff). RC2 published 2026-09-08 as above.
+- [ ] **Order 6 — `v0.1.0-rc.4` (this round, pending tag/publish).** The
+  same gate as above, re-applied: commit the working tree
+  (parse-before-help strictness on all four help short-circuits, eval
+  schema v2 + retained v1 validator, two-verdict evaluation reporting,
+  portable evidence paths + `verify-evidence`, docs status corrections +
+  version bump to `0.1.0-rc.4`), tag `v0.1.0-rc.4`, push with tags — CI
+  gates the tag and `.github/workflows/release.yml` creates the GitHub
+  Release with the tarball attached, prerelease-marked and tag-verified.
+  Confirm both workflows green and the asset present, then verify the
+  published asset by clean install under a temp `HARNIE_HOME`
+  (`--version`, `init --bogus` exit 1, `backup x.db --bogus` exit 1,
+  fixture import + handoff) — see `docs/internal/RELEASE-0.1.0-rc.4.md`.
+  These are orchestrator steps (nothing is committed, tagged, pushed, or
+  run against the GitHub API by the release prep).
   How to verify: `npm run check` (numbers above),
   `npm run test:package`, install-instructions walkthrough on a clean machine,
   release tag + published GitHub Release.

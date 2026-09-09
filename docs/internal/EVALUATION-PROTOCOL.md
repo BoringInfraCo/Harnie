@@ -62,6 +62,7 @@ Commands:
 | `collect --dir <condition dir>` | Re-collect git status/diff + handoff size into `result.json` (after a manual run). |
 | `record --dir <condition dir> --file <result.json>` | Validate a filled result against the schema and register it. |
 | `summarize --run <run-id>` | Side-by-side `summary.md`/`summary.json`, incl. the preview-gate line. |
+| `verify-evidence --dir <curated eval dir>` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt). Non-zero exit on any finding. |
 
 Key properties:
 
@@ -70,24 +71,56 @@ Key properties:
 - **Mock injection**: `--agent-command "<argv...>"` (or env `HARNIE_EVAL_AGENT_COMMAND`) replaces the real receiver binary — used by tests. Placeholders `{prompt_text}`, `{prompt_file}`, `{clone}` are substituted.
 - **No fabricated results**: the harness records what actually happened (exit code, logs, git status/diff, handoff size) and marks human-judged metrics `unknown`; only a human/next agent fills them via `record`, and `record` rejects results that fail schema validation or lie about shape. Manual mode marks status `manual`, never `ran`.
 
-## 4. Results schema (`harnie-eval-result/v1`)
+## 4. Results schema (`harnie-eval-result/v1` and `v2`)
 
-One JSON per task/condition. Validated by `record` (and by `validateResult`, unit-tested).
+One JSON per task/condition. Validated by `record` (and by `validateResult`,
+unit-tested). Versioning (2026-09-10 re-audit remediation):
 
-| Field | Type / allowed values |
-| --- | --- |
-| `schema` | `"harnie-eval-result/v1"` |
-| `runId`, `taskId`, `recordedAt` | non-empty strings |
-| `condition` | `handoff` \| `baseline` |
-| `status` | `ran` \| `manual` \| `not-run` (+ `notRunReason`) |
-| `environment` | `{ agent, agentVersion, model, node, platform, ref, clonePath }` — model/environment details are mandatory, per the audit |
-| `handoff` | `{ path, chars, sha256 }` — chars = **package size (chars)** |
-| `execution` | `{ invocation, exitCode, signal, wallMs, stdoutLog, stderrLog }` |
-| `commandsRun` | array of `{ cmd, purpose }` (filled by the observer, not guessed) |
-| `edits` | `{ files, outOfScopeFiles, diffChars, diffPath }` |
-| `verification` | `{ ran, commands, passed, details }` |
-| `metrics` | the audit line 145 set, below |
-| `notes` | free text — failures and anything surprising |
+- **`harnie-eval-result/v1`** — the original schema, retained for **archived**
+  results (2026-09-07 / 2026-09-08 evidence). Does not require the
+  directed-matrix provenance fields. Archived v1 files are never rewritten to
+  v2; `validateResultV1` / `record` keep accepting them.
+- **`harnie-eval-result/v2`** — current generation. Requires the provenance
+  fields below. The 2026-09-09 records (which carry the fields) were stamped
+  `schema: "harnie-eval-result/v2"` in place — they are current-generation
+  evidence. The validator dispatches on the record's declared `schema` field;
+  `record` accepts both versions.
+
+| Field | Type / allowed values | v1 | v2 |
+| --- | --- | --- | --- |
+| `schema` | `"harnie-eval-result/v1"` \| `"harnie-eval-result/v2"` | required (v1) | required (v2) |
+| `runId`, `taskId`, `recordedAt` | non-empty strings | required | required |
+| `condition` | `handoff` \| `baseline` | required | required |
+| `status` | `ran` \| `manual` \| `not-run` (+ `notRunReason`) | required | required |
+| `environment` | `{ agent, agentVersion, model, node, platform, ref, clonePath }` — model/environment details are mandatory, per the audit | required | required |
+| `sourceHarness` | driver harness name (`pi`/`opencode`/`codex`) or `null` for baseline | optional | **required** |
+| `targetHarness` | receiver harness name, non-empty | optional | **required** |
+| `tagSha` | resolved 40-hex commit sha of the evaluated ref | optional | **required** |
+| `refName` | non-empty string (e.g. `v0.1.0-rc.3`) | optional | **required** |
+| `handoffArtifactSha` | 64-hex sha256 of the exact handoff file consumed, or `null` | optional | **required** |
+| `handoff` | `{ path, chars, sha256 }` — chars = **package size (chars)** | required | required |
+| `execution` | `{ invocation, exitCode, signal, wallMs, stdoutLog, stderrLog }` | required | required |
+| `commandsRun` | array of `{ cmd, purpose }` (filled by the observer, not guessed) | required | required |
+| `edits` | `{ files, outOfScopeFiles, diffChars, diffPath }` | required | required |
+| `verification` | `{ ran, commands, passed, details }` | required | required |
+| `metrics` | the audit line 145 set, below | required | required |
+| `notes` | free text — failures and anything surprising | required | required |
+
+**Path convention in records (v2, 2026-09-10):** every file reference
+(`stdoutLog`, `stderrLog`, `edits.diffPath`, `handoff.path`, `patch.path`) is a
+path **relative to the directory containing `result.json`**; `environment.clonePath`
+is prefixed `disposable:` and is relative to the run dir (clones live only in
+the disposable tmp store); `run.json`'s `repo` records the repo directory
+**name**, never a machine-local absolute path; `execution.invocation[0]` records
+the binary name, not its absolute path. Raw receiver logs are evidence and are
+never rewritten, so quoted machine paths inside log/prompt **content** are
+acceptable; the path fields themselves must be portable. `verify-evidence`
+enforces all of this.
+
+Run manifest schema: `harnie-eval-run/v2` (same shape as v1; `repo` is now the
+repo name instead of an absolute path — the evaluated commit is identified by
+`refName` + `tagSha`). The per-run `summary.json` schema
+(`harnie-eval-summary/v1`) is unchanged — no shape change, no bump.
 
 `metrics` enums (honest defaults are `unknown`/`null`):
 
@@ -101,6 +134,21 @@ One JSON per task/condition. Validated by `record` (and by `validateResult`, uni
 - `packageSizeChars`: number|null
 
 **Initial preview gate** (per audit line 145): for the selected benchmark tasks, PASS requires `falseCompletion !== true` and `repeatedFinishedEdits !== "yes"` in every condition, with verification passing. `summarize` prints this per task with explicit FAIL reasons; failures and environment details are always reported, not just a GO label. `unknown`/`null` human metrics still require review before any gate claim.
+
+**Verdict rules (two-verdict framing, mandatory since the 2026-09-10 re-audit):**
+every evaluation report MUST report two separate verdicts; a PASS on the first
+is never a PASS on the second.
+
+- **Verdict A — safety behavior among completed runs.** Whether the runs that
+  actually completed exhibited no false completion, no repeated finished
+  edits, and no out-of-scope edits, with verification. Failed/blocked runs do
+  not count toward A (positively or negatively) — but they are always listed.
+- **Verdict B — full Order 5 matrix / protocol gate.** PASS **only if every
+  required condition of every required leg ran and verified** (handoff AND
+  baseline; all requested trials). Excluding failed runs from B is not
+  permitted: blocked conditions keep B at **PARTIAL / INCONCLUSIVE**, with the
+  exact reason per leg recorded. Verdict B is the gate the release decision
+  consumes; verdict A alone must never be reported as "the evaluation passed".
 
 ## 5. Receiver-runner support per available CLI
 

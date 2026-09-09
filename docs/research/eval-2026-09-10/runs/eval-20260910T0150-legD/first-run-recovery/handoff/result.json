@@ -1,0 +1,83 @@
+{
+  "schema": "harnie-eval-result/v2",
+  "runId": "eval-20260910T0150-legD",
+  "taskId": "first-run-recovery",
+  "condition": "handoff",
+  "sourceHarness": "codex",
+  "targetHarness": "opencode",
+  "tagSha": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+  "refName": "v0.1.0-rc.3",
+  "handoffArtifactSha": "a6fe4003c09e6a3920fe4c2d517a0dcaaa2abc3c928a784108b095ece6c59cbd",
+  "patch": null,
+  "recordedAt": "2026-09-09T01:43:07.973Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+    "clonePath": "disposable:first-run-recovery/handoff/clone"
+  },
+  "handoff": {
+    "path": "../../../../driver/handoff-codex_opencode-first-run-recovery.md",
+    "chars": 1907,
+    "sha256": "a6fe4003c09e6a3920fe4c2d517a0dcaaa2abc3c928a784108b095ece6c59cbd"
+  },
+  "execution": {
+    "invocation": [
+      "opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: first-run-recovery\n\nA previous agent session already worked on this task in this repository. The Harnie handoff package produced from that session appears at the bottom of this message. Use it as your context; do not re-investigate from scratch.\n\n## Task\nDocument backup/restore recovery in the first-run walkthrough.\n\nAdd a short '## Recovery' section to docs/internal/FIRST-RUN.md covering: `harnie backup <path>` writes a consistent SQLite snapshot (0600), `harnie restore <path> --force` validates the backup and then overwrites the live store, and restore has no undo. Edit only that file; no code changes.\n\n## Required verification\n- grep -n '^## Recovery' docs/internal/FIRST-RUN.md   # section exists\n- git diff --stat   # only docs/internal/FIRST-RUN.md modified\n\n## Expected end state\ndocs/internal/FIRST-RUN.md has a Recovery section with backup/restore usage and the no-undo caveat; no other file is modified.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n\n## Continuation handoff (from prior session)\n# Harnie handoff\n\nContinue this work. Do not re-investigate from scratch. Use the state below.\n\n## Goal\nWe are documenting recovery in this repo (/workspace/harnie-project). Investigate what `harnie backup <path>` and `harnie restore <path> --force` actually do, then plan a short '## Recovery' section for docs/internal/FIRST-RUN.md covering b… [+164 chars omitted]\n\n## Workspace\n/workspace/harnie-project\n\n## Execution\ncodex / gpt-5.2-codex\ncodex-rollout-v1\n01a0drv-firstrun-4f2a-9c31-000000000001\n\n## Findings\n- Findings: docs/internal/FIRST-RUN.md currently walks through init/observe/handoff but has no recovery guidance (evidence: codex:01a0drv-firstrun-4f2a-9c31-000000000001:8:message)\n- `harnie backup <path>` writes a consistent SQLite snapshot of the live store with mode 0600; `harnie restore <path> --force` validates the backup and then overwrites the live store; restore has NO undo, so a bad backup replaces the live sta… [+15 chars omitted] (evidence: codex:01a0drv-firstrun-4f2a-9c31-000000000001:8:message)\n- Plan for the next session: add a short '## Recovery' section to docs/internal/FIRST-RUN.md with those three facts and the exact commands (evidence: codex:01a0drv-firstrun-4f2a-9c31-000000000001:8:message)\n- The edit itself is left to the next session — nothing modified yet. (evidence: codex:01a0drv-firstrun-4f2a-9c31-000000000001:8:message)\n\n## Operations\n- shell — succeeded\n- shell — succeeded\n\n## Event summary\n- message: 2\n- tool_call: 2\n- tool_result: 2\n\n## Provenance\nWork work:codex:01a0drv-firstrun-4f2a-9c31-000000000001\nSource codex session 01a0drv-firstrun-4f2a-9c31-000000000001\n\n## Receiver instructions\n- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n- Handing this artifact to another agent may transmit its contents through that agent's provider.\n\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "timedOut": false,
+    "wallMs": 35107,
+    "stdoutLog": "agent-stdout.log",
+    "stderrLog": "agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "grep -n '^## Recovery' docs/internal/FIRST-RUN.md",
+      "purpose": "receiver verification"
+    },
+    {
+      "cmd": "git diff --stat",
+      "purpose": "receiver verification"
+    }
+  ],
+  "edits": {
+    "files": [
+      "docs/internal/FIRST-RUN.md"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 996,
+    "diffPath": "edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "grep -n '^## Recovery' docs/internal/FIRST-RUN.md",
+      "git diff --stat"
+    ],
+    "passed": true,
+    "details": "receiver reported pass (Recovery section present, only docs/internal/FIRST-RUN.md modified); evaluator re-verified in the clone: '## Recovery' at line 495, git diff --stat shows only docs/internal/FIRST-RUN.md (+21), backup 0600 / restore validates-then-overwrites / no-undo all present"
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": 1907
+  },
+  "notes": "funded rerun (2026-09-10) of the unrelated-task pair bound to v0.1.0-rc.3 (cbe5399); driver context MATCHES the explicit benchmark task (synthetic codex driver for first-run-recovery, declared synthetic), unlike the 2026-09-09 Codex->OpenCode leg whose handoff context was unrelated"
+}

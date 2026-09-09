@@ -57,18 +57,22 @@ const expectedFormatHint: Record<string, string> = {
 };
 
 export const runImport = async (argv: string[], options: RunImportOptions): Promise<number> => {
-  if (argv.includes("--help") || argv.includes("-h") || argv.includes("help")) {
-    options.stdout.write(importHelp);
-    return 0;
-  }
-
   // Strict parsing: unknown flags are rejected, never skipped; a duplicated
-  // flag is rejected instead of silently keeping one value.
+  // flag is rejected instead of silently keeping one value. Help short-circuits
+  // only after the argv passes flag validation.
   let harness: string | undefined;
   let path: string | undefined;
   let workId: string | undefined;
   try {
-    const parsed = parseFlags(argv, { "--work": { kind: "value" } });
+    const parsed = parseFlags(argv, {
+      "--work": { kind: "value" },
+      "--help": { kind: "switch" },
+      "-h": { kind: "switch" },
+    });
+    if (argv.includes("--help") || argv.includes("-h") || argv.includes("help")) {
+      options.stdout.write(importHelp);
+      return 0;
+    }
     if (parsed.positionals.length > 2) {
       options.stderr.write(usage);
       return 1;

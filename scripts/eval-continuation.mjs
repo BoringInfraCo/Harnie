@@ -10,15 +10,34 @@ import {
   symlinkSync,
   openSync,
   closeSync,
+  readdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname, resolve, relative, basename } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const EVAL_ROOT = process.env.HARNIE_EVAL_ROOT || join(tmpdir(), "opencode", "harnie-eval");
-const RESULT_SCHEMA = "harnie-eval-result/v1";
+// Schema versioning (2026-09-10 re-audit remediation):
+//   v1 — original results schema (archived 2026-09-07 / 2026-09-08 evidence);
+//        no directed-matrix provenance fields required.
+//   v2 — current generation; REQUIRES sourceHarness, targetHarness, tagSha,
+//        refName, handoffArtifactSha. `record` accepts both, so archived v1
+//        files stay validatable without rewriting history.
+const RESULT_SCHEMA = "harnie-eval-result/v2";
+const RESULT_SCHEMA_V1 = "harnie-eval-result/v1";
+// Run manifest: v2 same shape as v1 except `repo` records the repo directory
+// NAME (never a machine-local absolute path); the evaluated commit is already
+// identified by refName + tagSha.
+const RUN_SCHEMA = "harnie-eval-run/v2";
+const RUN_SCHEMA_V1 = "harnie-eval-run/v1";
 const CONDITIONS = ["handoff", "baseline"];
+// Path convention in result records (2026-09-10): every file reference is
+// relative to the directory containing result.json; references to evidence
+// that intentionally lives only in the disposable tmp store are prefixed
+// `disposable:` and are relative to the run dir. Machine-local absolute paths
+// (/Users/..., /var/folders/...) must never appear in curated records —
+// enforced by `verify-evidence`.
 
 export const TASKS = [
   {
@@ -313,10 +332,8 @@ function emptyMetrics() {
   };
 }
 
-export function validateResult(r) {
+export function validateCoreResult(r, { requireProvenance }) {
   const errors = [];
-  if (!r || typeof r !== "object") return { ok: false, errors: ["result is not an object"] };
-  if (r.schema !== RESULT_SCHEMA) errors.push(`schema must be "${RESULT_SCHEMA}"`);
   for (const key of ["runId", "taskId", "recordedAt"]) {
     if (typeof r[key] !== "string" || !r[key]) errors.push(`${key} must be a non-empty string`);
   }
@@ -332,23 +349,25 @@ export function validateResult(r) {
     errors.push("edits.files must be an array");
   }
   if (!r.verification || typeof r.verification !== "object") errors.push("verification must be an object");
-  // Directed-matrix provenance (2026-09-09): which harness produced the driver
-  // session, which harness consumed the handoff, and exactly which commit was
-  // evaluated. sourceHarness is null only when there is no driver (baseline).
-  if (r.sourceHarness !== null && (typeof r.sourceHarness !== "string" || !r.sourceHarness)) {
-    errors.push("sourceHarness must be a non-empty string or null");
-  }
-  if (typeof r.targetHarness !== "string" || !r.targetHarness) {
-    errors.push("targetHarness must be a non-empty string");
-  }
-  if (typeof r.tagSha !== "string" || !/^[0-9a-f]{40}$/.test(r.tagSha)) {
-    errors.push("tagSha must be a resolved 40-hex commit sha");
-  }
-  if (typeof r.refName !== "string" || !r.refName) {
-    errors.push("refName must be a non-empty string");
-  }
-  if (r.handoffArtifactSha !== null && !/^[0-9a-f]{64}$/.test(r.handoffArtifactSha ?? "")) {
-    errors.push("handoffArtifactSha must be a 64-hex sha256 or null");
+  if (requireProvenance) {
+    // Directed-matrix provenance (2026-09-09): which harness produced the driver
+    // session, which harness consumed the handoff, and exactly which commit was
+    // evaluated. sourceHarness is null only when there is no driver (baseline).
+    if (r.sourceHarness !== null && (typeof r.sourceHarness !== "string" || !r.sourceHarness)) {
+      errors.push("sourceHarness must be a non-empty string or null");
+    }
+    if (typeof r.targetHarness !== "string" || !r.targetHarness) {
+      errors.push("targetHarness must be a non-empty string");
+    }
+    if (typeof r.tagSha !== "string" || !/^[0-9a-f]{40}$/.test(r.tagSha)) {
+      errors.push("tagSha must be a resolved 40-hex commit sha");
+    }
+    if (typeof r.refName !== "string" || !r.refName) {
+      errors.push("refName must be a non-empty string");
+    }
+    if (r.handoffArtifactSha !== null && !/^[0-9a-f]{64}$/.test(r.handoffArtifactSha ?? "")) {
+      errors.push("handoffArtifactSha must be a 64-hex sha256 or null");
+    }
   }
   const m = r.metrics;
   if (!m || typeof m !== "object") {
@@ -374,6 +393,37 @@ export function validateResult(r) {
     }
   }
   return { ok: errors.length === 0, errors };
+}
+
+// v1 validator: archived 2026-09-07 / 2026-09-08 results. Same core shape, but
+// the directed-matrix provenance fields are NOT required (they did not exist).
+export function validateResultV1(r) {
+  if (!r || typeof r !== "object") return { ok: false, errors: ["result is not an object"] };
+  if (r.schema !== RESULT_SCHEMA_V1) {
+    return { ok: false, errors: [`schema must be "${RESULT_SCHEMA_V1}"`] };
+  }
+  return validateCoreResult(r, { requireProvenance: false });
+}
+
+// v2 validator: current generation; provenance is mandatory.
+export function validateResultV2(r) {
+  if (!r || typeof r !== "object") return { ok: false, errors: ["result is not an object"] };
+  if (r.schema !== RESULT_SCHEMA) {
+    return { ok: false, errors: [`schema must be "${RESULT_SCHEMA}"`] };
+  }
+  return validateCoreResult(r, { requireProvenance: true });
+}
+
+// Dispatch on the record's declared `schema` field. `record` accepts both, so
+// archived v1 evidence can be re-registered without rewriting it to v2.
+export function validateResult(r) {
+  if (!r || typeof r !== "object") return { ok: false, errors: ["result is not an object"] };
+  if (r.schema === RESULT_SCHEMA_V1) return validateResultV1(r);
+  if (r.schema === RESULT_SCHEMA) return validateResultV2(r);
+  return {
+    ok: false,
+    errors: [`schema must be "${RESULT_SCHEMA_V1}" or "${RESULT_SCHEMA}"`],
+  };
 }
 
 function sha256File(path) {
@@ -415,9 +465,11 @@ function ensureRun({ repo, refInput, runId }) {
     tagSha = null; // invalid ref: prepareClone will fail loudly below
   }
   const run = {
-    schema: "harnie-eval-run/v1",
+    schema: RUN_SCHEMA,
     runId,
-    repo,
+    // v2: repo is recorded as the repo directory NAME, never a machine-local
+    // absolute path (the evaluated commit is identified by refName + tagSha).
+    repo: basename(repo),
     ref: tagSha ?? ref,
     refName,
     tagSha,
@@ -602,8 +654,13 @@ function cmdRun(parsed) {
     const dir = join(runDir, task.id, condition);
     mkdirSync(dir, { recursive: true });
     const cloneDir = join(dir, "clone");
-    const prep = prepareClone({ repo: run.repo, ref: run.ref, dir: cloneDir });
-    const patchInfo = patchPath ? applyDriverPatch(cloneDir, patchPath) : null;
+    // prepareClone needs the real repo path (run.repo only records the name).
+    const prep = prepareClone({ repo: REPO_ROOT, ref: run.ref, dir: cloneDir });
+    // Store the patch reference relative to the result dir (path convention:
+    // no machine-local absolute paths in records).
+    const patchInfo = patchPath
+      ? { ...applyDriverPatch(cloneDir, patchPath), path: relative(dir, patchPath) }
+      : null;
     const promptPath = join(dir, "prompt.md");
     writeFileSync(promptPath, buildPrompt(task, condition, condHandoffContent));
 
@@ -646,9 +703,13 @@ function cmdRun(parsed) {
 
     if (!canRun) {
       writeFileSync(join(dir, "manual-instructions.md"), manual);
-      writeFileSync(join(dir, "result-template.json"), JSON.stringify(resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath, sourceHarness: condSourceHarness, targetHarness }), null, 2) + "\n");
+      const template = resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath, sourceHarness: condSourceHarness, targetHarness });
+      // Path convention applies in manual mode too.
+      template.environment.clonePath = `disposable:${relative(runDir, cloneDir)}`;
+      template.handoff.path = condHandoffPath ? relative(dir, condHandoffPath) : null;
+      writeFileSync(join(dir, "result-template.json"), JSON.stringify(template, null, 2) + "\n");
       const result = {
-        ...resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath, sourceHarness: condSourceHarness, targetHarness }),
+        ...template,
         patch: patchInfo,
         status: "manual",
         recordedAt: new Date().toISOString(),
@@ -699,6 +760,10 @@ function cmdRun(parsed) {
     const timedOut = res.error?.code === "ETIMEDOUT" || res.signal === "SIGTERM";
 
     const evidence = collectEvidence(dir, cloneDir, task, condHandoffPath, run);
+    // Path convention: records store paths relative to the result dir; the
+    // disposable clone is prefixed `disposable:` (relative to the run dir);
+    // invocation[0] records the binary NAME, never its absolute path.
+    const recordedInvocation = [basename(String(invocation[0])), ...invocation.slice(1)];
     const result = {
       schema: RESULT_SCHEMA,
       runId: run.runId,
@@ -720,24 +785,27 @@ function cmdRun(parsed) {
         node: run.node,
         platform: run.platform,
         ref: prep.head,
-        clonePath: cloneDir,
+        clonePath: `disposable:${relative(runDir, cloneDir)}`,
       },
-      handoff: evidence.handoff,
+      handoff: {
+        ...evidence.handoff,
+        path: condHandoffPath ? relative(dir, condHandoffPath) : null,
+      },
       execution: {
-        invocation,
+        invocation: recordedInvocation,
         exitCode: res.status,
         signal: res.signal || null,
         timedOut,
         wallMs,
-        stdoutLog: outPath,
-        stderrLog: errPath,
+        stdoutLog: relative(dir, outPath),
+        stderrLog: relative(dir, errPath),
       },
       commandsRun: [],
       edits: {
         files: evidence.files,
         outOfScopeFiles: evidence.files.filter((f) => !task.files.includes(f)),
         diffChars: evidence.diffChars,
-        diffPath: evidence.diffPath,
+        diffPath: evidence.diffPath ? relative(dir, evidence.diffPath) : null,
       },
       verification: { ran: null, commands: [], passed: null, details: "not attributable automatically — fill via record if observed" },
       metrics: emptyMetrics(),
@@ -764,7 +832,7 @@ function cmdPrepare(parsed) {
     const dir = join(runDir, task.id, condition);
     mkdirSync(dir, { recursive: true });
     const cloneDir = join(dir, "clone");
-    const prep = prepareClone({ repo: run.repo, ref: run.ref, dir: cloneDir });
+    const prep = prepareClone({ repo: REPO_ROOT, ref: run.ref, dir: cloneDir });
     console.log(`${task.id}/${condition}: clone=${cloneDir} head=${prep.head}`);
   }
   return 0;
@@ -786,16 +854,27 @@ function cmdCollect(parsed) {
     console.error(`result references unknown task ${result.taskId}`);
     return 1;
   }
-  const handoffPath = result.handoff && result.handoff.path ? result.handoff.path : parsed.flags.handoff ? resolve(parsed.flags.handoff) : null;
+  const handoffPath = result.handoff && result.handoff.path
+    ? resolve(dir, result.handoff.path)
+    : parsed.flags.handoff
+      ? resolve(parsed.flags.handoff)
+      : null;
   const evidence = collectEvidence(dir, join(dir, "clone"), task, handoffPath, run);
   result.edits = {
     files: evidence.files,
     outOfScopeFiles: evidence.files.filter((f) => !task.files.includes(f)),
     diffChars: evidence.diffChars,
-    diffPath: evidence.diffPath,
+    diffPath: evidence.diffPath ? relative(dir, evidence.diffPath) : null,
   };
-  result.handoff = evidence.handoff;
+  result.handoff = {
+    ...evidence.handoff,
+    path: handoffPath ? relative(dir, handoffPath) : null,
+  };
   result.handoffArtifactSha = evidence.handoff.sha256;
+  // Normalize a machine-local absolute clonePath to the disposable: convention.
+  if (typeof result.environment?.clonePath === "string" && result.environment.clonePath.startsWith("/")) {
+    result.environment.clonePath = `disposable:${relative(dirname(dirname(dir)), result.environment.clonePath)}`;
+  }
   const written = writeResult(dir, result);
   console.log(`Collected evidence into ${written}`);
   return 0;
@@ -933,6 +1012,146 @@ function cmdSummarize(parsed) {
   return 0;
 }
 
+// Integrity check over a curated eval directory (docs/research/eval-<date>/).
+// Verifies, per the 2026-09-10 re-audit: every referenced file exists; handoff
+// artifact hashes match; every result belongs to its run dir; every run dir
+// has run.json + summary.{md,json}; no machine-local absolute paths remain in
+// curated records. Raw receiver logs are evidence and are never rewritten, so
+// the machine-path check applies to the structured records only.
+function cmdVerifyEvidence(parsed) {
+  const evalDir = parsed.flags.dir ? resolve(parsed.flags.dir) : null;
+  if (!evalDir || !existsSync(join(evalDir, "runs"))) {
+    console.error("verify-evidence requires --dir <curated eval dir> containing runs/");
+    return 1;
+  }
+  const problems = [];
+  const hasLocalPath = (s) => typeof s === "string" && (s.includes("/Users/") || s.includes("/var/folders/"));
+  const runsDir = join(evalDir, "runs");
+  const runIds = readdirSync(runsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  if (!runIds.length) problems.push("runs/ contains no run directories");
+  let resultCount = 0;
+  for (const runId of runIds) {
+    const runDir = join(runsDir, runId);
+    const runJsonPath = join(runDir, "run.json");
+    let run = null;
+    if (!existsSync(runJsonPath)) {
+      problems.push(`${runId}: missing run.json`);
+    } else {
+      try {
+        run = JSON.parse(readFileSync(runJsonPath, "utf8"));
+      } catch (e) {
+        problems.push(`${runId}/run.json: invalid JSON (${e.message})`);
+      }
+      if (run) {
+        if (![RUN_SCHEMA_V1, RUN_SCHEMA].includes(run.schema)) {
+          problems.push(`${runId}/run.json: unexpected schema ${JSON.stringify(run.schema)}`);
+        }
+        if (run.runId !== runId) problems.push(`${runId}/run.json: runId ${JSON.stringify(run.runId)} does not match directory`);
+        if (hasLocalPath(JSON.stringify(run))) problems.push(`${runId}/run.json: machine-local absolute path`);
+        if (typeof run.repo === "string" && run.repo.startsWith("/")) {
+          problems.push(`${runId}/run.json: repo must not be an absolute path (v2 convention: repo name)`);
+        }
+        if (run.schema === RUN_SCHEMA && !/^[0-9a-f]{40}$/.test(run.tagSha ?? "")) {
+          problems.push(`${runId}/run.json: tagSha missing or not a 40-hex sha (required in v2)`);
+        }
+      }
+    }
+    for (const f of ["summary.md", "summary.json"]) {
+      if (!existsSync(join(runDir, f))) problems.push(`${runId}: missing ${f}`);
+    }
+    const taskDirs = readdirSync(runDir, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "harnie-home");
+    for (const taskEnt of taskDirs) {
+      const condDirs = readdirSync(join(runDir, taskEnt.name), { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "clone");
+      for (const condEnt of condDirs) {
+        const resultDir = join(runDir, taskEnt.name, condEnt.name);
+        const resultPath = join(resultDir, "result.json");
+        if (!existsSync(resultPath)) {
+          problems.push(`${runId}/${taskEnt.name}/${condEnt.name}: no result.json`);
+          continue;
+        }
+        let r = null;
+        try {
+          r = JSON.parse(readFileSync(resultPath, "utf8"));
+        } catch (e) {
+          problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: invalid JSON (${e.message})`);
+          continue;
+        }
+        resultCount++;
+        const v = validateResult(r);
+        if (!v.ok) for (const err of v.errors) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${err}`);
+        if (r.runId !== runId) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: runId does not match run dir`);
+        if (r.taskId !== taskEnt.name) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: taskId does not match directory`);
+        if (r.condition !== condEnt.name) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: condition does not match directory`);
+        // Machine-path check is field-targeted: prompt text / notes may quote
+        // the driver workspace or machine paths as CONTENT (e.g. a handoff
+        // artifact rendered from a real driver session); those are raw
+        // evidence. Record-owned path fields must be portable.
+        for (const [k, v] of Object.entries(r.environment ?? {})) {
+          if (hasLocalPath(v) || (typeof v === "string" && v.startsWith("/") && k !== "agentVersion")) {
+            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: environment.${k} is a machine-local path`);
+          }
+        }
+        for (const el of r.execution?.invocation ?? []) {
+          // Only argv-position path elements (starting with "/") are checked;
+          // a prompt-text element may legitimately quote machine paths as
+          // content (e.g. handoff artifact text).
+          if (typeof el === "string" && el.startsWith("/")) {
+            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: execution.invocation contains an absolute-path element`);
+            break;
+          }
+        }
+        const refs = [
+          ["execution.stdoutLog", r.execution?.stdoutLog],
+          ["execution.stderrLog", r.execution?.stderrLog],
+          ["edits.diffPath", r.edits?.diffPath],
+          ["handoff.path", r.handoff?.path],
+          ["patch.path", r.patch?.path],
+        ];
+        for (const [name, value] of refs) {
+          if (!value || typeof value !== "string") continue;
+          if (value.startsWith("disposable:")) continue; // intentionally tmp-only evidence
+          if (value.startsWith("/")) {
+            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${name} is an absolute path (${JSON.stringify(value)})`);
+            continue;
+          }
+          if (!existsSync(resolve(resultDir, value))) {
+            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${name} does not resolve (${value})`);
+          }
+        }
+        const handoffFile = r.handoff?.path && !r.handoff.path.startsWith("disposable:")
+          ? resolve(resultDir, r.handoff.path)
+          : null;
+        if (handoffFile && r.handoff.sha256) {
+          if (!existsSync(handoffFile)) {
+            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: handoff artifact missing, cannot verify sha256`);
+          } else {
+            const actual = sha256File(handoffFile);
+            if (actual !== r.handoff.sha256) {
+              problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: handoff.sha256 mismatch (recorded ${r.handoff.sha256.slice(0, 12)}, actual ${actual.slice(0, 12)})`);
+            }
+          }
+        }
+        if (r.handoff?.sha256 && r.handoffArtifactSha && r.handoff.sha256 !== r.handoffArtifactSha) {
+          problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: handoffArtifactSha != handoff.sha256`);
+        }
+      }
+    }
+  }
+  for (const f of ["README.md", "summary.md"]) {
+    if (!existsSync(join(evalDir, f))) problems.push(`missing ${f} at eval dir root`);
+  }
+  if (problems.length) {
+    console.error(`verify-evidence: FAILED — ${problems.length} problem(s) in ${evalDir}`);
+    for (const p of problems) console.error(`  - ${p}`);
+    return 1;
+  }
+  console.log(`verify-evidence: OK — ${runIds.length} run dir(s), ${resultCount} result record(s) checked in ${evalDir}`);
+  return 0;
+}
+
 function cmdTasks(parsed) {
   if (parsed.flags.json) {
     console.log(JSON.stringify(TASKS, null, 2));
@@ -979,6 +1198,14 @@ Commands:
       Validate a filled result JSON and register it.
   summarize --run <run-id>
       Side-by-side handoff vs baseline summary (summary.md/json).
+  verify-evidence --dir <curated eval dir>
+      Integrity check over a curated eval directory (e.g.
+      docs/research/eval-2026-09-09): every referenced file exists relative to
+      its result.json; handoff artifact sha256s match; every result belongs to
+      its run dir and matches its path; every run dir has run.json +
+      summary.{md,json}; no machine-local absolute paths (/Users/,
+      /var/folders/) in the records (raw receiver logs are never rewritten);
+      references prefixed with disposable: are tmp-only and skipped for existence.
 `;
 
 function main(argv) {
@@ -1001,6 +1228,8 @@ function main(argv) {
       return cmdRecord(parsed);
     case "summarize":
       return cmdSummarize(parsed);
+    case "verify-evidence":
+      return cmdVerifyEvidence(parsed);
     default:
       console.error(`Unknown command "${cmd}".\n`);
       process.stdout.write(USAGE);

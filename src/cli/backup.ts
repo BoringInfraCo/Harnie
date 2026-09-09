@@ -12,12 +12,15 @@ const backupUsage = "Usage: harnie backup <dest-path>\n";
 const restoreUsage = "Usage: harnie restore <src-path> [--force]\n";
 
 export const runBackup = async (argv: string[], options: RunBackupOptions): Promise<number> => {
-  if (argv.includes("--help") || argv.includes("-h")) {
-    options.stdout.write(backupUsage);
-    return 0;
-  }
   try {
-    const parsed = parseFlags(argv, {});
+    const parsed = parseFlags(argv, {
+      "--help": { kind: "switch" },
+      "-h": { kind: "switch" },
+    });
+    if (parsed.switches["--help"] === true || parsed.switches["-h"] === true) {
+      options.stdout.write(backupUsage);
+      return 0;
+    }
     const dest = parsed.positionals[0];
     if (dest === undefined || dest === "" || parsed.positionals.length > 1) {
       options.stderr.write(backupUsage);
@@ -42,12 +45,16 @@ export const runBackup = async (argv: string[], options: RunBackupOptions): Prom
 };
 
 export const runRestore = async (argv: string[], options: RunBackupOptions): Promise<number> => {
-  if (argv.includes("--help") || argv.includes("-h")) {
-    options.stdout.write(restoreUsage);
-    return 0;
-  }
   try {
-    const parsed = parseFlags(argv, { "--force": { kind: "switch" } });
+    const parsed = parseFlags(argv, {
+      "--force": { kind: "switch" },
+      "--help": { kind: "switch" },
+      "-h": { kind: "switch" },
+    });
+    if (parsed.switches["--help"] === true || parsed.switches["-h"] === true) {
+      options.stdout.write(restoreUsage);
+      return 0;
+    }
     const src = parsed.positionals[0];
     if (src === undefined || src === "" || parsed.positionals.length > 1) {
       options.stderr.write(restoreUsage);

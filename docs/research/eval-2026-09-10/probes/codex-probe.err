@@ -1,0 +1,19 @@
+Reading additional input from stdin...
+OpenAI Codex v0.149.1
+--------
+workdir: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval-2026-09-10/probes/probe-repo
+model: gpt-5.6-sol
+provider: openai
+approval: on-request
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a083d3-1590-7531-866d-25f4db2249a6
+--------
+user
+Reply with exactly: PROBE-OK
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+PROBE-OK
+tokens used
+10,765

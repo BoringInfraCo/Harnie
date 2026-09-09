@@ -1,5 +1,5 @@
 {
-  "schema": "harnie-eval-result/v1",
+  "schema": "harnie-eval-result/v2",
   "runId": "eval-20260909T1700-legA-r2",
   "taskId": "version-flag",
   "condition": "handoff",
@@ -19,28 +19,28 @@
     "node": "v22.23.0",
     "platform": "darwin",
     "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
-    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone"
+    "clonePath": "disposable:version-flag/handoff/clone"
   },
   "handoff": {
-    "path": "/Users/sergio/Documents/Developer/BoringInfraCo/Harnie/docs/research/eval-2026-09-09/driver/handoff-pi_opencode-version-flag.md",
+    "path": "../../../../driver/handoff-pi_opencode-version-flag.md",
     "chars": 1780,
     "sha256": "aacd151b63529dbc4c684a72b2858a5aefdeba904354acccce020771a23fa9da"
   },
   "execution": {
     "invocation": [
-      "/Users/sergio/.opencode/bin/opencode",
+      "opencode",
       "-m",
       "opencode-go/kimi-k2.7-code",
       "run",
       "--auto",
-      "# Harnie continuation evaluation — task: version-flag\n\nA previous agent session already worked on this task in this repository. The Harnie handoff package produced from that session appears at the bottom of this message. Use it as your context; do not re-investigate from scratch.\n\n## Task\nAdd a --version flag to the Harnie CLI that prints the package version.\n\nWhen the CLI is invoked with --version (or -v) as its first argument, print the version declared in package.json (read it, do not hardcode) to stdout and exit with code 0, before any other argument handling. All other flags and commands must behave exactly as before.\n\n## Required verification\n- npm run build\n- node dist/cli.js --version   # prints 0.0.0, exit 0\n- npx vitest run tests/cli-init.test.ts   # still green\n\n## Expected end state\n`node dist/cli.js --version` prints 0.0.0 and exits 0; existing CLI behavior and the cli-init tests are unchanged.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n\n## Continuation handoff (from prior session)\n# Harnie handoff\n\nContinue this work. Do not re-investigate from scratch. Use the state below.\n\n## Goal\nAdd a --version flag to the Harnie CLI in this repo (/workspace/harnie-project). It should print the version from package.json and exit 0, before any other argument handling. Investigate first; do not edit yet.\n\n## Workspace\n/workspace/harnie-project\n\n## Relevant files\n- src/cli.ts\n\n## Read yields\n- src/cli.ts — 1 import { ... } ...\n\n## Execution\npi / openrouter / moonshotai/kimi-k2.6\npi-session-v3\n8f1a2b3c-0000-4000-8000-000000000001\n\n## Decisions\n- I will add a --version / -v branch as the FIRST check in main() that prints the version read from package.json and exits 0, leaving every other command unchanged (evidence: 8f1a2b3c-0000-4000-8000-000000000001:9:00000007:message:record)\n\n## Findings\n- Findings: the version lives in package.json (0.0.0) and argument handling starts at the top of src/cli.ts main() (evidence: 8f1a2b3c-0000-4000-8000-000000000001:9:00000007:message:record)\n- The edit itself is left to the next session — nothing has been modified yet. (evidence: 8f1a2b3c-0000-4000-8000-000000000001:9:00000007:message:record)\n\n## Operations\n- bash node -p \"require('package.json').version … — succeeded\n- read src/cli.ts — succeeded\n\n## Event summary\n- message: 4\n- tool_call: 2\n- tool_result: 2\n- unknown: 2\n\n## Diagnostics\n- unknown_record_type\n\n## Provenance\nWork work:pi:8f1a2b3c-0000-4000-8000-000000000001\nSource pi session 8f1a2b3c-0000-4000-8000-000000000001\n\n## Receiver instructions\n- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n- Handing this artifact to another agent may transmit its contents through that agent's provider.\n\n"
+      "# Harnie continuation evaluation \u2014 task: version-flag\n\nA previous agent session already worked on this task in this repository. The Harnie handoff package produced from that session appears at the bottom of this message. Use it as your context; do not re-investigate from scratch.\n\n## Task\nAdd a --version flag to the Harnie CLI that prints the package version.\n\nWhen the CLI is invoked with --version (or -v) as its first argument, print the version declared in package.json (read it, do not hardcode) to stdout and exit with code 0, before any other argument handling. All other flags and commands must behave exactly as before.\n\n## Required verification\n- npm run build\n- node dist/cli.js --version   # prints 0.0.0, exit 0\n- npx vitest run tests/cli-init.test.ts   # still green\n\n## Expected end state\n`node dist/cli.js --version` prints 0.0.0 and exits 0; existing CLI behavior and the cli-init tests are unchanged.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n\n## Continuation handoff (from prior session)\n# Harnie handoff\n\nContinue this work. Do not re-investigate from scratch. Use the state below.\n\n## Goal\nAdd a --version flag to the Harnie CLI in this repo (/workspace/harnie-project). It should print the version from package.json and exit 0, before any other argument handling. Investigate first; do not edit yet.\n\n## Workspace\n/workspace/harnie-project\n\n## Relevant files\n- src/cli.ts\n\n## Read yields\n- src/cli.ts \u2014 1 import { ... } ...\n\n## Execution\npi / openrouter / moonshotai/kimi-k2.6\npi-session-v3\n8f1a2b3c-0000-4000-8000-000000000001\n\n## Decisions\n- I will add a --version / -v branch as the FIRST check in main() that prints the version read from package.json and exits 0, leaving every other command unchanged (evidence: 8f1a2b3c-0000-4000-8000-000000000001:9:00000007:message:record)\n\n## Findings\n- Findings: the version lives in package.json (0.0.0) and argument handling starts at the top of src/cli.ts main() (evidence: 8f1a2b3c-0000-4000-8000-000000000001:9:00000007:message:record)\n- The edit itself is left to the next session \u2014 nothing has been modified yet. (evidence: 8f1a2b3c-0000-4000-8000-000000000001:9:00000007:message:record)\n\n## Operations\n- bash node -p \"require('package.json').version \u2026 \u2014 succeeded\n- read src/cli.ts \u2014 succeeded\n\n## Event summary\n- message: 4\n- tool_call: 2\n- tool_result: 2\n- unknown: 2\n\n## Diagnostics\n- unknown_record_type\n\n## Provenance\nWork work:pi:8f1a2b3c-0000-4000-8000-000000000001\nSource pi session 8f1a2b3c-0000-4000-8000-000000000001\n\n## Receiver instructions\n- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n- Handing this artifact to another agent may transmit its contents through that agent's provider.\n\n"
     ],
     "exitCode": 0,
     "signal": null,
     "timedOut": false,
     "wallMs": 30739,
-    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/agent-stdout.log",
-    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/agent-stderr.log"
+    "stdoutLog": "agent-stdout.log",
+    "stderrLog": "agent-stderr.log"
   },
   "commandsRun": [
     {
@@ -62,7 +62,7 @@
     ],
     "outOfScopeFiles": [],
     "diffChars": 1056,
-    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/edits.diff"
+    "diffPath": "edits.diff"
   },
   "verification": {
     "ran": true,

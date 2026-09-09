@@ -1,7 +1,7 @@
 {
-  "schema": "harnie-eval-run/v1",
+  "schema": "harnie-eval-run/v2",
   "runId": "eval-20260909T1700-legA-r2",
-  "repo": "/Users/sergio/Documents/Developer/BoringInfraCo/Harnie",
+  "repo": "Harnie",
   "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
   "refName": "v0.1.0-rc.2",
   "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",

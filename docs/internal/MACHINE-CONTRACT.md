@@ -85,12 +85,16 @@ codes. Thrown store/work-layer errors are classified by message prefix
 ## Flag hardening
 
 All commands reject unknown flags and duplicate flags with exit 1 (stable code
-in JSON mode). Previously the import parser silently skipped unknown flags and
-ignored duplicate `--work` values; fork silently kept the first
-`--checkpoint`; sessions silently kept the first `--harness`. These now fail:
-import prints `Unknown flag: <flag>` / `Duplicate flag: <flag>` followed by its
-usage, fork prints the message, and the JSON commands emit the matching code.
-Both `--flag value` and `--flag=value` spellings are accepted everywhere.
+in JSON mode). Help short-circuits are not exempt: `--help`/`-h` print help and
+exit 0 only when the rest of the argv parses cleanly — an unknown or duplicate
+flag next to `--help` (e.g. `harnie backup --help --bogus`) is rejected with
+exit 1 exactly as in normal execution. Previously the import parser silently
+skipped unknown flags and ignored duplicate `--work` values; fork silently kept
+the first `--checkpoint`; sessions silently kept the first `--harness`. These
+now fail: import prints `Unknown flag: <flag>` / `Duplicate flag: <flag>`
+followed by its usage, fork prints the message, and the JSON commands emit the
+matching code. Both `--flag value` and `--flag=value` spellings are accepted
+everywhere.
 
 ## Per-command data shapes
 

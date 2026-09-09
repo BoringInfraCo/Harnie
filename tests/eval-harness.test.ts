@@ -1,12 +1,15 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 
 interface EvalMod {
   TASKS: Array<{ id: string; files: string[]; statement: string; verify: string[] }>;
   validateResult: (r: unknown) => { ok: boolean; errors: string[] };
+  validateResultV1: (r: unknown) => { ok: boolean; errors: string[] };
+  validateResultV2: (r: unknown) => { ok: boolean; errors: string[] };
   buildPrompt: (
     task: { id: string; statement: string; details: string; verify: string[]; endState: string },
     condition: string,
@@ -111,7 +114,7 @@ describe("eval harness — clone preparation", () => {
     expect(other.code).toBe(0);
     const otherClone = join(EVAL_BASE, runId, "shebang-guard", "baseline", "clone");
     expect(otherClone).not.toBe(clone);
-    expect(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8")).toContain("harnie-eval-run/v1");
+    expect(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8")).toContain("harnie-eval-run/v2");
     expect(head).toBeTruthy();
   });
 });
@@ -138,7 +141,7 @@ describe("eval harness — mocked agent run", () => {
 
     const dir = join(EVAL_BASE, runId, "version-flag", "baseline");
     const result = JSON.parse(readFileSync(join(dir, "result.json"), "utf8"));
-    expect(result.schema).toBe("harnie-eval-result/v1");
+    expect(result.schema).toBe("harnie-eval-result/v2");
     expect(result.status).toBe("ran");
     expect(result.taskId).toBe("version-flag");
     expect(result.condition).toBe("baseline");
@@ -285,7 +288,13 @@ describe("eval harness — mocked agent run", () => {
     const status = execFileSync("git", ["-C", clone, "status", "--porcelain"], { encoding: "utf8" });
     expect(status).not.toContain("DRIVER-STEPS.md");
     const result = JSON.parse(readFileSync(join(dir, "result.json"), "utf8"));
-    expect(result.patch).toEqual({ path: patchPath, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), committed: true });
+    expect(result.patch).toEqual({
+      path: expect.any(String),
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      committed: true,
+    });
+    expect(result.patch.path).not.toMatch(/^\//);
+    expect(resolve(dir, result.patch.path)).toBe(patchPath);
     expect(result.edits.files).not.toContain("DRIVER-STEPS.md");
     expect(mod.validateResult(result).ok).toBe(true);
   });
@@ -421,7 +430,9 @@ describe("eval harness — handoff/baseline isolation", () => {
     const handoffResult = JSON.parse(readFileSync(join(base, "handoff", "result.json"), "utf8"));
     const baselineResult = JSON.parse(readFileSync(join(base, "baseline", "result.json"), "utf8"));
 
-    expect(handoffResult.handoff.path).toBe(handoffFile);
+    // Path convention: handoff.path is relative to the result dir and resolves.
+    expect(handoffResult.handoff.path).not.toMatch(/^\//);
+    expect(resolve(join(base, "handoff"), handoffResult.handoff.path)).toBe(handoffFile);
     expect(handoffResult.handoff.chars).toBeGreaterThan(0);
     expect(handoffResult.handoff.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(readFileSync(join(base, "handoff", "prompt.md"), "utf8")).toContain(handoffMarker);
@@ -466,7 +477,8 @@ describe("eval harness — handoff/baseline isolation", () => {
     const base = join(EVAL_BASE, runId, "first-run-recovery");
     const handoffResult = JSON.parse(readFileSync(join(base, "handoff", "result.json"), "utf8"));
     const baselineResult = JSON.parse(readFileSync(join(base, "baseline", "result.json"), "utf8"));
-    expect(handoffResult.handoff.path).toBe(handoffFile);
+    expect(handoffResult.handoff.path).not.toMatch(/^\//);
+    expect(resolve(join(base, "handoff"), handoffResult.handoff.path)).toBe(handoffFile);
     expect(baselineResult.handoff).toEqual({ path: null, chars: null, sha256: null });
     expect(mod.validateResult(baselineResult).ok).toBe(true);
     expect(mod.validateResult(handoffResult).ok).toBe(true);
@@ -502,6 +514,181 @@ describe("eval harness — summarize", () => {
       expect.arrayContaining(["handoff", "baseline"]),
     );
   });
+});
+
+describe("eval harness — schema versioning (v1 archived / v2 current)", () => {
+  it("validates an archived v1 result file from eval-2026-09-07 with the retained v1 validator", () => {
+    const archivedPath = join(
+      import.meta.dirname,
+      "..",
+      "docs",
+      "research",
+      "eval-2026-09-07",
+      "runs",
+      "eval-20260907T2041",
+      "version-flag",
+      "handoff",
+      "result.json",
+    );
+    expect(existsSync(archivedPath)).toBe(true);
+    const archived = JSON.parse(readFileSync(archivedPath, "utf8"));
+    expect(archived.schema).toBe("harnie-eval-result/v1");
+    expect(archived.tagSha).toBeUndefined();
+    expect(archived.sourceHarness).toBeUndefined();
+    // Retained v1 validator accepts the archived record as-is.
+    expect(mod.validateResultV1(archived).ok).toBe(true);
+    // Dispatch on the declared schema field routes it to v1.
+    expect(mod.validateResult(archived).ok).toBe(true);
+    // v2 requirements correctly reject it (provenance fields absent).
+    expect(mod.validateResultV2(archived).ok).toBe(false);
+  });
+
+  it("v2 records require the provenance fields; unknown schemas are rejected", () => {
+    const v2 = {
+      schema: "harnie-eval-result/v2",
+      runId: "r", taskId: "version-flag", recordedAt: "now", condition: "baseline",
+      status: "ran", notRunReason: null,
+      sourceHarness: null, targetHarness: "opencode",
+      tagSha: "a".repeat(40), refName: "v0.1.0-rc.3", handoffArtifactSha: null,
+      environment: { agent: "opencode" }, handoff: { path: null, chars: null, sha256: null },
+      execution: {}, commandsRun: [], edits: { files: [] },
+      verification: {},
+      metrics: {
+        developerReExplanation: "unknown", repeatedInvestigation: "unknown",
+        repeatedFinishedEdits: "unknown", nextActionCorrect: "unknown",
+        missingOrFalseContext: "unknown", taskCompleted: null, falseCompletion: null,
+        packageSizeChars: null,
+      },
+      notes: null,
+    };
+    expect(mod.validateResult(v2).ok).toBe(true);
+    const noTagSha = { ...v2, tagSha: undefined };
+    expect(mod.validateResultV2(noTagSha).ok).toBe(false);
+    // v1 stays tolerant of extra fields (archived records must keep passing);
+    // unknown schemas are rejected by dispatch.
+    expect(mod.validateResult({ ...v2, schema: "harnie-eval-result/v1" }).ok).toBe(true);
+    expect(mod.validateResult({ ...v2, schema: "harnie-eval-result/v3" }).ok).toBe(false);
+  });
+});
+
+describe("eval harness — verify-evidence integrity check", () => {
+  // Builds a curated eval-dir fixture from a real harness run (baseline +
+  // handoff with a driver artifact), then returns its root path.
+  const makeFixture = (handoffFile: string) => {
+    const runId = uniqueRun();
+    const res = runHarness([
+      "run",
+      "--task",
+      "version-flag",
+      "--condition",
+      "handoff,baseline",
+      "--run",
+      runId,
+      "--agent-command",
+      agentCommand("VE"),
+      "--handoff",
+      handoffFile,
+    ]);
+    expect(res.code).toBe(0);
+    const srcRun = join(EVAL_BASE, runId);
+    const fixtureRoot = join(scratch, `ve-fixture-${cleanupDirs.length}`);
+    const runsDir = join(fixtureRoot, "runs", runId);
+    mkdirSync(join(fixtureRoot, "driver"), { recursive: true });
+    mkdirSync(runsDir, { recursive: true });
+    cpSync(join(srcRun, "run.json"), join(runsDir, "run.json"));
+    for (const cond of ["handoff", "baseline"]) {
+      const condDir = join(runsDir, "version-flag", cond);
+      cpSync(join(srcRun, "version-flag", cond), condDir, { recursive: true });
+      rmSync(join(condDir, "clone"), { recursive: true, force: true });
+      // The fake-agent invocation embeds machine-local /var/folders paths;
+      // apply the same curation the real flow uses (binary/script names only).
+      const rp = join(condDir, "result.json");
+      const rec = JSON.parse(readFileSync(rp, "utf8"));
+      rec.execution.invocation = rec.execution.invocation.map((a: string) =>
+        typeof a === "string" && a.startsWith("/") ? basename(a) : a,
+      );
+      writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    }
+    // Move the handoff artifact into the fixture's driver/ dir and re-point
+    // the record at it with a fixture-relative path (the recorded relative
+    // path resolves against the original EVAL_ROOT, not the fixture).
+    const driverCopy = join(fixtureRoot, "driver", "fake-handoff-ve.md");
+    cpSync(handoffFile, driverCopy);
+    const handoffResultPath = join(runsDir, "version-flag", "handoff", "result.json");
+    const handoffResult = JSON.parse(readFileSync(handoffResultPath, "utf8"));
+    handoffResult.handoff.path = relative(join(runsDir, "version-flag", "handoff"), driverCopy);
+    writeFileSync(handoffResultPath, JSON.stringify(handoffResult, null, 2) + "\n");
+    writeFileSync(join(runsDir, "summary.md"), "# fixture summary\n");
+    writeFileSync(join(runsDir, "summary.json"), JSON.stringify({ rows: [] }));
+    writeFileSync(join(fixtureRoot, "README.md"), "# fixture eval\n");
+    writeFileSync(join(fixtureRoot, "summary.md"), "# fixture eval summary\n");
+    return fixtureRoot;
+  };
+
+  const handoffSource = join(scratch, "fake-handoff-ve-src.md");
+  writeFileSync(handoffSource, "# integrity-check fixture handoff\n");
+
+  const soleRunDir = (fixture: string) => {
+    const runsDir = join(fixture, "runs");
+    const entries = readdirSync(runsDir).filter((name) =>
+      existsSync(join(runsDir, name, "run.json")),
+    );
+    expect(entries).toHaveLength(1);
+    return join(runsDir, entries[0]!);
+  };
+
+  it("passes a well-formed curated eval dir", () => {
+    const fixture = makeFixture(handoffSource);
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.stdout).toContain("verify-evidence: OK");
+    expect(res.code).toBe(0);
+  });
+
+  it("flags missing referenced files, local absolute paths, sha mismatches, and missing summaries", () => {
+    // (1) a referenced file does not resolve
+    let fixture = makeFixture(handoffSource);
+    const baselineDir = join(soleRunDir(fixture), "version-flag", "baseline");
+    const baselineResult = JSON.parse(readFileSync(join(baselineDir, "result.json"), "utf8"));
+    rmSync(join(baselineDir, baselineResult.execution.stdoutLog));
+    let res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("does not resolve");
+
+    // (2) machine-local absolute path in a record
+    fixture = makeFixture(handoffSource);
+    const resultPath = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    const withLocal = JSON.parse(readFileSync(resultPath, "utf8"));
+    withLocal.environment.clonePath = "/Users/someone/clone";
+    writeFileSync(resultPath, JSON.stringify(withLocal));
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("machine-local path");
+
+    // (3) handoff artifact content no longer matches the recorded sha256
+    fixture = makeFixture(handoffSource);
+    const driverCopy = join(fixture, "driver", "fake-handoff-ve.md");
+    writeFileSync(driverCopy, readFileSync(driverCopy, "utf8") + "\ntampered\n");
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("handoff.sha256 mismatch");
+
+    // (4) a run dir without summary.md
+    fixture = makeFixture(handoffSource);
+    rmSync(join(soleRunDir(fixture), "summary.md"));
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("missing summary.md");
+
+    // (5) unknown schema field on a result record
+    fixture = makeFixture(handoffSource);
+    const rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    const badSchema = JSON.parse(readFileSync(rp, "utf8"));
+    badSchema.schema = "harnie-eval-result/v9";
+    writeFileSync(rp, JSON.stringify(badSchema));
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("schema must be");
+  }, 30000);
 });
 
 afterAll(() => {

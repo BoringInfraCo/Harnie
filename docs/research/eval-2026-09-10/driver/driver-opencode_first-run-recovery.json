@@ -1,0 +1,156 @@
+{
+  "harness": "opencode",
+  "format": "opencode-session-v1",
+  "session": {
+    "id": "ses_drvfirstrun000000000000001a",
+    "directory": "/workspace/harnie-project",
+    "title": "first-run recovery section — investigation",
+    "agent": "build",
+    "model": {
+      "id": "kimi-k2.7-code",
+      "providerID": "opencode-go"
+    },
+    "version": "1.18.29",
+    "time_created": 1789016406000,
+    "time_updated": 1789016421000
+  },
+  "messages": [
+    {
+      "id": "msg_drv_00001a_000",
+      "time_created": 1789016406000,
+      "data": {
+        "role": "user",
+        "time": {
+          "created": 1789016406000
+        }
+      }
+    },
+    {
+      "id": "msg_drv_00001a_001",
+      "time_created": 1789016412500,
+      "data": {
+        "role": "assistant",
+        "parentID": "msg_drv_00001a_000",
+        "path": {
+          "cwd": "/workspace/harnie-project"
+        },
+        "modelID": "kimi-k2.7-code",
+        "providerID": "opencode-go",
+        "time": {
+          "created": 1789016412500
+        }
+      }
+    },
+    {
+      "id": "msg_drv_00001a_002",
+      "time_created": 1789016421000,
+      "data": {
+        "role": "assistant",
+        "parentID": "msg_drv_00001a_001",
+        "path": {
+          "cwd": "/workspace/harnie-project"
+        },
+        "modelID": "kimi-k2.7-code",
+        "providerID": "opencode-go",
+        "time": {
+          "created": 1789016421000
+        }
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "prt_drv_00001a_000",
+      "message_id": "msg_drv_00001a_000",
+      "time_created": 1789016406500,
+      "data": {
+        "type": "text",
+        "text": "We are documenting recovery in this repo (/workspace/harnie-project). Investigate what `harnie backup <path>` and `harnie restore <path> --force` actually do, then plan a short '## Recovery' section for docs/internal/FIRST-RUN.md covering backup (consistent SQLite snapshot, 0600), restore (validates the backup then overwrites the live store), and the no-undo caveat. Investigate first; do not edit yet."
+      }
+    },
+    {
+      "id": "prt_drv_00001a_001",
+      "message_id": "msg_drv_00001a_001",
+      "time_created": 1789016413000,
+      "data": {
+        "type": "step-start"
+      }
+    },
+    {
+      "id": "prt_drv_00001a_002",
+      "message_id": "msg_drv_00001a_001",
+      "time_created": 1789016413500,
+      "data": {
+        "type": "reasoning",
+        "text": "[SANITIZED REASONING]"
+      }
+    },
+    {
+      "id": "prt_drv_00001a_003",
+      "message_id": "msg_drv_00001a_001",
+      "time_created": 1789016414000,
+      "data": {
+        "type": "tool",
+        "tool": "read",
+        "callID": "call_drv_frr_01",
+        "state": {
+          "status": "completed",
+          "input": {
+            "filePath": "/workspace/harnie-project/docs/internal/FIRST-RUN.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "prt_drv_00001a_004",
+      "message_id": "msg_drv_00001a_001",
+      "time_created": 1789016414500,
+      "data": {
+        "type": "tool",
+        "tool": "bash",
+        "callID": "call_drv_frr_02",
+        "state": {
+          "status": "completed",
+          "input": {
+            "command": "node dist/cli.js backup --help && node dist/cli.js restore --help"
+          }
+        }
+      }
+    },
+    {
+      "id": "prt_drv_00001a_005",
+      "message_id": "msg_drv_00001a_001",
+      "time_created": 1789016415000,
+      "data": {
+        "type": "step-finish",
+        "reason": "tool-calls"
+      }
+    },
+    {
+      "id": "prt_drv_00001a_006",
+      "message_id": "msg_drv_00001a_002",
+      "time_created": 1789016421500,
+      "data": {
+        "type": "step-start"
+      }
+    },
+    {
+      "id": "prt_drv_00001a_007",
+      "message_id": "msg_drv_00001a_002",
+      "time_created": 1789016422000,
+      "data": {
+        "type": "text",
+        "text": "Findings: docs/internal/FIRST-RUN.md currently walks through init/observe/handoff but has no recovery guidance. `harnie backup <path>` writes a consistent SQLite snapshot of the live store with mode 0600; `harnie restore <path> --force` validates the backup and then overwrites the live store; restore has NO undo, so a bad backup replaces the live state irreversibly. Plan for the next session: add a short '## Recovery' section to docs/internal/FIRST-RUN.md with those three facts and the exact commands. The edit itself is left to the next session — nothing modified yet."
+      }
+    },
+    {
+      "id": "prt_drv_00001a_008",
+      "message_id": "msg_drv_00001a_002",
+      "time_created": 1789016422500,
+      "data": {
+        "type": "step-finish",
+        "reason": "stop"
+      }
+    }
+  ]
+}

@@ -36,11 +36,6 @@ Scans known locations:
 `;
 
 export const runSessions = async (argv: string[], options: RunSessionsOptions): Promise<number> => {
-  if (argv.includes("--help") || argv.includes("-h") || argv.includes("help")) {
-    options.stdout.write(usage);
-    return 0;
-  }
-
   // JSON mode is decided by the presence of --json so that a failure early in
   // parsing (unknown flag, duplicate flag) still produces a JSON envelope.
   const json = argv.includes("--json");
@@ -48,7 +43,14 @@ export const runSessions = async (argv: string[], options: RunSessionsOptions): 
     const parsed = parseFlags(argv, {
       "--harness": { kind: "value" },
       "--json": { kind: "switch" },
+      "--help": { kind: "switch" },
+      "-h": { kind: "switch" },
     });
+    // Help short-circuits only after the argv passes flag validation.
+    if (argv.includes("--help") || argv.includes("-h") || argv.includes("help")) {
+      options.stdout.write(usage);
+      return 0;
+    }
     const harness = parsed.values["--harness"];
     if (harness !== undefined && !isSessionHarness(harness)) {
       const message = `Unknown harness "${harness}". Supported harnesses: pi, opencode, codex.`;

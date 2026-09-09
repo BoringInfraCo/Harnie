@@ -1,0 +1,83 @@
+{
+  "schema": "harnie-eval-result/v2",
+  "runId": "eval-20260910T0150-legD",
+  "taskId": "first-run-recovery",
+  "condition": "baseline",
+  "sourceHarness": null,
+  "targetHarness": "opencode",
+  "tagSha": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+  "refName": "v0.1.0-rc.3",
+  "handoffArtifactSha": null,
+  "patch": null,
+  "recordedAt": "2026-09-09T01:43:41.787Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "cbe5399346a27d43a13dc8856dfe54ff039936fe",
+    "clonePath": "disposable:first-run-recovery/baseline/clone"
+  },
+  "handoff": {
+    "path": null,
+    "chars": null,
+    "sha256": null
+  },
+  "execution": {
+    "invocation": [
+      "opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation — task: first-run-recovery\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nDocument backup/restore recovery in the first-run walkthrough.\n\nAdd a short '## Recovery' section to docs/internal/FIRST-RUN.md covering: `harnie backup <path>` writes a consistent SQLite snapshot (0600), `harnie restore <path> --force` validates the backup and then overwrites the live store, and restore has no undo. Edit only that file; no code changes.\n\n## Required verification\n- grep -n '^## Recovery' docs/internal/FIRST-RUN.md   # section exists\n- git diff --stat   # only docs/internal/FIRST-RUN.md modified\n\n## Expected end state\ndocs/internal/FIRST-RUN.md has a Recovery section with backup/restore usage and the no-undo caveat; no other file is modified.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "timedOut": false,
+    "wallMs": 33271,
+    "stdoutLog": "agent-stdout.log",
+    "stderrLog": "agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "grep -n '^## Recovery' docs/internal/FIRST-RUN.md",
+      "purpose": "receiver verification"
+    },
+    {
+      "cmd": "git diff --stat",
+      "purpose": "receiver verification"
+    }
+  ],
+  "edits": {
+    "files": [
+      "docs/internal/FIRST-RUN.md"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 935,
+    "diffPath": "edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "grep -n '^## Recovery' docs/internal/FIRST-RUN.md",
+      "git diff --stat"
+    ],
+    "passed": true,
+    "details": "receiver reported pass (Recovery section present, only docs/internal/FIRST-RUN.md modified); evaluator re-verified in the clone: '## Recovery' at line 495, git diff --stat shows only docs/internal/FIRST-RUN.md (+19), backup 0600 / restore validates-then-overwrites / no-undo all present"
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": null
+  },
+  "notes": "funded rerun (2026-09-10): statement-only baseline paired with the handoff condition, ref v0.1.0-rc.3"
+}

@@ -9,7 +9,7 @@ Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Cod
 
 **Preview promise:** Import supported local coding sessions, inspect evidence-backed work history, and prepare Markdown continuation packages.
 
-- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the import-side live gate is a single manual datapoint. The receiver side is partially validated: a Codex receiver consumed a Harnie handoff in a live run on 2026-09-09 (`docs/research/eval-2026-09-09/`).
+- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the import-side live gate is a single manual datapoint. The receiver side is partially validated: Codex→OpenCode executed successfully (transport/receiver compatibility — `docs/research/eval-2026-09-09/`, `docs/research/eval-2026-09-10/`); Codex→Pi remains provider-blocked.
 - Harnie does not resume sessions natively in any harness, does not accept every session format, and makes no productivity-saving claims. Derived state (goal, decisions, findings, next steps) consists of rule-derived claims over observed events with per-claim provenance — traceable, but not necessarily true, current, or settled.
 
 **For engineers:**
@@ -28,7 +28,7 @@ Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie 
 npm ci
 npm pack
 npm install --global ./harnie-*.tgz
-harnie --version   # e.g. 0.1.0-rc.3
+harnie --version   # e.g. 0.1.0-rc.4
 harnie --help
 ```
 

@@ -1,5 +1,14 @@
 # Directed handoff-matrix evaluation — 2026-09-09 (Order 5, post-rc.2 re-audit P1)
 
+> **2026-09-10 re-audit note:** verdict B of this pass was PARTIAL (blocked pi
+> legs). The funded rerun pass with availability probes, explicit not-run
+> records, and an rc.3-bound unrelated-task pair is
+> [`eval-2026-09-10/`](../eval-2026-09-10/README.md). Records in this dir were
+> curated in place (schema stamped `harnie-eval-result/v2`, portable relative
+> paths, per-run summaries generated) and verified by
+> `node scripts/eval-continuation.mjs verify-evidence --dir docs/research/eval-2026-09-09`
+> → OK; the verdict section below now reports two verdicts per protocol §4.
+
 Raw outcome evidence for the **directed** cross-harness continuation matrix
 required by `docs/internal/ROADMAP.md:200`:
 
@@ -145,11 +154,14 @@ only `src/cli.ts` modified, `git diff` empty on `src/greeting.ts` and
 re-verified). This tests actual continuation (the receiver consumed prior
 completed work and did the next step), not just a fresh small edit.
 
-## PASS/FAIL gate — "no false completion or repeated completed edits"
+## Verdicts — two-verdict framing (per EVALUATION-PROTOCOL.md §4)
 
-**PASS across all 7 successful receiver runs** (Pi→OpenCode handoff-retry +
-baseline; OpenCode→Pi handoff trial 1; Codex→OpenCode handoff + baseline;
-OpenCode→Codex continuation handoff + baseline):
+Verdict A and verdict B are separate claims; a PASS on A is not a PASS on B.
+
+**Verdict A — safety behavior among completed runs: PASS.** Across all 7
+successful receiver runs (Pi→OpenCode handoff-retry + baseline; OpenCode→Pi
+handoff trial 1; Codex→OpenCode handoff + baseline; OpenCode→Codex continuation
+handoff + baseline):
 
 - zero false completions: every completion claim is corroborated by the
   recorded diff and the evaluator's independent re-verification; the pi trial-1
@@ -164,6 +176,26 @@ OpenCode→Codex continuation handoff + baseline):
   out-of-scope `package-lock.json` modification before dying — that is a
   FAILED run, not counted toward the gate.
 
+**Verdict B — full Order 5 matrix / protocol gate: PARTIAL (INCONCLUSIVE as a
+gate).** The protocol requires verification in **every** required condition
+(handoff AND baseline, per required leg) for a PASS; declaring PASS by
+excluding failed runs is not permitted. This pass did not verify: the
+OpenCode→Pi baseline (all attempts provider-blocked), OpenCode→Pi requested
+extra trials, and the entire Codex→Pi leg. Verdict B stays PARTIAL/INCONCLUSIVE
+until every required condition verifies — see
+[`eval-2026-09-10/`](../eval-2026-09-10/README.md) for the funded rerun pass.
+
+**Codex legs, stated precisely (2026-09-10 re-audit wording):** the Codex→
+OpenCode leg executed successfully — that demonstrates transport/receiver
+compatibility (a codex-rendered handoff artifact was consumed by an opencode
+receiver, which completed the explicit benchmark task). Codex→Pi remains
+provider-blocked (openrouter credit exhaustion; nothing rerun against it in
+this pass). Additionally, the Codex→OpenCode handoff context was unrelated to
+its explicit benchmark task (the driver rollout `01a06ce3…` / sprint024
+concerned other work in this repo), so that leg does **not** demonstrate
+semantic continuation — the continuation-semantics evidence is the separate
+`greeting-command` OpenCode→Codex leg, whose driver context matched the task.
+
 ## ROADMAP.md:200 directed-matrix coverage
 
 | ROADMAP path | Status | Evidence |
@@ -171,7 +203,7 @@ OpenCode→Codex continuation handoff + baseline):
 | Pi → Harnie → OpenCode | **met** | handoff-retry PASS + paired baseline PASS (`runs/eval-20260909T1700-legA-r2/`, `...legA/...baseline/`) |
 | OpenCode → Harnie → Pi | **partially met** | handoff condition PASS (n=1, `runs/eval-20260909T1700-legB/...handoff/`); paired baseline **not run** (all 6 baseline/handoff-retry attempts failed on openrouter 402 credits / 402 in-flight budget / 429 free-tier daily limit — logs preserved in each run dir); requested 2–3 trials: 1 successful trial + 5 recorded failed attempts |
 | Codex → Harnie → Pi | **not run** | all attempts failed at startup on openrouter credit exhaustion (`runs/eval-20260909T1700-legC1/` — 402 `openrouter_credits`: balance cannot fund the model's max_tokens); pi is only authenticated against openrouter on this machine (`~/.pi/agent/auth.json`), no alternative provider key available |
-| Codex → Harnie → OpenCode | **met** | handoff + baseline PASS (`runs/eval-20260909T1700-legC2/`); ROADMAP allows "Pi/OpenCode" |
+| Codex → Harnie → OpenCode | **met (transport/receiver compatibility only)** | handoff + baseline PASS (`runs/eval-20260909T1700-legC2/`); ROADMAP allows "Pi/OpenCode". Caveat: the handoff context was unrelated to the explicit benchmark task, so this is not semantic-continuation evidence |
 | Continuation semantics (next-step, not fresh edit) | **met** | `greeting-command` OpenCode→Codex leg: driver steps 1–2 pre-applied, receiver completed step 3 only (`runs/eval-20260909T1700-cont/`) |
 
 ## Not-run / failed items and why (nothing fabricated)
@@ -207,10 +239,17 @@ OpenCode→Codex continuation handoff + baseline):
 - `runs/<runId>/run.json` — `refName: "v0.1.0-rc.2"`, resolved `tagSha`
   `0231dd77…`, node/platform.
 - `runs/<runId>/<task>/<condition>/result.json` — registered via harness
-  `record` (schema `harnie-eval-result/v1` with the new `sourceHarness`,
-  `targetHarness`, `tagSha`, `refName`, `handoffArtifactSha`, `patch` fields);
-  `prompt.md` (exact receiver prompt), `agent-stdout.log`, `agent-stderr.log`,
-  `edits.diff`; per-run harness summaries in `runs/<runId>/summary.{md,json}`.
+  `record` (schema now stamped **`harnie-eval-result/v2`** — v2 requires the
+  `sourceHarness`, `targetHarness`, `tagSha`, `refName`, `handoffArtifactSha`
+  provenance fields these records already carry; the schema field was bumped in
+  the 2026-09-10 re-audit remediation, archived 2026-09-07/09-08 evidence stays
+  v1); `prompt.md` (exact receiver prompt), `agent-stdout.log`,
+  `agent-stderr.log`, `edits.diff`; per-run harness summaries in
+  `runs/<runId>/summary.{md,json}` (regenerated for every run dir in the same
+  remediation). Path convention: record path fields are relative to the
+  result.json's own directory (`driver/…` references resolve from there);
+  tmp-only evidence is prefixed `disposable:`. Verified by
+  `node scripts/eval-continuation.mjs verify-evidence --dir <this dir>`.
 - `runs/curate.mjs` — the curation script that filled only observed
   human/evaluator-judged fields (idempotent; re-running re-registers the same
   values).

@@ -1,0 +1,11 @@
+Report:
+
+1. Files edited: `docs/internal/FIRST-RUN.md` only.
+2. Commands run:
+   - `grep -n '^## Recovery' docs/internal/FIRST-RUN.md`
+   - `git diff --stat`
+   - `git status --short`
+3. Verification:
+   - `grep -n '^## Recovery' docs/internal/FIRST-RUN.md` → `495:## Recovery` (pass)
+   - `git diff --stat` → only `docs/internal/FIRST-RUN.md` changed, 19 insertions (pass)
+4. Task status: complete.
