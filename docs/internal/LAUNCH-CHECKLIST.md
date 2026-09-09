@@ -177,3 +177,24 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   (downloaded independently; sidecar match verified 2026-09-09),
   `isPrerelease` true. Packaged manifest now carries only the lifecycle-
   neutral rc.6 release note.
+- [x] **Order 6 — `v0.1.0-rc.7` published 2026-09-09.** RC7 = RC6 + the
+  verifier-integrity round (required manifest binding fields via
+  `validateRunV2`, paired + git-resolved `handoffGeneratedBy` provenance
+  with qualifying-run generation pinned to `tagSha`, byte-exact
+  `summary.md` comparison, runId/createdAt chronology binding with a
+  narrowed documented guarantee + `--attest` execution-time attestation)
+  and the docs-reconciliation round (volatile counts removed from the
+  packaged matrix, rc.6-note claim corrected, checklist bindings/labels
+  fixed, README Phase-0 softened, "latest full run" smoke ban, historical
+  run-ids re-stamped from genuine manifest timestamps).
+  First push (ea90beb) failed CI on a non-hermetic `--attest` test
+  (runner GITHUB_* env) + a spawn-heavy chronology test timeout; fixed in
+  `34372be` and the tag force-moved to it.
+  Tag `v0.1.0-rc.7` → commit `34372be`; CI green on main (run
+  34411736497) and the tag (run 34411738203); Release workflow green
+  (run 34411738226); GitHub Release
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.7 with
+  assets `harnie-0.1.0-rc.7.tgz` and its `.sha256` sidecar, SHA-256
+  `f673607141b973ec2c35463d4e4dd24168d6683d4b8aeae5fee91d3bdfea6f04`
+  (downloaded independently; sidecar match verified 2026-09-09),
+  `isPrerelease` true. Suite at publish: 64 test files / 428 tests.
