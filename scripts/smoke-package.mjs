@@ -24,7 +24,17 @@ try {
   assert.equal(existsSync(join(installedPackage, "src")), false, "The installed CLI must not rely on TypeScript sources");
   const docs = join(installedPackage, "docs");
   assert.ok(existsSync(docs), "The installed package must ship its docs");
-  const lifecyclePhrases = [/pending tag/i, /prepared, pending/i, /what remains to publish/i];
+  const lifecyclePhrases = [
+    /most recent published release/i,
+    /next release candidate/i,
+    /next release/i,
+    /latest release/i,
+    /CI run/i,
+    /release asset/i,
+    /pending tag/i,
+    /prepared, pending/i,
+    /what remains to publish/i,
+  ];
   for (const entry of readdirSync(docs, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const contents = readFileSync(join(entry.parentPath, entry.name), "utf8");

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
@@ -10,6 +10,7 @@ interface EvalMod {
   validateResult: (r: unknown) => { ok: boolean; errors: string[] };
   validateResultV1: (r: unknown) => { ok: boolean; errors: string[] };
   validateResultV2: (r: unknown) => { ok: boolean; errors: string[] };
+  generateSummary: (runDir: string, run: unknown) => { data: unknown; md: string };
   buildPrompt: (
     task: { id: string; statement: string; details: string; verify: string[]; endState: string },
     condition: string,
@@ -655,6 +656,28 @@ describe("eval harness — v2 invariants (condition, provenance, nested fields)"
     ).toBe(true);
   });
 
+  it("validates the optional handoffGeneratedBy provenance fields when present", () => {
+    // Canonical form: 40-hex git commit sha of the generating ref.
+    const withGen = (o: Record<string, unknown>) => makeV2({ condition: "handoff", sourceHarness: "codex", handoffArtifactSha: "b".repeat(64), handoff: { path: "h.md", chars: 10, sha256: "b".repeat(64) }, ...o });
+    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(40) })).ok).toBe(true);
+    // 64-hex sha256 form is also accepted.
+    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(64) })).ok).toBe(true);
+    // Explicit nulls (generating ref equals the candidate / unknown) stay valid.
+    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: null, handoffGeneratedBySha: null })).ok).toBe(true);
+    // Non-hex or short shas are rejected.
+    const badSha = withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "nothex" });
+    expect(mod.validateResultV2(badSha).ok).toBe(false);
+    expect(mod.validateResultV2(badSha).errors.join("\n")).toContain("handoffGeneratedBySha");
+    const shortSha = withGen({ handoffGeneratedBySha: "c".repeat(39) });
+    expect(mod.validateResultV2(shortSha).ok).toBe(false);
+    // Empty ref strings are rejected.
+    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "" })).ok).toBe(false);
+    // A baseline has no handoff artifact, so it cannot name a generating ref.
+    const baselineGen = makeV2({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(40) });
+    expect(mod.validateResultV2(baselineGen).ok).toBe(false);
+    expect(mod.validateResultV2(baselineGen).errors.join("\n")).toContain('condition "baseline" requires handoffGeneratedBySha null');
+  });
+
   it("rejects the OLD malformed baseline shape (non-null sourceHarness on baseline)", () => {
     // Historical probe: the pre-fix eval-2026-09-10 pi-blocked baseline records
     // carried sourceHarness "opencode"/"codex" on condition "baseline".
@@ -799,6 +822,12 @@ describe("eval harness — verify-evidence integrity check", () => {
     writeFileSync(handoffResultPath, JSON.stringify(handoffResult, null, 2) + "\n");
     writeFileSync(join(runsDir, "summary.md"), "# fixture summary\n");
     writeFileSync(join(runsDir, "summary.json"), JSON.stringify({ rows: [] }));
+    // The committed per-run summary must be the canonical regeneration (the
+    // drift check compares it against one); build it with the shared code path.
+    const runJson = JSON.parse(readFileSync(join(runsDir, "run.json"), "utf8"));
+    const { data, md } = mod.generateSummary(runsDir, runJson);
+    writeFileSync(join(runsDir, "summary.md"), md);
+    writeFileSync(join(runsDir, "summary.json"), JSON.stringify(data, null, 2) + "\n");
     writeFileSync(join(fixtureRoot, "README.md"), "# fixture eval\n");
     writeFileSync(join(fixtureRoot, "summary.md"), "# fixture eval summary\n");
     return fixtureRoot;
@@ -928,6 +957,142 @@ describe("eval harness — verify-evidence integrity check", () => {
     expect(res.code).not.toBe(0);
     expect(res.stderr).toContain("run.json: createdAt");
     expect(res.stderr).toContain("hand-authored date");
+  }, 30000);
+
+  // Exact candidate binding (2026-09-10 re-audit P2): the git re-resolution
+  // tests run against a throwaway repo (never the working repo) passed via
+  // --repo, so the check is hermetic and deterministic.
+  const makeHermeticRepo = () => {
+    const repoDir = join(scratch, `binding-repo-${cleanupDirs.length}`);
+    execFileSync("git", ["init", "-q", repoDir]);
+    const g = (args: string[]) =>
+      execFileSync("git", ["-C", repoDir, "-c", "user.name=t", "-c", "user.email=t@example.test", ...args], {
+        encoding: "utf8",
+      });
+    writeFileSync(join(repoDir, "f.txt"), "candidate commit\n");
+    g(["add", "-A"]);
+    g(["commit", "-q", "-m", "candidate"]);
+    const shaTagged = g(["rev-parse", "HEAD"]).trim();
+    writeFileSync(join(repoDir, "f.txt"), "other commit\n");
+    g(["add", "-A"]);
+    g(["commit", "-q", "-m", "other"]);
+    const shaOther = g(["rev-parse", "HEAD"]).trim();
+    // tag the CANDIDATE commit (the first one), not HEAD
+    g(["tag", "candidate", shaTagged]);
+    return { repoDir, shaTagged, shaOther };
+  };
+
+  const rebind = (runDir: string, refName: string, tagSha: string) => {
+    const rjp = join(runDir, "run.json");
+    const runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    runJson.refName = refName;
+    runJson.ref = tagSha;
+    runJson.tagSha = tagSha;
+    writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+    for (const cond of ["handoff", "baseline"]) {
+      const rp = join(runDir, "version-flag", cond, "result.json");
+      const rec = JSON.parse(readFileSync(rp, "utf8"));
+      rec.refName = refName;
+      rec.tagSha = tagSha;
+      rec.environment.ref = tagSha;
+      writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    }
+    // keep the committed summary consistent with the rebound records
+    const { data, md } = mod.generateSummary(runDir, runJson);
+    writeFileSync(join(runDir, "summary.json"), JSON.stringify(data, null, 2) + "\n");
+    writeFileSync(join(runDir, "summary.md"), md);
+  };
+
+  it("re-resolves a tag refName in git and rejects a tagSha binding mismatch (--repo)", () => {
+    const { repoDir, shaTagged, shaOther } = makeHermeticRepo();
+    const fixture = makeFixture(handoffSource);
+    const runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaOther);
+    const res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("exact candidate binding mismatch");
+    expect(res.stderr).toContain("candidate");
+    expect(shaTagged).toMatch(/^[0-9a-f]{40}$/);
+  }, 30000);
+
+  it("accepts a consistent tag binding (--repo) and warns on an unresolvable ref instead of passing silently", () => {
+    const { repoDir, shaTagged } = makeHermeticRepo();
+    const fixture = makeFixture(handoffSource);
+    rebind(soleRunDir(fixture), "candidate", shaTagged);
+    const ok = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(ok.code).toBe(0);
+    expect(ok.stdout).toContain("verify-evidence: OK");
+
+    const warnFixture = makeFixture(handoffSource);
+    rebind(soleRunDir(warnFixture), "no-such-tag-anywhere", shaTagged);
+    const warned = runHarness(["verify-evidence", "--dir", warnFixture, "--repo", repoDir]);
+    expect(warned.code).toBe(0);
+    expect(warned.stdout).toContain("verify-evidence: OK");
+    expect(warned.stderr).toContain("warning");
+    expect(warned.stderr).toContain("no-such-tag-anywhere");
+    expect(warned.stderr).toContain("not re-verifiable against git");
+  }, 30000);
+
+  it("rejects a record whose tagSha / refName / environment.ref do not match the run manifest", () => {
+    // tagSha mismatch
+    let fixture = makeFixture(handoffSource);
+    let rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    let rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.tagSha = "b".repeat(40);
+    writeFileSync(rp, JSON.stringify(rec));
+    let res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("does not match the run manifest tagSha");
+
+    // refName mismatch
+    fixture = makeFixture(handoffSource);
+    rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.refName = "v9.9.9-other";
+    writeFileSync(rp, JSON.stringify(rec));
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("does not match the run manifest refName");
+
+    // environment.ref mismatch
+    fixture = makeFixture(handoffSource);
+    rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.environment.ref = "c".repeat(40);
+    writeFileSync(rp, JSON.stringify(rec));
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("environment.ref");
+    expect(res.stderr).toContain("exact candidate binding");
+  }, 30000);
+
+  it("detects summary drift and --fix regenerates the canonical summary", () => {
+    // drift = error
+    let fixture = makeFixture(handoffSource);
+    const sp = join(soleRunDir(fixture), "summary.json");
+    const committed = JSON.parse(readFileSync(sp, "utf8"));
+    (committed.rows as Array<{ status?: string }>)[0]!.status = "manual";
+    writeFileSync(sp, JSON.stringify(committed, null, 2) + "\n");
+    let res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("summary drift");
+
+    // --fix regenerates and passes; the rewritten summary matches the records
+    fixture = makeFixture(handoffSource);
+    const sp2 = join(soleRunDir(fixture), "summary.json");
+    const committed2 = JSON.parse(readFileSync(sp2, "utf8"));
+    (committed2.rows as Array<{ status?: string }>)[0]!.status = "manual";
+    writeFileSync(sp2, JSON.stringify(committed2, null, 2) + "\n");
+    res = runHarness(["verify-evidence", "--dir", fixture, "--fix"]);
+    expect(res.code).toBe(0);
+    expect(res.stderr).toContain("summary drift FIXED");
+    const runDir = soleRunDir(fixture);
+    const runJson = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+    const { data } = mod.generateSummary(runDir, runJson);
+    expect(JSON.parse(readFileSync(sp2, "utf8"))).toEqual(data);
+    const after = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(after.code).toBe(0);
+    expect(after.stdout).toContain("verify-evidence: OK");
   }, 30000);
 });
 

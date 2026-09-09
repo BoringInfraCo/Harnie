@@ -10,6 +10,16 @@ Purpose: final Order 5 attempt to run the re-audit's four missing pi-receiver le
 | pi / `openrouter/moonshotai/kimi-k2.5` | **402 `openrouter_credits`** — 4096 max_tokens requested, 2422 affordable; credits do not reset (`probes/pi-kimi-k2.5-probe.{out,err}`) |
 | pi / `openrouter/cohere/north-mini-code:free` | **429 `openrouter_free_tier_daily`** — X-RateLimit-Remaining 0; resets 2026-09-10T00:00Z; account-wide contested key (`probes/pi-free-probe.{out,err}`) |
 
+### Re-probe (post-rc.5 re-audit P2 status check, 2026-09-09T15:35Z)
+
+Both models re-probed and **still blocked** — appended (not overwritten) to
+the same probe files with live-clock separators: kimi-k2.5 **402
+`openrouter_credits`** (identical 2422/4096 shortfall), free tier **429**
+(`X-RateLimit-Remaining: 0`, reset 2026-09-10T00:00Z). **Orchestrator status:
+still BLOCKED — do not sequence full candidate-bound pi legs.** The four
+not-run records carry this outcome in their `notes`; no receiver legs were
+run in the re-probe.
+
 ## Per-leg results (run `eval-20260909T1354-pi-blocked`)
 
 | Leg (source→target) | Task | Condition | tagSha | Status | Evidence |
@@ -46,4 +56,4 @@ Mean Δ ≈ −0.6s, mixed sign; command counts identical within every pair; `re
 
 ## Integrity
 
-`node scripts/eval-continuation.mjs verify-evidence --dir docs/research/eval-2026-09-09c` → OK (1 run dir, 4 result records); also OK on `eval-2026-09-09` (10/17) and `eval-2026-09-09b` (2/6). `tests/eval-harness.test.ts` 27/27 green.
+`node scripts/eval-continuation.mjs verify-evidence --dir docs/research/eval-2026-09-09c` → OK (1 run dir, 4 result records) under the stricter post-rc.5 re-audit rules (exact candidate binding incl. git re-resolution of the `v0.1.0-rc.5` tag; committed summaries compared against harness regenerations); also OK on `eval-2026-09-09` (10/17) and `eval-2026-09-09b` (2/6). The handoff-condition records carry `handoffGeneratedByRef`/`handoffGeneratedBySha` (v0.1.0-rc.2 / `0231dd77…`) naming the rc.2-era runs that rendered the referenced artifacts; the per-run summary was regenerated via `--fix` after those edits. `tests/eval-harness.test.ts` + `tests/eval-docs-consistency.test.ts` 35/35 green.

@@ -1,6 +1,6 @@
 # Release notes — harnie 0.1.0-rc.4 (developer preview)
 
-Date: 2026-09-10. Status: **published** (`v0.1.0-rc.4`). RC4 =
+Date: 2026-09-09. Status: **published** (`v0.1.0-rc.4`). RC4 =
 RC3 (`docs/internal/RELEASE-0.1.0-rc.3.md`, published — tag `v0.1.0-rc.3` →
 `cbe5399346a27d43a13dc8856dfe54ff039936fe`, release
 https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.3 with asset
@@ -78,10 +78,11 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
 - **Codex remains experimental.** Import-side live gate is still a single
   manual datapoint plus fixtures. The receiver side is stronger but partial:
   Codex→OpenCode executed successfully (transport/receiver compatibility —
-  and on 2026-09-10 with driver context matching the benchmark task,
-  handoff + baseline PASS, rc.3), but the 2026-09-09 Codex→OpenCode
-  handoff context was unrelated to its benchmark task and does not
-  demonstrate semantic continuation; Codex→Pi remains provider-blocked.
+  and on 2026-09-09 (~01:41–01:46Z, before the rc.4 publish; recorded in
+  `docs/research/eval-2026-09-09b/`) with driver context matching the
+  benchmark task, handoff + baseline PASS, rc.3), but the 2026-09-09
+  Codex→OpenCode handoff context was unrelated to its benchmark task and does
+  not demonstrate semantic continuation; Codex→Pi remains provider-blocked.
 - **Evaluation caveats (standing).** pi/opencode drivers are synthetic
   (real sessions are trivial to attach and remain a trivial step away);
   n=1 per successful leg; do not quote performance numbers beyond
@@ -90,14 +91,16 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
   baseline and requested extra trials, and the entire Codex→Pi leg, are
   NOT RUN — the pi receiver is provider-unfunded (paid openrouter credits
   exhausted / contested 429 free-tier daily quota; probes recorded
-  2026-09-10). This is not a code or harness problem: handoff artifacts
+  2026-09-09T13:54Z, `docs/research/eval-2026-09-09c/`). This is not a code
+  or harness problem: handoff artifacts
   are ready and sha-pinned, and the legs can execute unchanged once a
   funded pi model exists.
 
 ## Evaluation result (Order 5, two-verdict)
 
-**Verdict A — safety among completed runs: PASS** (09-09: 7 runs, rc.2;
-09-10: 2 runs, rc.3): no false completion, no repeated finished edits, no
+**Verdict A — safety among completed runs: PASS** (2026-09-09: 7 runs, rc.2;
+2026-09-09 ~01:41–01:46Z: 2 runs, rc.3, `docs/research/eval-2026-09-09b/`):
+no false completion, no repeated finished edits, no
 out-of-scope edits across all completed receiver runs; every completion
 claim corroborated by diff + evaluator re-verification; all
 provider-failure attempts honestly recorded.
@@ -105,12 +108,14 @@ provider-failure attempts honestly recorded.
 **Verdict B — full Order 5 matrix gate: PARTIAL/INCONCLUSIVE.** Met: the
 Pi→OpenCode pair (09-09, handoff+baseline), the OpenCode→Pi handoff
 (09-09, n=1, no paired baseline), Codex→OpenCode
-transport/receiver-compatibility legs (09-09; plus the 09-10 rc.3
-first-run-recovery pair with task-matching driver context), and the
+transport/receiver-compatibility legs (09-09; plus the 2026-09-09 rc.3
+first-run-recovery pair with task-matching driver context,
+`docs/research/eval-2026-09-09b/`), and the
 continuation-semantics OpenCode→Codex greeting-command leg (09-09;
 driver steps 1–2 → receiver step 3 only). Not met / not run: the
 OpenCode→Pi baseline + extra trials and the whole Codex→Pi leg —
-provider-blocked (402 credits / 429 free tier; probes recorded 09-10).
+provider-blocked (402 credits / 429 free tier; probes recorded
+2026-09-09T13:54Z, `docs/research/eval-2026-09-09c/`).
 Do not claim the matrix is met. Full verdicts, ledgers, and per-run
 provenance: `docs/research/eval-2026-09-09/` and
 `docs/research/eval-2026-09-09b/` (prior: `eval-2026-09-08/` receiver

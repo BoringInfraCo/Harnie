@@ -30,6 +30,24 @@ two prior probe passes). Per the pass rule ("probe still fails → do NOT burn
 budget retrying"), no pi-targeted receiver invocation was made and no retry
 loop was run.
 
+### Re-probe (post-rc.5 re-audit P2 status check, 2026-09-09T15:35Z)
+
+A fourth independent probe pass (two cheap `pi -p` calls, appended verbatim to
+the existing probe files with live-clock separators — never overwritten):
+
+| Probe (UTC 15:35Z) | Result | Evidence |
+| --- | --- | --- |
+| pi / `openrouter/moonshotai/kimi-k2.5` (paid) | **402 `openrouter_credits`** — identical shortfall ("You requested up to 4096 tokens, but can only afford 2422"; credits do not reset) | `probes/pi-kimi-k2.5-probe.{out,err}`, appended re-probe section |
+| pi / `openrouter/cohere/north-mini-code:free` (free tier) | **429 `openrouter_free_tier_daily`** — `X-RateLimit-Remaining: 0`, reset still 2026-09-10T00:00:00Z | `probes/pi-free-probe.{out,err}`, appended re-probe section |
+
+**Status for the orchestrator: still BLOCKED — do not sequence full
+candidate-bound legs.** Either probe succeeding would have been reported
+prominently here as the green light; both failed exactly as the 13:54Z pass
+did (4th and 5th consecutive independent confirmations of the funding
+blocker). The four not-run records below carry this re-probe outcome in their
+`notes`. No receiver legs were run in the re-probe (2 extra live invocations,
+both probes; ~10s total wall).
+
 Live invocations this pass: **2 of the ≤12 budget** (the two probes). No
 invocation hit the 10-minute kill timeout (probes exit immediately). No
 `harnie` command was invoked at all in this pass (the handoff artifacts are
@@ -47,10 +65,23 @@ temp or otherwise — was exercised; `~/.harnie` was never touched.
 
 Every record is schema `harnie-eval-result/v2`, `status: "not-run"`, with the
 probe-based `notRunReason`; the harness `record` command validated all four
-(strict v2 invariants, condition/provenance agreement). No result in this
-directory has `status: "ran"` — the candidate has **zero** candidate-bound
-receiver runs; all successful receiver evidence to date remains rc.2/rc.3-bound
-(recorded in the two prior dirs).
+(strict v2 invariants, condition/provenance agreement). The two
+handoff-condition records additionally carry the optional
+**`handoffGeneratedByRef` / `handoffGeneratedBySha`** provenance (added in the
+post-rc.5 re-audit P2 remediation): both referenced artifacts were **rendered
+by Harnie `v0.1.0-rc.2`** (`0231dd77ce909d04fcb60692ae48a47df04c9b68`) during
+the eval-2026-09-09 pass — derived from the generating runs' manifests
+(`eval-20260909T1700-legB` for `handoff-opencode_pi-version-flag.md`,
+`eval-20260909T1700-legC1` for `handoff-codex_pi-sprint024.md`; the rc.3-era
+eval-2026-09-09b pass re-declared both sha-pinned artifacts without
+re-rendering) — and both differ from this run's evaluated candidate
+`v0.1.0-rc.5`. The baseline records carry explicit nulls (no handoff artifact,
+no generating ref). The per-run `summary.{md,json}` were regenerated via the
+harness after the provenance edits (`verify-evidence --fix` path) to keep the
+committed summaries identical to the records. No result in this directory has
+`status: "ran"` — the candidate has **zero** candidate-bound receiver runs;
+all successful receiver evidence to date remains rc.2/rc.3-bound (recorded in
+the two prior dirs).
 
 ## Developer re-explanation proxy comparison (from existing logs; nothing new executed)
 
@@ -124,20 +155,27 @@ same way as 2026-09-09) and changed no completed-run facts.
 ## Raw evidence map
 
 - `probes/` — the two availability probes (stdout + stderr preserved verbatim,
-  exit codes recorded above).
+  exit codes recorded above) **plus the 2026-09-09T15:35Z re-probe sections
+  appended verbatim with live-clock separators** (never overwritten).
 - `runs/eval-20260909T1354-pi-blocked/` — `run.json` (`refName:
   "v0.1.0-rc.5"`, `tagSha 6ac02e3…`), four `status: "not-run"` result records
-  (strict v2, registered via harness `record`), harness
-  `summary.{md,json}`.
+  (strict v2, registered via harness `record`, handoff-condition records now
+  carrying `handoffGeneratedByRef`/`handoffGeneratedBySha` provenance),
+  harness `summary.{md,json}` (regenerated after the provenance edits).
 - `driver/` artifacts referenced by the handoff-condition records resolve
   relatively into [`eval-2026-09-09/driver/`](../eval-2026-09-09/driver/)
   (`../../../../../eval-2026-09-09/driver/handoff-*.md`); both sha256s were
   re-verified at 13:57Z today and are re-checked by `verify-evidence`.
 
 Integrity: `node scripts/eval-continuation.mjs verify-evidence --dir
-docs/research/eval-2026-09-09c` → OK (1 run dir, 4 result records); the same
-check passes on `eval-2026-09-09` (10 run dirs, 17 records) and
-`eval-2026-09-09b` (2 run dirs, 6 records).
+docs/research/eval-2026-09-09c` → OK (1 run dir, 4 result records) under the
+STRICTER post-rc.5 re-audit rules (exact candidate binding incl. git
+re-resolution of the `v0.1.0-rc.5` tag; summary regeneration compared with the
+committed summary.json — one drift finding after the provenance edits, fixed
+via `--fix`); the same check passes on `eval-2026-09-09` (10 run dirs, 17
+records) and `eval-2026-09-09b` (2 run dirs, 6 records).
+`tests/eval-harness.test.ts` and `tests/eval-docs-consistency.test.ts` are
+green (35/35).
 
 ## Limitations
 

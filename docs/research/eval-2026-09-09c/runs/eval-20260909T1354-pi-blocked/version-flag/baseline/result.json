@@ -8,6 +8,8 @@
   "tagSha": "6ac02e359b3b973c7fc4b4c603a6d2db38b665dc",
   "refName": "v0.1.0-rc.5",
   "handoffArtifactSha": null,
+  "handoffGeneratedByRef": null,
+  "handoffGeneratedBySha": null,
   "patch": null,
   "recordedAt": "2026-09-09T13:58:37.834Z",
   "status": "not-run",
@@ -58,5 +60,5 @@
     "falseCompletion": null,
     "packageSizeChars": null
   },
-  "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); this is the still-missing baseline that would pair with the rc.2-bound trial-1 handoff PASS in eval-2026-09-09 (runs/eval-20260909T1700-legB)."
+  "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); this is the still-missing baseline that would pair with the rc.2-bound trial-1 handoff PASS in eval-2026-09-09 (runs/eval-20260909T1700-legB). handoffGeneratedBy is null: a baseline consumes no handoff artifact, so there is no generating ref to name. Re-probed 2026-09-09T15:35Z (post-rc.5 re-audit P2 status check): both candidate models still blocked (kimi-k2.5 402 openrouter_credits; free tier 429, X-RateLimit-Remaining 0) — see the appended re-probe sections in probes/."
 }

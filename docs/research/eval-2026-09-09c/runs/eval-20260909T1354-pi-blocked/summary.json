@@ -27,7 +27,7 @@
       "taskCompleted": null,
       "packageSizeChars": 1736,
       "notRunReason": "OpenCode->Pi extra handoff trials (leg a, trials 2-3 of the >=3-trial target, bound to v0.1.0-rc.5 / 6ac02e3): NOT RUN - pi receiver provider unfunded, re-verified by cheap probes 2026-09-09T13:54Z (probes/): pi/openrouter moonshotai/kimi-k2.5 -> 402 openrouter_credits ('You requested up to 4096 tokens, but can only afford 2422'; credits do not reset); pi/openrouter cohere/north-mini-code:free -> 429 openrouter_free_tier_daily (X-RateLimit-Remaining: 0; account-wide 50/day key contested; X-RateLimit-Reset 2026-09-10T00:00Z). Per pass rule: probe failure -> no receiver invocation spent, no budget burned on retries.",
-      "notes": "ready artifact (unchanged since the rc.2 trial-1 PASS, sha256 re-verified 2026-09-09T13:57Z): eval-2026-09-09/driver/handoff-opencode_pi-version-flag.md, 1736 chars. The leg executes unchanged once a funded pi model exists."
+      "notes": "ready artifact (unchanged since the rc.2 trial-1 PASS, sha256 re-verified 2026-09-09T13:57Z): eval-2026-09-09/driver/handoff-opencode_pi-version-flag.md, 1736 chars. The leg executes unchanged once a funded pi model exists. handoffGeneratedBy provenance (2026-09-10 re-audit P2): the referenced artifact was rendered by Harnie v0.1.0-rc.2 during the eval-2026-09-09 pass (generating run eval-20260909T1700-legB, tagSha 0231dd77ce909d04fcb60692ae48a47df04c9b68) — it differs from this run's evaluated candidate v0.1.0-rc.5. Re-probed 2026-09-09T15:35Z (post-rc.5 re-audit P2 status check): kimi-k2.5 still 402 openrouter_credits (2422 of 4096 max_tokens affordable) — see the appended re-probe sections in probes/."
     },
     {
       "taskId": "version-flag",
@@ -51,7 +51,7 @@
       "taskCompleted": null,
       "packageSizeChars": null,
       "notRunReason": "OpenCode->Pi baseline (leg a, bound to v0.1.0-rc.5 / 6ac02e3): NOT RUN - pi receiver provider unfunded, re-verified by cheap probes 2026-09-09T13:54Z (probes/): pi/openrouter moonshotai/kimi-k2.5 -> 402 openrouter_credits ('You requested up to 4096 tokens, but can only afford 2422'; credits do not reset); pi/openrouter cohere/north-mini-code:free -> 429 openrouter_free_tier_daily (X-RateLimit-Remaining: 0; account-wide 50/day key contested; X-RateLimit-Reset 2026-09-10T00:00Z). Per pass rule: probe failure -> no receiver invocation spent, no budget burned on retries.",
-      "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); this is the still-missing baseline that would pair with the rc.2-bound trial-1 handoff PASS in eval-2026-09-09 (runs/eval-20260909T1700-legB)."
+      "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); this is the still-missing baseline that would pair with the rc.2-bound trial-1 handoff PASS in eval-2026-09-09 (runs/eval-20260909T1700-legB). handoffGeneratedBy is null: a baseline consumes no handoff artifact, so there is no generating ref to name. Re-probed 2026-09-09T15:35Z (post-rc.5 re-audit P2 status check): both candidate models still blocked (kimi-k2.5 402 openrouter_credits; free tier 429, X-RateLimit-Remaining 0) — see the appended re-probe sections in probes/."
     },
     {
       "taskId": "shebang-guard",
@@ -75,7 +75,7 @@
       "taskCompleted": null,
       "packageSizeChars": 3225,
       "notRunReason": "Codex->Pi handoff (leg b, bound to v0.1.0-rc.5 / 6ac02e3): NOT RUN - pi receiver provider unfunded, re-verified by cheap probes 2026-09-09T13:54Z (probes/): pi/openrouter moonshotai/kimi-k2.5 -> 402 openrouter_credits ('You requested up to 4096 tokens, but can only afford 2422'; credits do not reset); pi/openrouter cohere/north-mini-code:free -> 429 openrouter_free_tier_daily (X-RateLimit-Remaining: 0; account-wide 50/day key contested; X-RateLimit-Reset 2026-09-10T00:00Z). Per pass rule: probe failure -> no receiver invocation spent, no budget burned on retries.",
-      "notes": "ready artifact (unchanged since 2026-09-09, sha256 re-verified 2026-09-09T13:57Z): eval-2026-09-09/driver/handoff-codex_pi-sprint024.md, 3225 chars. The leg executes unchanged once a funded pi model exists."
+      "notes": "ready artifact (unchanged since 2026-09-09, sha256 re-verified 2026-09-09T13:57Z): eval-2026-09-09/driver/handoff-codex_pi-sprint024.md, 3225 chars. The leg executes unchanged once a funded pi model exists. handoffGeneratedBy provenance (2026-09-10 re-audit P2): the referenced artifact was rendered by Harnie v0.1.0-rc.2 during the eval-2026-09-09 pass (first consumed by the rc.2-bound run eval-20260909T1700-legC1, tagSha 0231dd77ce909d04fcb60692ae48a47df04c9b68; the rc.3-era eval-2026-09-09b pass re-declared the same sha-pinned artifact without re-rendering) — it differs from this run's evaluated candidate v0.1.0-rc.5. Re-probed 2026-09-09T15:35Z (post-rc.5 re-audit P2 status check): kimi-k2.5 still 402 openrouter_credits — see the appended re-probe sections in probes/."
     },
     {
       "taskId": "shebang-guard",
@@ -99,7 +99,7 @@
       "taskCompleted": null,
       "packageSizeChars": null,
       "notRunReason": "Codex->Pi baseline (leg b, bound to v0.1.0-rc.5 / 6ac02e3): NOT RUN - pi receiver provider unfunded, re-verified by cheap probes 2026-09-09T13:54Z (probes/): pi/openrouter moonshotai/kimi-k2.5 -> 402 openrouter_credits ('You requested up to 4096 tokens, but can only afford 2422'; credits do not reset); pi/openrouter cohere/north-mini-code:free -> 429 openrouter_free_tier_daily (X-RateLimit-Remaining: 0; account-wide 50/day key contested; X-RateLimit-Reset 2026-09-10T00:00Z). Per pass rule: probe failure -> no receiver invocation spent, no budget burned on retries.",
-      "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); no baseline has ever succeeded for a pi receiver on any leg."
+      "notes": "provider unfunded, re-verified 2026-09-09T13:54Z (see notRunReason + probes/); no baseline has ever succeeded for a pi receiver on any leg. handoffGeneratedBy is null: a baseline consumes no handoff artifact, so there is no generating ref to name. Re-probed 2026-09-09T15:35Z (post-rc.5 re-audit P2 status check): both candidate models still blocked (kimi-k2.5 402 openrouter_credits; free tier 429, X-RateLimit-Remaining 0) — see the appended re-probe sections in probes/."
     },
     {
       "taskId": "first-run-recovery",

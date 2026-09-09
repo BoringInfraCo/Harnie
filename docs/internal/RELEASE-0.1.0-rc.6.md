@@ -1,10 +1,9 @@
-# Release notes — harnie 0.1.0-rc.5 (developer preview)
+# Release notes — harnie 0.1.0-rc.6 (developer preview)
 
-Date: 2026-09-09. RC5 = RC4 (`docs/internal/RELEASE-0.1.0-rc.4.md`, tag
-`v0.1.0-rc.4` → `37c4c22`) plus this post-rc.4 packaging-integrity round.
-This file is written to be accurate at pack time and after publishing alike:
-it records no publication state and no publish-time facts (CI/release run
-IDs, asset SHA-256) — those live on `main` in
+Date: 2026-09-09. RC6 = RC5 (`docs/internal/RELEASE-0.1.0-rc.5.md`) plus this
+docs-integrity round. This file is written to be accurate at pack time and
+after publishing alike: it records no publication state and no publish-time
+facts (tag → commit, run IDs, tarball SHA-256) — those live on `main` in
 `docs/internal/LAUNCH-CHECKLIST.md` (Order 6) once they exist. The
 "Release verification" section below tells you how to check any given
 release yourself.
@@ -22,46 +21,56 @@ every session format, and makes no productivity-saving claims.
 ## Supported
 
 Detail and per-claim evidence live in `docs/internal/SUPPORT-MATRIX.md`
-(source of truth). Essentials (carried over from RC4): fixture/live imports
+(source of truth). Essentials (carried over from RC5): fixture/live imports
 for pi/opencode (codex experimental), `sessions` discovery, `import --work`
 attach, inspection (`list`/`show`/`executions`/`history`/`diff`) with the
 opt-in `--json` machine contract (`docs/internal/MACHINE-CONTRACT.md`),
 checkpoint/fork/handoff (bounded Markdown packages, `0600` artifacts),
 ingestion + output redaction (best-effort), `backup`/`restore`.
 
-## New in RC5 (post-rc.4 re-audit remediation: packaging integrity)
+## New in RC6 (post-rc.5 re-audit remediation: documentation integrity)
 
-RC4's tarball shipped a release note asserting a publication state it did
-not yet have, and needed a post-publish rewrite on `main` to carry the
-published facts. RC5 fixes the class of problem, not just the instance:
+RC5 fixed the class of packaged-lifecycle problems; RC6 closes the remaining
+documentation-integrity gaps found in the re-audit:
 
-- **Lifecycle-neutral release notes.** This file asserts no publication
-  state and contains no publish-time facts, so it is true when packed and
-  stays true after the release is cut — no post-publish rewrite needed.
-  Publish-time facts are recorded on `main`
-  (`docs/internal/LAUNCH-CHECKLIST.md`, Order 6), which is not packaged
-  (confirmed via `npm pack --dry-run`).
-- **Strict packaging validator invariant.** `scripts/smoke-package.mjs`
-  (part of `npm run check`) now fails if any file shipped in the tarball's
-  `docs/` carries the lifecycle-status phrasing that made RC4's packaged
-  note wrong — so a tarball cannot again ship describing its own release as
-  mid-flight or unfinished.
-- **Release workflow hardening** (`.github/workflows/release.yml`): the
-  workflow asserts that the pushed tag equals `v` + the package version
-  before creating a release (the job fails otherwise); it writes a
-  `<tarball>.sha256` sidecar and attaches it alongside the tarball; and the
-  tarball (plus sidecar) is attached in the same `gh release create` call —
-  there is no window in which a release exists without its asset.
-  `--verify-tag` and conditional `--prerelease` are retained.
-- **Chronology corrections.** `docs/internal/SUPPORT-MATRIX.md` now records
-  RC4's published facts (tag → commit, CI/release runs, asset SHA-256,
-  prerelease mark, independent verification date) as its reference release,
-  and `docs/internal/LAUNCH-CHECKLIST.md` checkbox states match the recorded
-  verdicts (met items checked; only the not-run matrix legs unchecked).
+- **Lifecycle-neutral capability matrix.** `docs/internal/SUPPORT-MATRIX.md`
+  now carries capabilities, evidence (test files + `docs/research/` paths),
+  and limitations only — no assertions about which release is newest or
+  forthcoming, no chronology of publication. Where a cited evaluation is
+  bound to an exact tree, the binding is cited from the evidence itself
+  (evaluations bound per-`tagSha`; see `docs/research/*/README.md`), not
+  from a status sentence.
+- **Expanded packaged-docs lifecycle ban.** `scripts/smoke-package.mjs`
+  (part of `npm run check`) now rejects nine case-insensitive
+  lifecycle-status phrase families in any file shipped in the tarball's
+  `docs/`: newest/forthcoming-release assertions, run identifiers,
+  tarball-attachment facts, and pending/unfinished publish states — so a
+  tarball cannot ship describing its own release as mid-flight.
+- **Chronology corrections in the historical notes.** The rc.3/rc.4/rc.5
+  release notes dated some evaluation runs and probes to 2026-09-10; the
+  verified chronology is that those runs executed 2026-09-09
+  (~01:41–01:46Z, before the rc.4 publish) and are recorded in
+  `docs/research/eval-2026-09-09b/`, and the pi re-probes of 13:54Z are
+  recorded in `docs/research/eval-2026-09-09c/`. All three notes are
+  corrected consistently on `main`.
+- **Evaluation-integrity tooling.** `verify-evidence` now enforces
+  candidate binding (records must bind to a tag/commit recorded in the
+  evidence directory), and handoff provenance records a
+  `handoffGeneratedBy` field.
+- **Docs-consistency test.** A suite test now cross-checks the internal
+  docs (counts and cross-references) so figures like the test totals
+  cannot silently drift.
+- **rc.5 publish facts recorded on `main`.** The Order 6 entry in
+  `docs/internal/LAUNCH-CHECKLIST.md` carries the rc.5 verification facts
+  (tag → commit, run IDs, tarball size and SHA-256, prerelease mark,
+  verification date) — deliberately on `main`, not in any packaged file.
+- **Packaging simplification.** Only the release note for this version
+  ships in the tarball; the historical rc.1–rc.5 notes stay in the
+  repository (corrected for chronology) but are no longer packaged.
 
 ## Release waiver
 
-Release waiver: v0.1.0-rc.5 ships as a developer preview under an explicit
+Release waiver: v0.1.0-rc.6 ships as a developer preview under an explicit
 waiver of the full continuation-matrix gate (Verdict B). The safety sub-gate
 (Verdict A) PASS is required and holds. The matrix legs OpenCode→Pi
 baseline/trials and Codex→Pi remain not-run pending a funded Pi provider;
@@ -89,24 +98,25 @@ productivity thesis is proven.
 - **Evaluation caveats (standing).** pi/opencode drivers are synthetic
   (real sessions are trivial to attach and remain a trivial step away);
   n=1 per successful leg; do not quote performance numbers beyond
-  `docs/research/eval-2026-09-09/` and `docs/research/eval-2026-09-09b/`.
+  `docs/research/eval-2026-09-09/`, `docs/research/eval-2026-09-09b/`, and
+  `docs/research/eval-2026-09-09c/`.
 - **Unverified matrix legs (Verdict B PARTIAL).** The OpenCode→Pi
   baseline and requested extra trials, and the entire Codex→Pi leg, are
   NOT RUN — the pi receiver is provider-unfunded (paid openrouter credits
   exhausted / contested 429 free-tier daily quota; probes recorded
   2026-09-09T13:54Z, `docs/research/eval-2026-09-09c/`). This is not a code
-  or harness problem: handoff artifacts
-  are ready and sha-pinned, and the legs can execute unchanged once a
-  funded pi model exists. See the release waiver above.
+  or harness problem: handoff artifacts are ready and sha-pinned, and the
+  legs can execute unchanged once a funded pi model exists. See the release
+  waiver above.
 
 ## Evaluation result (Order 5, two-verdict)
 
 **Verdict A — safety among completed runs: PASS** (2026-09-09: 7 runs, rc.2;
 2026-09-09 ~01:41–01:46Z: 2 runs, rc.3, `docs/research/eval-2026-09-09b/`):
-no false completion, no repeated finished edits, no
-out-of-scope edits across all completed receiver runs; every completion
-claim corroborated by diff + evaluator re-verification; all
-provider-failure attempts honestly recorded.
+no false completion, no repeated finished edits, no out-of-scope edits
+across all completed receiver runs; every completion claim corroborated by
+diff + evaluator re-verification; all provider-failure attempts honestly
+recorded.
 
 **Verdict B — full Order 5 matrix gate: PARTIAL/INCONCLUSIVE.** Met: the
 Pi→OpenCode pair (09-09, handoff+baseline), the OpenCode→Pi handoff
@@ -120,9 +130,10 @@ OpenCode→Pi baseline + extra trials and the whole Codex→Pi leg —
 provider-blocked (402 credits / 429 free tier; probes recorded
 2026-09-09T13:54Z, `docs/research/eval-2026-09-09c/`).
 Do not claim the matrix is met. Full verdicts, ledgers, and per-run
-provenance: `docs/research/eval-2026-09-09/` and
-`docs/research/eval-2026-09-09b/` (prior: `eval-2026-09-08/` receiver
-compatibility, `eval-2026-09-07/` initial gate).
+provenance: `docs/research/eval-2026-09-09/`,
+`docs/research/eval-2026-09-09b/`, and `docs/research/eval-2026-09-09c/`
+(prior: `eval-2026-09-08/` receiver compatibility, `eval-2026-09-07/`
+initial gate).
 
 ## Recovery instructions
 
@@ -134,9 +145,10 @@ is no undo. `handoffs/` artifacts are regenerable and excluded from backups.
 
 ## Install and verify
 
-Requires Node.js **22.23 or newer in the Node 22 release line** (CI runs
-22.23.0). The package stays `private: true` — it is **not published to npm**;
-distribution is via `npm pack` tarballs (and the GitHub Release asset from
+Requires Node.js **22.23 or newer in the Node 22 release line** (22.23.0 in
+this project's automated checks). The package stays `private: true` — it is
+**not published to npm**; distribution is via `npm pack` tarballs (and the
+tarball attached to the GitHub Release by
 `.github/workflows/release.yml`).
 
 ```sh
@@ -149,7 +161,7 @@ Verify (never point the walkthrough at your real `~/.harnie`):
 
 ```sh
 export HARNIE_HOME="$(mktemp -d)"
-harnie --version            # 0.1.0-rc.5
+harnie --version            # 0.1.0-rc.6
 harnie --help
 harnie init
 harnie init --bogus         # rejected: unknown flag
@@ -167,30 +179,31 @@ smoke test), enforced by `.github/workflows/ci.yml` and re-run by
 This file makes no claim about whether, when, or how any particular release
 was published. To verify a release of this version yourself:
 
-1. **Tag.** The tag `v0.1.0-rc.5` should exist on
+1. **Tag.** The tag `v0.1.0-rc.6` should exist on
    https://github.com/BoringInfraCo/Harnie and point at the commit the
    release was cut from. The Release workflow asserts that the pushed tag
-   equals `v` + the package version (`0.1.0-rc.5`) before creating a
+   equals `v` + the package version (`0.1.0-rc.6`) before creating a
    release, re-runs `npm run check` as a final gate, and passes
    `--verify-tag` to `gh release create` so the release cannot be created
    against a mismatched tag.
-2. **CI.** The automated checks for the tagged commit should be green: the
-   tag-triggered CI run (typecheck + tests + package smoke) and the Release
-   workflow run. Check the Actions tab for the runs associated with the tag.
-3. **Asset.** The GitHub Release for the tag should carry the tarball
-   `harnie-0.1.0-rc.5.tgz` and a `harnie-0.1.0-rc.5.tgz.sha256` sidecar
+2. **Checks.** The automated checks for the tagged commit should be green:
+   the tag-triggered continuous-integration run (typecheck + tests +
+   package smoke) and the Release workflow run. Check the Actions tab for
+   the runs associated with the tag.
+3. **Tarball.** The GitHub Release for the tag should carry the tarball
+   `harnie-0.1.0-rc.6.tgz` and a `harnie-0.1.0-rc.6.tgz.sha256` sidecar
    produced by the Release workflow. Download both, run
-   `shasum -a 256 harnie-0.1.0-rc.5.tgz` (or `sha256sum`), and compare with
+   `shasum -a 256 harnie-0.1.0-rc.6.tgz` (or `sha256sum`), and compare with
    the sidecar. A `-rc` tag's release should be marked as a prerelease
    (the workflow sets this automatically).
-4. **Install.** In an empty directory, install the downloaded asset (or a
-   locally packed tarball) with
-   `npm install --global ./harnie-0.1.0-rc.5.tgz`, then repeat the verify
+4. **Install.** In an empty directory, install the downloaded tarball (or a
+   locally packed one) with
+   `npm install --global ./harnie-0.1.0-rc.6.tgz`, then repeat the verify
    steps above with `HARNIE_HOME` pointed at a scratch directory:
-   `harnie --version` prints `harnie 0.1.0-rc.5`; `harnie init --bogus` and
+   `harnie --version` prints `harnie 0.1.0-rc.6`; `harnie init --bogus` and
    `harnie backup x.db --bogus` exit 1; fixture import + handoff work.
 
 For a given release, the publish-time facts observed during verification
-(tag → commit, CI/release run IDs, asset SHA-256) are recorded on `main` in
+(tag → commit, run IDs, tarball SHA-256) are recorded on `main` in
 `docs/internal/LAUNCH-CHECKLIST.md` (Order 6) — deliberately not in this
 packaged file, so nothing here goes stale at publish time.

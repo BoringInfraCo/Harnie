@@ -4,10 +4,11 @@ Date: 2026-09-08. Maps the audit's Orders 1–6
 (`docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md`, "Recommended launch
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
-on the `0.1.0-rc.5` tree on 2026-09-09 (typecheck clean, 63 test files /
-396 tests passed, package smoke passed on v22.23.0 including the
+on the `0.1.0-rc.6` tree on 2026-09-09 (typecheck clean, 63 test files /
+415 tests passed, package smoke passed on v22.23.0 including the expanded
 packaged-docs lifecycle check, strict-flag (help-mode parse-before-help)
-and `--version` repros); the suite-green
+and `--version` repros); for the current counts see the latest CI run —
+the suite-green
 caveats below describe the state at the time each order was closed,
 superseded by that run.
 
@@ -141,17 +142,34 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
    How to verify: `npm run check` (numbers above),
    `npm run test:package`, install-instructions walkthrough on a clean machine,
    release tag + published GitHub Release.
-- [ ] **Order 6 — `v0.1.0-rc.5` pending.** RC5 = RC4 + post-rc.4
-  packaging-integrity round: lifecycle-neutral release notes
-  (`docs/internal/RELEASE-0.1.0-rc.5.md` — packaged file asserts no
-  publication state and carries no publish-time facts, so no post-publish
-  rewrite is needed), packaged-docs smoke assertion
-  (`scripts/smoke-package.mjs` fails the package smoke if any packaged doc
-  asserts a publish-time state), release-workflow hardening (tag/version
-  assertion before release creation, `<tarball>.sha256` sidecar attached,
-  tarball attached in the single `gh release create` call),
-  SUPPORT-MATRIX/checklist chronology corrections, version bump to
-  `0.1.0-rc.5` (rc.4 release-note entry replaced in the packaged `files`).
+- [x] **Order 6 — `v0.1.0-rc.5` published 2026-09-09.** RC5 = RC4 + post-rc.4
+  packaging-integrity round (lifecycle-neutral release notes
+  `docs/internal/RELEASE-0.1.0-rc.5.md`, packaged-docs smoke assertion in
+  `scripts/smoke-package.mjs`, release-workflow hardening — tag/version
+  assertion, `<tarball>.sha256` sidecar, tarball attached in the single
+  `gh release create` call — and chronology/checklist corrections).
+  Tag `v0.1.0-rc.5` → commit
+  `6ac02e359b3b973c7fc4b4c603a6d2db38b665dc`; Release workflow green (run
+  34359422518); CI green on the tag (run 34359422359) and on main (run
+  34361335860); tarball `harnie-0.1.0-rc.5.tgz` 96,218 bytes, SHA-256
+  `c5808439ce0862344bc3577068294923fb23a9a72f87416a357774205e0af524`
+  (sidecar-validated by the re-auditor), `isPrerelease` true; verified
+  2026-09-09.
+   How to verify: `npm run check`, `npm run test:package`,
+   release tag + published GitHub Release.
+- [ ] **Order 6 — `v0.1.0-rc.6` pending.** RC6 = RC5 + post-rc.5
+  documentation-integrity round: lifecycle-neutral capability matrix
+  (`docs/internal/SUPPORT-MATRIX.md` — capabilities, evidence, limitations
+  only; no release-status or publication chronology; candidate binding
+  cited from the evidence's per-`tagSha` records), expanded packaged-docs
+  lifecycle ban in `scripts/smoke-package.mjs` (nine phrase families),
+  chronology corrections in the historical rc.3–rc.5 notes (runs dated
+  2026-09-09 ~01:41–01:46Z, pre-rc.4-publish, recorded in
+  `docs/research/eval-2026-09-09b/`; the pi re-probes of 13:54Z in
+  `docs/research/eval-2026-09-09c/`), verify-evidence candidate-binding
+  enforcement + `handoffGeneratedBy` provenance, docs-consistency test,
+  version bump to `0.1.0-rc.6` (historical release notes rc.1–rc.5 removed
+  from the packaged `files`; only the current rc.6 note ships).
   To record here after publishing (on `main`, not in the packaged file):
   tag → commit, CI/release run IDs, asset + sidecar SHA-256,
   `isPrerelease`, independent verification results.

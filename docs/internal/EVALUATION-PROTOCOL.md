@@ -62,7 +62,7 @@ Commands:
 | `collect --dir <condition dir>` | Re-collect git status/diff + handoff size into `result.json` (after a manual run). |
 | `record --dir <condition dir> --file <result.json>` | Validate a filled result against the schema and register it. |
 | `summarize --run <run-id>` | Side-by-side `summary.md`/`summary.json`, incl. the preview-gate line. |
-| `verify-evidence --dir <curated eval dir>` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt); chronology enforced (`recordedAt` within ±1h of the run manifest, ≤1h past the newest file mtime — hand-authored dates fail). Non-zero exit on any finding. |
+| `verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix]` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt); chronology enforced (`recordedAt` within ±1h of the run manifest, ≤1h past the newest file mtime — hand-authored dates fail); **exact candidate binding** enforced (below); **summary drift** detected (the committed `summary.json` of every run dir is compared against a harness regeneration and must match structurally; `--fix` rewrites `summary.{md,json}` from the committed records). Warnings are printed to stderr and never fail the check by themselves. Non-zero exit on any finding. |
 
 Key properties:
 
@@ -99,6 +99,8 @@ unit-tested). Versioning (2026-09-10 re-audit remediation):
 | `tagSha` | resolved 40-hex commit sha of the evaluated ref | optional | **required** |
 | `refName` | non-empty string (e.g. `v0.1.0-rc.3`) | optional | **required** |
 | `handoffArtifactSha` | 64-hex sha256 of the exact handoff file consumed, or `null` | optional | **required** |
+| `handoffGeneratedByRef` | ref name of the harness build that GENERATED the referenced handoff artifact (e.g. `v0.1.0-rc.2`), or `null` | — | optional |
+| `handoffGeneratedBySha` | 40-hex git commit sha of `handoffGeneratedByRef` (canonical; a 64-hex sha256 form of the generated artifact is also accepted), or `null` | — | optional |
 | `handoff` | `{ path, chars, sha256 }` — chars = **package size (chars)** | required | required |
 | `execution` | `{ invocation, exitCode, signal, timedOut, wallMs, stdoutLog, stderrLog }` | required | required |
 | `commandsRun` | array of `{ cmd, purpose }` (filled by the observer, not guessed) | required | required |
@@ -123,6 +125,61 @@ incomplete:
   artifact file and rejects a mismatch with the recorded hash.
 - `status: "not-run"` ⇒ `notRunReason` **non-empty** (why the leg did not
   run, e.g. provider-blocked with probe evidence).
+- `condition === "baseline"` ⇒ `handoffGeneratedByRef`/`handoffGeneratedBySha`
+  **null** (a baseline consumes no handoff artifact, so there is no generating
+  ref to name). A `handoff`-condition record may leave them `null` only when
+  the generating ref equals the evaluated candidate or is genuinely unknown.
+
+**Handoff-generation provenance (`handoffGeneratedByRef` /
+`handoffGeneratedBySha`, 2026-09-10 re-audit P2):** identifies **which ref
+GENERATED a handoff artifact** when that ref differs from the evaluated
+candidate — e.g. an artifact rendered by Harnie `v0.1.0-rc.2` and consumed by
+an `rc.5`-bound leg records `handoffGeneratedByRef: "v0.1.0-rc.2"` plus the
+rc.2 manifest's resolved `tagSha`. Fill both from the generating run's
+manifest (`refName` + `tagSha`); when the generating ref is genuinely
+unresolvable, set both explicitly to `null` and record the reason in `notes`.
+Validated whenever present: the ref must be a non-empty string and the sha a
+40-hex commit sha (64-hex sha256 also accepted); anything else is rejected.
+
+**Exact candidate binding (2026-09-10 re-audit P2, enforced by
+`verify-evidence`):** every result record must describe the candidate its run
+dir sits under — no half-bound provenance.
+
+- Per record: `tagSha`, `refName`, and `environment.ref` (when present) must
+  **EQUAL** the run manifest's (`run.json`) values. Any mismatch is an error.
+- Per run manifest: when `refName` is **immutable** (a tag name or a 40-hex
+  commit sha), `verify-evidence` re-resolves it in git
+  (`git rev-parse <refName>^{commit}`) against a repository — default: the
+  repo the harness lives in (equivalent to running with cwd = repo root);
+  override with `--repo <git dir>` (used by tests with a throwaway repo) —
+  and the peeled commit must equal `tagSha`; a disagreement is an error. A
+  40-hex `refName` must equal `tagSha` directly.
+- **Unresolvable or mutable refs** (missing tags, `HEAD`, branches, short
+  shas) must produce a **warning** on stderr — never a silent pass, never a
+  false failure. Warnings do not fail the check by themselves.
+- Additionally, the run's committed `summary.json` is regenerated from the
+  committed records via the harness's single summary-generation code path and
+  compared **structurally** with the committed file; any difference is a
+  **summary drift error** (`--fix` rewrites `summary.{md,json}` from the
+  committed records). This catches hand-edited records whose curated summary
+  was not regenerated, and stale summaries after record corrections.
+
+**Documentation consistency rules (2026-09-10 re-audit P2, enforced by
+`tests/eval-docs-consistency.test.ts`):**
+
+- No documentation file (`docs/internal/**/*.md`, `docs/research/**/*.md`,
+  `README.md`) may reference a corrected-away eval directory name (e.g. the
+  pre-rename future-dated name of the `eval-2026-09-09b` dir — cite the
+  corrected name, never the abandoned one); raw evidence files (logs, probes,
+  driver fixtures) are exempt — they are never rewritten and may quote machine
+  paths as content.
+- For every `docs/research/eval-*/README.md`, every run manifest's
+  `createdAt` **UTC date** must appear among the dates claimed in that
+  directory's README — a manifest describing a day the README does not claim
+  is a documentation/manifest disagreement (fails).
+- Every `docs/research/eval-*/runs/*/run.json` `createdAt` must not be in the
+  future relative to the newest file mtime in the same run dir (1h tolerance,
+  matching the chronology rule above) — future-dated manifests fail.
 - `status: "ran"` ⇒ `execution.invocation` non-empty array,
   `execution.stdoutLog`/`stderrLog` non-empty, `execution.wallMs` a number,
   and an exit code (number) or an honest kill marker (`timedOut: true` /

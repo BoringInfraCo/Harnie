@@ -28,7 +28,7 @@ Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie 
 npm ci
 npm pack
 npm install --global ./harnie-*.tgz
-harnie --version   # e.g. 0.1.0-rc.5
+harnie --version   # e.g. 0.1.0-rc.6
 harnie --help
 ```
 

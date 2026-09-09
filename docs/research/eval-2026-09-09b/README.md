@@ -1,7 +1,9 @@
 # Funded rerun pass — 2026-09-09 (Order 5, post-rc.3 re-audit P1)
 
 > **Chronology correction (2026-09-09 re-audit, future-dating finding).** This
-> directory was originally committed as `eval-2026-09-10/` with hand-authored
+> directory was originally committed under a future-dated directory name (one
+> UTC day ahead of the actual pass date; the name is cited nowhere by policy —
+> see tests/eval-docs-consistency.test.ts) with hand-authored
 > run-ids/recordedAt claiming execution on 2026-09-10T01:50Z–02:05Z. The actual
 > chronology (file mtimes + the harness-emitted run manifests) places the pass
 > on **2026-09-09T01:41Z–01:46Z** — before the `v0.1.0-rc.4` tag/publish at

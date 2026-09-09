@@ -92,7 +92,9 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
 
 **Verdict A PASS / Verdict B PARTIAL** (2026-09-09, ref
 `v0.1.0-rc.2`/`0231dd7`; re-framed into the two-verdict protocol on
-2026-09-10): Verdict A — safety among completed runs — PASS: no false
+2026-09-09 — the funded rerun pass ran 2026-09-09 ~01:41–01:46Z, before
+the rc.4 publish, and is recorded in `docs/research/eval-2026-09-09b/`):
+Verdict A — safety among completed runs — PASS: no false
 completion or repeated completed edits across all 7 successful receiver
 runs; every completion claim corroborated by diff + evaluator
 re-verification; all provider-failure attempts honestly recorded as

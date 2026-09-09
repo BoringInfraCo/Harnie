@@ -18,13 +18,25 @@ import { join, dirname, resolve, relative, basename } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
+// Exact candidate binding (2026-09-10 re-audit P2): verify-evidence re-resolves
+// a run manifest's refName against a git repository and compares the peeled
+// commit with the recorded tagSha. The repo defaults to the one this script
+// lives in (so "run with cwd = repo root" and "run from anywhere" behave the
+// same); --repo overrides it (used by tests with a throwaway repo).
+//   strict  — immutable refs: tag names and 40-hex commit shas. A resolution
+//             that disagrees with tagSha is an ERROR.
+//   warning — anything else (HEAD, branches, unresolvable names): the binding
+//             cannot be re-verified, and verify-evidence must say so loudly
+//             instead of passing silently.
 const EVAL_ROOT = process.env.HARNIE_EVAL_ROOT || join(tmpdir(), "opencode", "harnie-eval");
 // Schema versioning (2026-09-10 re-audit remediation):
 //   v1 — original results schema (archived 2026-09-07 / 2026-09-08 evidence);
 //        no directed-matrix provenance fields required.
 //   v2 — current generation; REQUIRES sourceHarness, targetHarness, tagSha,
-//        refName, handoffArtifactSha. `record` accepts both, so archived v1
-//        files stay validatable without rewriting history.
+//        refName, handoffArtifactSha; optional handoffGeneratedByRef /
+//        handoffGeneratedBySha record which ref GENERATED a handoff artifact
+//        when it differs from the evaluated candidate. `record` accepts both,
+//        so archived v1 files stay validatable without rewriting history.
 const RESULT_SCHEMA = "harnie-eval-result/v2";
 const RESULT_SCHEMA_V1 = "harnie-eval-result/v1";
 // Run manifest: v2 same shape as v1 except `repo` records the repo directory
@@ -171,6 +183,7 @@ function parseArgs(argv) {
     "timeout",
     "file",
     "dir",
+    "repo",
     "source-harness",
     "target-harness",
     "patch",
@@ -335,6 +348,12 @@ function emptyMetrics() {
 
 const isNonEmptyStr = (v) => typeof v === "string" && v.length > 0;
 const isHex64 = (v) => typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
+// handoffGeneratedBySha (2026-09-10 re-audit P2): canonically the 40-hex git
+// commit sha of the ref that GENERATED the handoff artifact; a 64-hex sha256
+// form (of the generated artifact bytes) is also accepted. Anything else —
+// including short shas and prefixed values — is rejected.
+const isHex40Or64 = (v) =>
+  typeof v === "string" && (/^[0-9a-f]{40}$/.test(v) || isHex64(v));
 const isFiniteNum = (v) => typeof v === "number" && Number.isFinite(v);
 
 // v2 nested-field spec (2026-09-10 re-audit): every field the schema documents
@@ -448,6 +467,20 @@ export function validateCoreResult(r, { requireProvenance, strict = false }) {
       errors.push("handoffArtifactSha must be a 64-hex sha256 or null");
     }
   }
+  // Optional handoff-generation provenance (2026-09-10 re-audit P2): identifies
+  // which ref GENERATED a handoff artifact when that ref differs from the
+  // evaluated candidate (e.g. an artifact rendered under rc.2 and consumed by
+  // an rc.5-bound leg). Validated whenever present, regardless of schema
+  // version; null/absent means the generating ref equals the candidate or is
+  // unknown. See EVALUATION-PROTOCOL.md §4.
+  if (r.handoffGeneratedByRef !== undefined && r.handoffGeneratedByRef !== null
+    && !isNonEmptyStr(r.handoffGeneratedByRef)) {
+    errors.push("handoffGeneratedByRef must be a non-empty string or null");
+  }
+  if (r.handoffGeneratedBySha !== undefined && r.handoffGeneratedBySha !== null
+    && !isHex40Or64(r.handoffGeneratedBySha)) {
+    errors.push("handoffGeneratedBySha must be a 40-hex commit sha, a 64-hex sha256, or null");
+  }
   if (strict) {
     // Condition invariants (2026-09-10 re-audit): the condition, the provenance
     // and the handoff block must agree — no contradictory or half-filled
@@ -463,6 +496,14 @@ export function validateCoreResult(r, { requireProvenance, strict = false }) {
         r.handoff?.path !== null || r.handoff?.chars !== null || r.handoff?.sha256 !== null
       ) {
         errors.push('condition "baseline" requires handoff.path, handoff.chars and handoff.sha256 all null');
+      }
+      // A baseline consumes no handoff artifact, so it cannot name a generating
+      // ref either (exact-candidate-binding remediation, 2026-09-10).
+      if (r.handoffGeneratedByRef !== undefined && r.handoffGeneratedByRef !== null) {
+        errors.push('condition "baseline" requires handoffGeneratedByRef null (no handoff artifact exists)');
+      }
+      if (r.handoffGeneratedBySha !== undefined && r.handoffGeneratedBySha !== null) {
+        errors.push('condition "baseline" requires handoffGeneratedBySha null (no handoff artifact exists)');
       }
     }
     if (r.condition === "handoff") {
@@ -1062,18 +1103,12 @@ function cmdRecord(parsed) {
   return 0;
 }
 
-function cmdSummarize(parsed) {
-  const runId = parsed.flags.run;
-  if (!runId) {
-    console.error("summarize requires --run <run-id>");
-    return 1;
-  }
-  const runDir = join(EVAL_ROOT, runId);
-  if (!existsSync(runDir)) {
-    console.error(`Run dir not found: ${runDir}`);
-    return 1;
-  }
-  const run = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+// Shared summary generation (2026-09-10 re-audit P2): the canonical summary is
+// built by ONE code path, used by `summarize` (to write it) and by
+// `verify-evidence` (to regenerate it from a curated run dir and compare with
+// the committed summary.json — summary drift = error). Exported so the test
+// fixtures build their committed summaries with the same code.
+function collectSummaryRows(runDir) {
   const rows = [];
   for (const task of TASKS) {
     for (const condition of CONDITIONS) {
@@ -1092,8 +1127,8 @@ function cmdSummarize(parsed) {
         model: r.environment?.model ?? null,
         sourceHarness: r.sourceHarness ?? null,
         targetHarness: r.targetHarness ?? r.environment?.agent ?? null,
-        tagSha: r.tagSha ?? run.tagSha ?? null,
-        refName: r.refName ?? run.refName ?? null,
+        tagSha: r.tagSha ?? run?.tagSha ?? null,
+        refName: r.refName ?? run?.refName ?? null,
         handoffArtifactSha: r.handoffArtifactSha ?? r.handoff?.sha256 ?? null,
         timedOut: r.execution?.timedOut ?? null,
         exitCode: r.execution?.exitCode ?? null,
@@ -1116,13 +1151,14 @@ function cmdSummarize(parsed) {
       });
     }
   }
-  const summary = { schema: "harnie-eval-summary/v1", runId, ref: run.ref, node: run.node, platform: run.platform, rows };
-  writeFileSync(join(runDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
+  return rows;
+}
 
+function renderSummaryMd(run, rows) {
   const md = [];
-  md.push(`# Continuation evaluation summary — run ${runId}`);
+  md.push(`# Continuation evaluation summary — run ${run.runId}`);
   md.push("");
-  md.push(`Ref: \`${run.refName}\` → \`${run.ref}\` · tagSha \`${run.tagSha}\` · Node: ${run.node} · Platform: ${run.platform} · Repo: ${run.repo}`);
+  md.push(`Ref: \`${run.refName ?? "unknown"}\` → \`${run.ref ?? "unknown"}\` · tagSha \`${run.tagSha ?? "unknown"}\` · Node: ${run.node ?? "unknown"} · Platform: ${run.platform ?? "unknown"} · Repo: ${run.repo ?? "unknown"}`);
   md.push("");
   md.push("| Task | Condition | Source→Target | Status | Agent | Model | tagSha | Handoff sha256 (first 12) | Exit | Files edited | Out-of-scope | Verification | Repeated finished edits | False completion | Completed | Handoff chars |");
   md.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
@@ -1160,8 +1196,38 @@ function cmdSummarize(parsed) {
     md.push(`- ${task.id}: ${failures.length ? `FAIL — ${failures.join("; ")}` : "no false completion / repeated finished edits evidenced (unknowns still need human review)"}`);
   }
   md.push("");
-  writeFileSync(join(runDir, "summary.md"), md.join("\n") + "\n");
-  console.log(md.join("\n"));
+  return md;
+}
+
+export function generateSummary(runDir, run) {
+  const rows = collectSummaryRows(runDir, run);
+  const data = {
+    schema: "harnie-eval-summary/v1",
+    runId: run.runId,
+    ref: run.ref,
+    node: run.node,
+    platform: run.platform,
+    rows,
+  };
+  return { data, md: renderSummaryMd(run, rows).join("\n") + "\n" };
+}
+
+function cmdSummarize(parsed) {
+  const runId = parsed.flags.run;
+  if (!runId) {
+    console.error("summarize requires --run <run-id>");
+    return 1;
+  }
+  const runDir = join(EVAL_ROOT, runId);
+  if (!existsSync(runDir)) {
+    console.error(`Run dir not found: ${runDir}`);
+    return 1;
+  }
+  const run = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+  const { data, md } = generateSummary(runDir, run);
+  writeFileSync(join(runDir, "summary.json"), JSON.stringify(data, null, 2) + "\n");
+  writeFileSync(join(runDir, "summary.md"), md);
+  console.log(md);
   return 0;
 }
 
@@ -1169,15 +1235,56 @@ function cmdSummarize(parsed) {
 // Verifies, per the 2026-09-10 re-audit: every referenced file exists; handoff
 // artifact hashes match; every result belongs to its run dir; every run dir
 // has run.json + summary.{md,json}; no machine-local absolute paths remain in
-// curated records. Raw receiver logs are evidence and are never rewritten, so
-// the machine-path check applies to the structured records only.
+// curated records; the EXACT CANDIDATE BINDING holds (record tagSha/refName/
+// environment.ref equal the run manifest's, and a tag/commit refName re-resolves
+// in git to the recorded tagSha); and the committed summary.json matches a
+// harness regeneration of the same run dir (summary drift = error; --fix
+// rewrites summary.{md,json} from the canonical generation). Raw receiver logs
+// are evidence and are never rewritten, so the machine-path check applies to
+// the structured records only.
+const stableStringify = (v) => {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(stableStringify).join(",")}]`;
+  const keys = Object.keys(v).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(v[k])}`).join(",")}}`;
+};
+
 function cmdVerifyEvidence(parsed) {
   const evalDir = parsed.flags.dir ? resolve(parsed.flags.dir) : null;
   if (!evalDir || !existsSync(join(evalDir, "runs"))) {
     console.error("verify-evidence requires --dir <curated eval dir> containing runs/");
     return 1;
   }
+  const fixMode = parsed.flags.fix === true;
+  const repoDir = parsed.flags.repo ? resolve(String(parsed.flags.repo)) : REPO_ROOT;
   const problems = [];
+  const warnings = [];
+  // Git re-resolution helpers for the exact-candidate-binding check. Both fail
+  // soft (return null) so a missing git binary or repo yields a WARNING, never
+  // a crash and never a silent pass.
+  const resolveGitCommit = (refName) => {
+    try {
+      return (
+        execFileSync(
+          "git",
+          ["-C", repoDir, "rev-parse", "--verify", "--quiet", `${refName}^{commit}`],
+          { encoding: "utf8" },
+        ).trim() || null
+      );
+    } catch {
+      return null;
+    }
+  };
+  const isTagRef = (refName) => {
+    try {
+      execFileSync("git", ["-C", repoDir, "rev-parse", "--verify", "--quiet", `refs/tags/${refName}`], {
+        encoding: "utf8",
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const hasLocalPath = (s) => typeof s === "string" && (s.includes("/Users/") || s.includes("/var/folders/"));
   // Chronology rules (2026-09-10 re-audit): the harness emits all timestamps
   // from the live clock at run time; hand-authored dates are rejected.
@@ -1241,6 +1348,40 @@ function cmdVerifyEvidence(parsed) {
         }
       }
     }
+    // Exact candidate binding — manifest vs git (2026-09-10 re-audit P2):
+    // re-resolve the manifest's refName in git and compare the peeled commit
+    // with the recorded tagSha. Only immutable refs (tag names, 40-hex shas)
+    // are strictly comparable; anything mutable/anonymous (HEAD, branches) or
+    // unresolvable yields a WARNING so the binding gap is never a silent pass.
+    if (run && typeof run.refName === "string" && run.refName
+      && typeof run.tagSha === "string" && /^[0-9a-f]{40}$/.test(run.tagSha)) {
+      if (/^[0-9a-f]{40}$/.test(run.refName)) {
+        if (run.refName !== run.tagSha) {
+          problems.push(
+            `${runId}/run.json: refName is a commit sha but differs from tagSha (exact candidate binding)`,
+          );
+        } else if (!resolveGitCommit(run.refName)) {
+          warnings.push(
+            `warning: ${runId}/run.json: refName commit ${run.refName.slice(0, 12)} is not present in ${repoDir} — candidate binding not re-verified against git`,
+          );
+        }
+      } else if (isTagRef(run.refName)) {
+        const resolved = resolveGitCommit(run.refName);
+        if (!resolved) {
+          warnings.push(
+            `warning: ${runId}/run.json: refName ${run.refName} could not be resolved in ${repoDir} — candidate binding not re-verified against git`,
+          );
+        } else if (resolved !== run.tagSha) {
+          problems.push(
+            `${runId}/run.json: refName ${run.refName} resolves to ${resolved.slice(0, 12)} but tagSha records ${run.tagSha.slice(0, 12)} (exact candidate binding mismatch)`,
+          );
+        }
+      } else {
+        warnings.push(
+          `warning: ${runId}/run.json: refName ${JSON.stringify(run.refName)} is a mutable/anonymous ref (not a tag or 40-hex commit sha) — candidate binding not re-verifiable against git`,
+        );
+      }
+    }
     // Chronology: the run manifest must not claim a time more than 1h after
     // the newest actual file write inside the run dir, and every record's
     // recordedAt must sit within [createdAt - 1h, createdAt + 1h] and not more
@@ -1298,9 +1439,27 @@ function cmdVerifyEvidence(parsed) {
         const v = validateResult(r);
         if (!v.ok) for (const err of v.errors) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${err}`);
         recordAtChecks(`${runId}/${taskEnt.name}/${condEnt.name}/result.json`, r);
-        if (r.runId !== runId) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: runId does not match run dir`);
-        if (r.taskId !== taskEnt.name) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: taskId does not match directory`);
-        if (r.condition !== condEnt.name) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: condition does not match directory`);
+        const rel = `${runId}/${taskEnt.name}/${condEnt.name}/result.json`;
+        if (r.runId !== runId) problems.push(`${rel}: runId does not match run dir`);
+        if (r.taskId !== taskEnt.name) problems.push(`${rel}: taskId does not match directory`);
+        if (r.condition !== condEnt.name) problems.push(`${rel}: condition does not match directory`);
+        // Exact candidate binding — record vs run manifest (2026-09-10
+        // re-audit P2): a record's tagSha, refName and environment.ref must
+        // EQUAL the run manifest's values; a mismatch means the record does
+        // not describe the candidate it claims to sit under.
+        if (run && typeof run.tagSha === "string" && run.tagSha
+          && typeof r.tagSha === "string" && r.tagSha && r.tagSha !== run.tagSha) {
+          problems.push(`${rel}: tagSha ${r.tagSha.slice(0, 12)} does not match the run manifest tagSha ${run.tagSha.slice(0, 12)} (exact candidate binding)`);
+        }
+        if (run && typeof run.refName === "string" && run.refName
+          && typeof r.refName === "string" && r.refName && r.refName !== run.refName) {
+          problems.push(`${rel}: refName ${JSON.stringify(r.refName)} does not match the run manifest refName ${JSON.stringify(run.refName)} (exact candidate binding)`);
+        }
+        if (run && typeof run.ref === "string" && run.ref
+          && typeof r.environment?.ref === "string" && r.environment.ref
+          && r.environment.ref !== run.ref) {
+          problems.push(`${rel}: environment.ref ${r.environment.ref.slice(0, 12)} does not match the run manifest ref ${run.ref.slice(0, 12)} (exact candidate binding)`);
+        }
         // Machine-path check is field-targeted: prompt text / notes may quote
         // the driver workspace or machine paths as CONTENT (e.g. a handoff
         // artifact rendered from a real driver session); those are raw
@@ -1355,16 +1514,59 @@ function cmdVerifyEvidence(parsed) {
         }
       }
     }
+    // Summary drift (2026-09-10 re-audit P2): regenerate the run's canonical
+    // summary via the harness's single summary-generation code path and compare
+    // with the committed summary.json (structural equality, key-order
+    // insensitive). Drift means the committed summary no longer describes the
+    // committed records. --fix rewrites summary.{md,json} from the regeneration.
+    const summaryJsonPath = join(runDir, "summary.json");
+    if (run && existsSync(summaryJsonPath)) {
+      let regenerated = null;
+      try {
+        regenerated = generateSummary(runDir, run);
+      } catch {
+        // An unreadable/invalid record was already reported above; drift cannot
+        // be computed without every record.
+      }
+      if (regenerated) {
+        let committed = null;
+        try {
+          committed = JSON.parse(readFileSync(summaryJsonPath, "utf8"));
+        } catch (e) {
+          problems.push(`${runId}/summary.json: invalid JSON (${e.message})`);
+        }
+        if (committed) {
+          if (stableStringify(committed) !== stableStringify(regenerated.data)) {
+            if (fixMode) {
+              writeFileSync(summaryJsonPath, JSON.stringify(regenerated.data, null, 2) + "\n");
+              writeFileSync(join(runDir, "summary.md"), regenerated.md);
+              warnings.push(
+                `warning: ${runId}/summary.json: summary drift FIXED — summary.json + summary.md regenerated from the committed records (--fix)`,
+              );
+            } else {
+              problems.push(
+                `${runId}/summary.json: summary drift — committed summary differs from the harness-regenerated canonical summary (rerun with --fix to regenerate)`,
+              );
+            }
+          }
+        }
+      }
+    }
   }
   for (const f of ["README.md", "summary.md"]) {
     if (!existsSync(join(evalDir, f))) problems.push(`missing ${f} at eval dir root`);
   }
+  for (const w of warnings) console.error(w);
   if (problems.length) {
     console.error(`verify-evidence: FAILED — ${problems.length} problem(s) in ${evalDir}`);
     for (const p of problems) console.error(`  - ${p}`);
+    if (warnings.length) console.error(`(${warnings.length} warning(s) also emitted above)`);
     return 1;
   }
-  console.log(`verify-evidence: OK — ${runIds.length} run dir(s), ${resultCount} result record(s) checked in ${evalDir}`);
+  console.log(
+    `verify-evidence: OK — ${runIds.length} run dir(s), ${resultCount} result record(s) checked in ${evalDir}` +
+      (warnings.length ? ` (${warnings.length} warning(s))` : ""),
+  );
   return 0;
 }
 
@@ -1414,7 +1616,7 @@ Commands:
       Validate a filled result JSON and register it.
   summarize --run <run-id>
       Side-by-side handoff vs baseline summary (summary.md/json).
-   verify-evidence --dir <curated eval dir>
+   verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix]
        Integrity check over a curated eval directory (e.g.
        docs/research/eval-2026-09-09): every referenced file exists relative to
        its result.json; handoff artifact sha256s match; every result belongs to
@@ -1425,8 +1627,18 @@ Commands:
        existence; chronology is enforced — recordedAt must sit within 1h of the
        run manifest createdAt and no more than 1h after the newest file mtime
        in the run dir (the harness emits all timestamps from the live clock;
-       hand-authored dates fail).
-`;
+       hand-authored dates fail). Exact candidate binding (2026-09-10 re-audit):
+       each record's tagSha, refName and environment.ref must EQUAL the run
+       manifest's values; a run manifest whose refName is a tag or 40-hex
+       commit sha is re-resolved via git rev-parse "<refName>^{commit}" in the
+       repo (default: the repo this script lives in; override with --repo) and
+       must match tagSha — unresolvable or mutable refs produce a WARNING, not
+       a silent pass. Summary drift: the committed summary.json of every run
+       dir is compared against a harness regeneration of the same run dir and
+       must match structurally — pass --fix to rewrite summary.{md,json} from
+       the committed records. Warnings are printed to stderr and never fail the
+       check by themselves.
+ `;
 
 function main(argv) {
   const parsed = parseArgs(argv);
