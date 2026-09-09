@@ -1,6 +1,6 @@
 {
   "name": "harnie",
-  "version": "0.1.0-rc.6",
+  "version": "0.1.0-rc.7",
   "private": true,
   "type": "module",
   "bin": {
@@ -28,7 +28,7 @@
     "docs/internal/BACKUP-RECOVERY.md",
     "docs/internal/MACHINE-CONTRACT.md",
     "docs/internal/SUPPORT-MATRIX.md",
-    "docs/internal/RELEASE-0.1.0-rc.6.md",
+    "docs/internal/RELEASE-0.1.0-rc.7.md",
     "tests/fixtures/pi/coding.jsonl"
   ],
   "engines": {

@@ -187,6 +187,7 @@ function parseArgs(argv) {
     "source-harness",
     "target-harness",
     "patch",
+    "attest",
   ]);
   const parsed = { _: [], flags: {}, multi: {} };
   for (let i = 0; i < argv.length; i++) {
@@ -355,6 +356,99 @@ const isHex64 = (v) => typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
 const isHex40Or64 = (v) =>
   typeof v === "string" && (/^[0-9a-f]{40}$/.test(v) || isHex64(v));
 const isFiniteNum = (v) => typeof v === "number" && Number.isFinite(v);
+const parseIsoMs = (s) => {
+  if (typeof s !== "string") return null;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : t;
+};
+// runId-embedded execution stamp (2026-09-10 re-audit P2, chronology): the
+// canonical run-id format is `eval-<YYYYMMDD>T<HHMM>[SS][-suffix]`, digits
+// interpreted as UTC (the harness default derives the id from
+// `new Date().toISOString()`; the curated dirs follow the same convention).
+// Returns the encoded stamp in epoch-ms, or null when the id does not encode
+// a calendar-valid UTC stamp (including hand-authored labels without one).
+const RUN_ID_STAMP_RE = /^eval-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(?:-.*)?$/;
+function runIdStampMs(runId) {
+  if (typeof runId !== "string") return null;
+  const m = RUN_ID_STAMP_RE.exec(runId);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const month = Number(mo), day = Number(d), hour = Number(h), minute = Number(mi), sec = Number(s ?? "0");
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || sec > 59) return null;
+  const ms = Date.UTC(Number(y), month - 1, day, hour, minute, sec);
+  // Round-trip rejects impossible calendar dates (e.g. Feb 30) that Date.UTC
+  // would silently roll over.
+  if (!new Date(ms).toISOString().startsWith(`${y}-${mo}-${d}T${h}:${mi}`)) return null;
+  return ms;
+}
+// Tolerances for the runId<->createdAt binding and the future-dating check
+// (2026-09-10 re-audit P2): a small skew allowance for clock/imprecision
+// between the id stamp and the manifest; anything beyond it in EITHER
+// direction is an inconsistent timestamp.
+const RUNID_TOL_MS = 10 * 60 * 1000;
+const FUTURE_TOL_MS = 10 * 60 * 1000;
+
+// Run-manifest validation (2026-09-10 re-audit P2): the v2 manifest is the
+// anchor of the exact-candidate-binding and chronology checks, so a manifest
+// missing or emptying any mandatory field would let a tampered record pass
+// by leaving nothing to compare against. Every mandatory field must be
+// PRESENT and NON-EMPTY: repo, ref, refName, tagSha (40-hex), createdAt
+// (ISO), node, platform, and a non-empty `tasks` array of registered task
+// ids. v2 additionally pins ref === tagSha (the resolved evaluated commit).
+// Chronology binding (same re-audit): the runId must encode the execution
+// timestamp (UTC) and agree with createdAt within +/-10 min — checked in
+// BOTH directions — and createdAt must not be in the future relative to the
+// verifier's live clock (future-dating at verification time is rejected).
+export function validateRunV2(run, { now = Date.now() } = {}) {
+  const errors = [];
+  if (!run || typeof run !== "object") return { ok: false, errors: ["run manifest is not an object"] };
+  if (run.schema !== RUN_SCHEMA) errors.push(`schema must be "${RUN_SCHEMA}"`);
+  for (const key of ["runId", "repo", "ref", "refName", "createdAt", "node", "platform"]) {
+    if (!isNonEmptyStr(run[key])) errors.push(`${key} must be a non-empty string`);
+  }
+  if (isNonEmptyStr(run.repo) && run.repo.startsWith("/")) {
+    errors.push("repo must not be an absolute path (v2 convention: repo name)");
+  }
+  if (!/^[0-9a-f]{40}$/.test(run.tagSha ?? "")) {
+    errors.push("tagSha must be a resolved 40-hex commit sha (required in v2)");
+  }
+  if (isNonEmptyStr(run.ref) && /^[0-9a-f]{40}$/.test(run.tagSha ?? "") && run.ref !== run.tagSha) {
+    errors.push("ref must equal tagSha (v2: the resolved evaluated commit)");
+  }
+  if (isNonEmptyStr(run.createdAt) && parseIsoMs(run.createdAt) === null) {
+    errors.push("createdAt must be an ISO timestamp");
+  }
+  if (!Array.isArray(run.tasks) || run.tasks.length === 0) {
+    errors.push("tasks must be a non-empty array of registered task ids");
+  } else {
+    run.tasks.forEach((t, i) => {
+      if (!isNonEmptyStr(t)) errors.push(`tasks[${i}] must be a non-empty string`);
+      else if (!TASKS.some((task) => task.id === t)) {
+        errors.push(`tasks[${i}] ${JSON.stringify(t)} is not a registered task id`);
+      }
+    });
+  }
+  const createdAtMs = parseIsoMs(run.createdAt);
+  if (createdAtMs !== null) {
+    if (createdAtMs > now + FUTURE_TOL_MS) {
+      errors.push(
+        `createdAt ${run.createdAt} is in the future relative to the verifier clock (future-dated manifest)`,
+      );
+    }
+    const stampMs = runIdStampMs(run.runId);
+    if (stampMs === null) {
+      errors.push(
+        `runId ${JSON.stringify(run.runId)} does not encode a UTC execution timestamp of the form eval-<YYYYMMDD>T<HHMM>[SS][-suffix] — chronology cannot be bound to the run id`,
+      );
+    } else if (Math.abs(stampMs - createdAtMs) > RUNID_TOL_MS) {
+      const direction = stampMs > createdAtMs ? "after" : "before";
+      errors.push(
+        `runId ${JSON.stringify(run.runId)} encodes a stamp more than 10 min ${direction} the manifest createdAt ${run.createdAt} (runId/createdAt binding)`,
+      );
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
 
 // v2 nested-field spec (2026-09-10 re-audit): every field the schema documents
 // must be present, with the documented type. `null` is allowed where the
@@ -368,7 +462,7 @@ const V2_NESTED_SPEC = {
     model: { type: "string" },
     node: { type: "string" },
     platform: { type: "string" },
-    ref: { type: "string" },
+    ref: { type: "string", required: true },
     clonePath: { type: "string" },
   },
   handoff: {
@@ -466,20 +560,33 @@ export function validateCoreResult(r, { requireProvenance, strict = false }) {
     if (r.handoffArtifactSha !== null && !isHex64(r.handoffArtifactSha ?? "")) {
       errors.push("handoffArtifactSha must be a 64-hex sha256 or null");
     }
+    // v2 records must bind environment.ref to the evaluated commit: required,
+    // non-null, and the 40-hex sha of the ref the receiver actually ran on
+    // (2026-09-10 re-audit P2 closure: a null environment.ref used to pass).
+    if (typeof r.environment?.ref !== "string" || !/^[0-9a-f]{40}$/.test(r.environment.ref)) {
+      errors.push("environment.ref must be a 40-hex commit sha (required and non-null in v2 records)");
+    }
   }
   // Optional handoff-generation provenance (2026-09-10 re-audit P2): identifies
   // which ref GENERATED a handoff artifact when that ref differs from the
   // evaluated candidate (e.g. an artifact rendered under rc.2 and consumed by
   // an rc.5-bound leg). Validated whenever present, regardless of schema
   // version; null/absent means the generating ref equals the candidate or is
-  // unknown. See EVALUATION-PROTOCOL.md §4.
-  if (r.handoffGeneratedByRef !== undefined && r.handoffGeneratedByRef !== null
-    && !isNonEmptyStr(r.handoffGeneratedByRef)) {
+  // unknown. See EVALUATION-PROTOCOL.md §4. The two fields are PAIRED: they
+  // must be both null/absent or both present — a half-filled provenance pair
+  // is rejected, not merely syntax-checked (2026-09-10 re-audit P2 closure).
+  const genRefSet = r.handoffGeneratedByRef !== undefined && r.handoffGeneratedByRef !== null;
+  const genShaSet = r.handoffGeneratedBySha !== undefined && r.handoffGeneratedBySha !== null;
+  if (genRefSet && !isNonEmptyStr(r.handoffGeneratedByRef)) {
     errors.push("handoffGeneratedByRef must be a non-empty string or null");
   }
-  if (r.handoffGeneratedBySha !== undefined && r.handoffGeneratedBySha !== null
-    && !isHex40Or64(r.handoffGeneratedBySha)) {
+  if (genShaSet && !isHex40Or64(r.handoffGeneratedBySha)) {
     errors.push("handoffGeneratedBySha must be a 40-hex commit sha, a 64-hex sha256, or null");
+  }
+  if (genRefSet !== genShaSet) {
+    errors.push(
+      "handoffGeneratedByRef and handoffGeneratedBySha must be paired (both null/absent or both present)",
+    );
   }
   if (strict) {
     // Condition invariants (2026-09-10 re-audit): the condition, the provenance
@@ -523,6 +630,24 @@ export function validateCoreResult(r, { requireProvenance, strict = false }) {
         errors.push('condition "handoff" requires handoff.sha256 (64-hex)');
       } else if (r.handoff.sha256 !== r.handoffArtifactSha) {
         errors.push("handoff.sha256 must equal handoffArtifactSha");
+      }
+    }
+    if (r.status === "ran" && r.condition === "handoff") {
+      // Release-qualifying run (2026-09-10 re-audit P2 closure): a completed
+      // handoff-conditioned leg must have consumed an artifact GENERATED BY
+      // THE SAME CANDIDATE — handoffGeneratedBySha must be present and equal
+      // the evaluated tagSha. Older artifacts are allowed only for
+      // non-qualifying records (status "not-run"/manual, baseline, or
+      // archived v1); those must carry their non-qualifying status explicitly
+      // (status/condition/schema already do) instead of inheriting a waiver.
+      if (r.handoffGeneratedBySha === undefined || r.handoffGeneratedBySha === null) {
+        errors.push(
+          'release-qualifying record (status "ran", condition "handoff") requires handoffGeneratedBySha === tagSha; older artifacts are allowed only for non-qualifying records',
+        );
+      } else if (r.handoffGeneratedBySha !== r.tagSha) {
+        errors.push(
+          'handoffGeneratedBySha must equal tagSha for a release-qualifying record (status "ran", condition "handoff"); older artifacts are allowed only for non-qualifying records',
+        );
       }
     }
     if (r.status === "ran") {
@@ -621,7 +746,7 @@ function applyDriverPatch(cloneDir, patchPath) {
   return { path: patchPath, sha256: sha256File(patchPath), committed: true };
 }
 
-function ensureRun({ repo, refInput, runId }) {
+function ensureRun({ repo, refInput, runId, attest }) {
   const runDir = join(EVAL_ROOT, runId);
   const runJsonPath = join(runDir, "run.json");
   if (existsSync(runJsonPath)) {
@@ -657,6 +782,22 @@ function ensureRun({ repo, refInput, runId }) {
     platform: process.platform,
     tasks: TASKS.map((t) => t.id),
   };
+  // Execution-time attestation (--attest, 2026-09-10 re-audit P2): when the
+  // operator passes --attest <string>, capture it — plus the GitHub Actions
+  // environment when present — into the manifest, ONCE at manifest-creation
+  // time. Self-recorded provenance, not a cryptographic attestation; see
+  // EVALUATION-PROTOCOL.md §4 for the narrowed guarantee.
+  if (attest) {
+    const attestation = {
+      source: process.env.GITHUB_RUN_ID ? "github-actions" : "provided",
+      attestation: String(attest),
+      capturedAt: new Date().toISOString(),
+    };
+    if (process.env.GITHUB_RUN_ID) attestation.githubRunId = process.env.GITHUB_RUN_ID;
+    if (process.env.GITHUB_REPOSITORY) attestation.githubRepository = process.env.GITHUB_REPOSITORY;
+    if (process.env.GITHUB_ACTOR) attestation.githubActor = process.env.GITHUB_ACTOR;
+    run.attestation = attestation;
+  }
   writeFileSync(runJsonPath, JSON.stringify(run, null, 2) + "\n");
   return { runDir, run };
 }
@@ -673,6 +814,10 @@ function resultTemplate({ task, condition, run, dirName, handoffPath, sourceHarn
     targetHarness: targetHarness ?? "human",
     tagSha: run.tagSha,
     refName: run.refName,
+    // Manual-mode skeleton is non-qualifying (status "manual"/"not-run"),
+    // so the generating provenance stays explicitly null (both fields paired).
+    handoffGeneratedByRef: null,
+    handoffGeneratedBySha: null,
     handoffArtifactSha: null,
     patch: null,
     recordedAt: null,
@@ -776,7 +921,7 @@ function cmdRun(parsed) {
     return 1;
   }
   const runId = parsed.flags.run || `eval-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-p${process.pid}`;
-  const { runDir, run } = ensureRun({ repo: REPO_ROOT, refInput: parsed.flags.ref, runId });
+  const { runDir, run } = ensureRun({ repo: REPO_ROOT, refInput: parsed.flags.ref, runId, attest: parsed.flags.attest });
   const conditions = parsed.flags.condition
     ? String(parsed.flags.condition).split(",")
     : CONDITIONS;
@@ -967,6 +1112,15 @@ function cmdRun(parsed) {
       targetHarness,
       tagSha: run.tagSha,
       refName: run.refName,
+      // Handoff-generation provenance (2026-09-10 re-audit P2 closure): a
+      // status "ran" handoff-conditioned record is release-qualifying and must
+      // pin the generating sha to the evaluated candidate. The harness records
+      // the run's own refName/tagSha (the operator's declared rendering ref);
+      // an artifact actually rendered by an older build cannot be registered
+      // as a ran+handoff record — the schema rejects the mismatch. A baseline
+      // consumes no artifact and carries the explicit null pair.
+      handoffGeneratedByRef: condition === "handoff" ? run.refName : null,
+      handoffGeneratedBySha: condition === "handoff" ? run.tagSha : null,
       handoffArtifactSha: evidence.handoff.sha256,
       patch: patchInfo,
       recordedAt: new Date().toISOString(),
@@ -1020,7 +1174,7 @@ function cmdPrepare(parsed) {
     return 1;
   }
   const runId = parsed.flags.run || `eval-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-p${process.pid}`;
-  const { runDir, run } = ensureRun({ repo: REPO_ROOT, refInput: parsed.flags.ref, runId });
+  const { runDir, run } = ensureRun({ repo: REPO_ROOT, refInput: parsed.flags.ref, runId, attest: parsed.flags.attest });
   const conditions = parsed.flags.condition ? String(parsed.flags.condition).split(",") : CONDITIONS;
   for (const condition of conditions) {
     const dir = join(runDir, task.id, condition);
@@ -1256,9 +1410,21 @@ function cmdVerifyEvidence(parsed) {
     return 1;
   }
   const fixMode = parsed.flags.fix === true;
+  // Archival mode (2026-09-10 re-audit remediation): explicit opt-in for the
+  // pre-manifest (v1-era) curated dirs (eval-2026-09-07 / eval-2026-09-08).
+  // Their records carry machine-local tmp paths and no run manifests — the
+  // conventions that postdate them are downgraded to LOUD WARNINGS here, while
+  // schema validation, file resolution, hash verification and the eval-root
+  // README/summary existence checks remain errors. Default (strict) mode is
+  // unchanged: anything v2 must pass everything.
+  const archivalMode = parsed.flags.archival === true;
   const repoDir = parsed.flags.repo ? resolve(String(parsed.flags.repo)) : REPO_ROOT;
   const problems = [];
   const warnings = [];
+  const problem = (msg, { archival = false } = {}) => {
+    if (archivalMode && archival) warnings.push(`warning (archival mode): ${msg}`);
+    else problems.push(msg);
+  };
   // Git re-resolution helpers for the exact-candidate-binding check. Both fail
   // soft (return null) so a missing git binary or repo yields a WARNING, never
   // a crash and never a silent pass.
@@ -1291,13 +1457,13 @@ function cmdVerifyEvidence(parsed) {
   // Tolerances: 1h skew allowance against the run manifest and the newest file
   // mtime inside the run dir (mtimes on a fresh checkout are checkout-time, so
   // only a recordedAt/createdAt claiming a time LONGER than 1h after every
-  // file's actual last write is a fabricated date).
+  // file's actual last write is a fabricated date). The runId<->createdAt
+  // binding (+/-10 min, both directions) and the live-clock future check live
+  // in validateRunV2; the manifest-level guarantee stays narrowed (see
+  // EVALUATION-PROTOCOL.md §4: inconsistent/future-dated timestamps are
+  // detected; historical execution time cannot be proven against coordinated
+  // backdating without an external attestation).
   const CHRONO_TOL_MS = 60 * 60 * 1000;
-  const parseIsoMs = (s) => {
-    if (typeof s !== "string") return null;
-    const t = Date.parse(s);
-    return Number.isNaN(t) ? null : t;
-  };
   const newestMtimeMs = (dir) => {
     let newest = 0;
     const walk = (d) => {
@@ -1321,13 +1487,14 @@ function cmdVerifyEvidence(parsed) {
     .map((d) => d.name)
     .sort();
   if (!runIds.length) problems.push("runs/ contains no run directories");
+  const manifestDates = [];
   let resultCount = 0;
   for (const runId of runIds) {
     const runDir = join(runsDir, runId);
     const runJsonPath = join(runDir, "run.json");
     let run = null;
     if (!existsSync(runJsonPath)) {
-      problems.push(`${runId}: missing run.json`);
+      problem(`${runId}: missing run.json`, { archival: true });
     } else {
       try {
         run = JSON.parse(readFileSync(runJsonPath, "utf8"));
@@ -1338,13 +1505,55 @@ function cmdVerifyEvidence(parsed) {
         if (![RUN_SCHEMA_V1, RUN_SCHEMA].includes(run.schema)) {
           problems.push(`${runId}/run.json: unexpected schema ${JSON.stringify(run.schema)}`);
         }
-        if (run.runId !== runId) problems.push(`${runId}/run.json: runId ${JSON.stringify(run.runId)} does not match directory`);
-        if (hasLocalPath(JSON.stringify(run))) problems.push(`${runId}/run.json: machine-local absolute path`);
-        if (typeof run.repo === "string" && run.repo.startsWith("/")) {
-          problems.push(`${runId}/run.json: repo must not be an absolute path (v2 convention: repo name)`);
+        if (run.runId !== runId) {
+          problem(`${runId}/run.json: runId ${JSON.stringify(run.runId)} does not match directory`, {
+            archival: true,
+          });
         }
-        if (run.schema === RUN_SCHEMA && !/^[0-9a-f]{40}$/.test(run.tagSha ?? "")) {
-          problems.push(`${runId}/run.json: tagSha missing or not a 40-hex sha (required in v2)`);
+        if (hasLocalPath(JSON.stringify(run))) {
+          problem(`${runId}/run.json: machine-local absolute path`, { archival: true });
+        }
+        if (run.schema === RUN_SCHEMA) {
+          // Mandatory manifest fields + runId/createdAt stamp binding +
+          // live-clock future check (2026-09-10 re-audit P2 closure).
+          const v = validateRunV2(run);
+          if (!v.ok) for (const err of v.errors) problems.push(`${runId}/run.json: ${err}`);
+          const createdMs = parseIsoMs(run.createdAt);
+          if (createdMs !== null) {
+            manifestDates.push({
+              runId,
+              date: new Date(createdMs).toISOString().slice(0, 10),
+            });
+          }
+        }
+        // Execution-time attestation (2026-09-10 re-audit P2, --attest): a
+        // manifest that records an attestation must carry the complete block,
+        // captured at manifest-creation time and consistent with the
+        // manifest's own createdAt within the chronology tolerance. The block
+        // is self-recorded (not a cryptographic attestation) — the protocol's
+        // guarantee stays narrowed accordingly.
+        if (run.attestation !== undefined) {
+          const a = run.attestation;
+          if (!a || typeof a !== "object" || Array.isArray(a)) {
+            problems.push(`${runId}/run.json: attestation must be an object`);
+          } else {
+            if (!isNonEmptyStr(a.source)) {
+              problems.push(`${runId}/run.json: attestation.source must be a non-empty string`);
+            }
+            if (!isNonEmptyStr(a.attestation)) {
+              problems.push(`${runId}/run.json: attestation.attestation must be a non-empty string`);
+            }
+            const capMs = parseIsoMs(a.capturedAt);
+            const createdMs = parseIsoMs(run.createdAt);
+            if (capMs === null) {
+              problems.push(`${runId}/run.json: attestation.capturedAt must be an ISO timestamp`);
+            } else if (createdMs !== null && Math.abs(capMs - createdMs) > RUNID_TOL_MS) {
+              problems.push(`${runId}/run.json: attestation.capturedAt ${a.capturedAt} is more than 10 min from the manifest createdAt (attestations are captured at execution time)`);
+            }
+            if (a.source === "github-actions" && !isNonEmptyStr(a.githubRunId)) {
+              problems.push(`${runId}/run.json: attestation.source "github-actions" requires attestation.githubRunId`);
+            }
+          }
         }
       }
     }
@@ -1416,7 +1625,7 @@ function cmdVerifyEvidence(parsed) {
       }
     };
     for (const f of ["summary.md", "summary.json"]) {
-      if (!existsSync(join(runDir, f))) problems.push(`${runId}: missing ${f}`);
+      if (!existsSync(join(runDir, f))) problem(`${runId}: missing ${f}`, { archival: true });
     }
     const taskDirs = readdirSync(runDir, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "harnie-home");
     for (const taskEnt of taskDirs) {
@@ -1440,7 +1649,7 @@ function cmdVerifyEvidence(parsed) {
         if (!v.ok) for (const err of v.errors) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${err}`);
         recordAtChecks(`${runId}/${taskEnt.name}/${condEnt.name}/result.json`, r);
         const rel = `${runId}/${taskEnt.name}/${condEnt.name}/result.json`;
-        if (r.runId !== runId) problems.push(`${rel}: runId does not match run dir`);
+        if (r.runId !== runId) problem(`${rel}: runId does not match run dir`, { archival: true });
         if (r.taskId !== taskEnt.name) problems.push(`${rel}: taskId does not match directory`);
         if (r.condition !== condEnt.name) problems.push(`${rel}: condition does not match directory`);
         // Exact candidate binding — record vs run manifest (2026-09-10
@@ -1455,10 +1664,63 @@ function cmdVerifyEvidence(parsed) {
           && typeof r.refName === "string" && r.refName && r.refName !== run.refName) {
           problems.push(`${rel}: refName ${JSON.stringify(r.refName)} does not match the run manifest refName ${JSON.stringify(run.refName)} (exact candidate binding)`);
         }
-        if (run && typeof run.ref === "string" && run.ref
-          && typeof r.environment?.ref === "string" && r.environment.ref
-          && r.environment.ref !== run.ref) {
-          problems.push(`${rel}: environment.ref ${r.environment.ref.slice(0, 12)} does not match the run manifest ref ${run.ref.slice(0, 12)} (exact candidate binding)`);
+        if (run && typeof run.ref === "string" && run.ref) {
+          const envRef = r.environment?.ref;
+          if (r.schema === RESULT_SCHEMA) {
+            // v2 records: environment.ref is REQUIRED, non-null, 40-hex, and
+            // must equal the manifest's resolved ref (2026-09-10 re-audit P2
+            // closure — `environment.ref: null` used to pass).
+            if (typeof envRef !== "string" || !/^[0-9a-f]{40}$/.test(envRef)) {
+              problems.push(`${rel}: environment.ref must be a 40-hex commit sha (required and non-null in v2 records)`);
+            } else if (envRef !== run.ref) {
+              problems.push(`${rel}: environment.ref ${envRef.slice(0, 12)} does not match the run manifest ref ${run.ref.slice(0, 12)} (exact candidate binding)`);
+            }
+          } else if (typeof envRef === "string" && envRef && envRef !== run.ref) {
+            // v1 archival: soft check (both present).
+            problems.push(`${rel}: environment.ref ${envRef.slice(0, 12)} does not match the run manifest ref ${run.ref.slice(0, 12)} (exact candidate binding)`);
+          }
+        }
+        // Handoff-generation provenance (2026-09-10 re-audit P2 closure): the
+        // pair must be complete (schema-level pairing above), the generating
+        // ref must RESOLVE in git to the recorded generating sha, and a
+        // release-qualifying record (status "ran" + condition "handoff") must
+        // pin the generating sha to the evaluated tagSha. Older artifacts are
+        // allowed only for non-qualifying records; an unresolvable generating
+        // ref is an ERROR for qualifying records and a WARNING otherwise
+        // (never a silent pass).
+        {
+          const genRefSet = r.handoffGeneratedByRef !== undefined && r.handoffGeneratedByRef !== null;
+          const genShaSet = r.handoffGeneratedBySha !== undefined && r.handoffGeneratedBySha !== null;
+          const qualifying = r.schema === RESULT_SCHEMA && r.status === "ran" && r.condition === "handoff";
+          if (genRefSet && genShaSet) {
+            const genRef = r.handoffGeneratedByRef;
+            const genSha = r.handoffGeneratedBySha;
+            if (qualifying && genSha !== r.tagSha) {
+              problems.push(`${rel}: handoffGeneratedBySha ${String(genSha).slice(0, 12)} does not equal the evaluated tagSha ${(r.tagSha ?? "").slice(0, 12)} — a release-qualifying run (status "ran", condition "handoff") must consume an artifact generated by the same candidate; older artifacts are allowed only for non-qualifying records`);
+            }
+            if (isHex40Or64(genSha) && isNonEmptyStr(genRef)) {
+              if (genSha.length === 64) {
+                warnings.push(
+                  `warning: ${rel}: handoffGeneratedBySha is the 64-hex sha256 form — handoffGeneratedByRef ${JSON.stringify(genRef)} cannot be re-resolved against git for it`,
+                );
+              } else {
+                const resolvedGen = resolveGitCommit(genRef);
+                if (!resolvedGen) {
+                  if (qualifying) {
+                    problems.push(`${rel}: handoffGeneratedByRef ${JSON.stringify(genRef)} could not be resolved in ${repoDir} (generating-ref resolution required for a release-qualifying record)`);
+                  } else {
+                    warnings.push(
+                      `warning: ${rel}: handoffGeneratedByRef ${JSON.stringify(genRef)} could not be resolved in ${repoDir} — generating-ref binding not re-verified against git`,
+                    );
+                  }
+                } else if (resolvedGen !== genSha) {
+                  problems.push(`${rel}: handoffGeneratedByRef ${JSON.stringify(genRef)} resolves to ${resolvedGen.slice(0, 12)} but handoffGeneratedBySha records ${genSha.slice(0, 12)} (generating-ref binding mismatch)`);
+                }
+              }
+            }
+          } else if (qualifying) {
+            problems.push(`${rel}: handoffGeneratedByRef/handoffGeneratedBySha missing — a release-qualifying run (status "ran", condition "handoff") requires handoffGeneratedBySha === tagSha; older artifacts are allowed only for non-qualifying records`);
+          }
         }
         // Machine-path check is field-targeted: prompt text / notes may quote
         // the driver workspace or machine paths as CONTENT (e.g. a handoff
@@ -1466,7 +1728,7 @@ function cmdVerifyEvidence(parsed) {
         // evidence. Record-owned path fields must be portable.
         for (const [k, v] of Object.entries(r.environment ?? {})) {
           if (hasLocalPath(v) || (typeof v === "string" && v.startsWith("/") && k !== "agentVersion")) {
-            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: environment.${k} is a machine-local path`);
+            problem(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: environment.${k} is a machine-local path`, { archival: true });
           }
         }
         for (const el of r.execution?.invocation ?? []) {
@@ -1474,7 +1736,7 @@ function cmdVerifyEvidence(parsed) {
           // a prompt-text element may legitimately quote machine paths as
           // content (e.g. handoff artifact text).
           if (typeof el === "string" && el.startsWith("/")) {
-            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: execution.invocation contains an absolute-path element`);
+            problem(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: execution.invocation contains an absolute-path element`, { archival: true });
             break;
           }
         }
@@ -1489,7 +1751,7 @@ function cmdVerifyEvidence(parsed) {
           if (!value || typeof value !== "string") continue;
           if (value.startsWith("disposable:")) continue; // intentionally tmp-only evidence
           if (value.startsWith("/")) {
-            problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${name} is an absolute path (${JSON.stringify(value)})`);
+            problem(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${name} is an absolute path (${JSON.stringify(value)})`, { archival: true });
             continue;
           }
           if (!existsSync(resolve(resultDir, value))) {
@@ -1517,9 +1779,14 @@ function cmdVerifyEvidence(parsed) {
     // Summary drift (2026-09-10 re-audit P2): regenerate the run's canonical
     // summary via the harness's single summary-generation code path and compare
     // with the committed summary.json (structural equality, key-order
-    // insensitive). Drift means the committed summary no longer describes the
-    // committed records. --fix rewrites summary.{md,json} from the regeneration.
+    // insensitive) AND the committed summary.md (byte equality). Drift in
+    // either output means the committed summary no longer describes the
+    // committed records — a hand-edited summary.md that still matches
+    // summary.json (e.g. an appended "FULL MATRIX PASS" line) is caught by the
+    // byte comparison (2026-09-10 re-audit P2 closure). --fix rewrites BOTH
+    // outputs from the canonical regeneration.
     const summaryJsonPath = join(runDir, "summary.json");
+    const summaryMdPath = join(runDir, "summary.md");
     if (run && existsSync(summaryJsonPath)) {
       let regenerated = null;
       try {
@@ -1535,19 +1802,30 @@ function cmdVerifyEvidence(parsed) {
         } catch (e) {
           problems.push(`${runId}/summary.json: invalid JSON (${e.message})`);
         }
+        let jsonDrift = false;
+        let mdDrift = false;
         if (committed) {
-          if (stableStringify(committed) !== stableStringify(regenerated.data)) {
-            if (fixMode) {
-              writeFileSync(summaryJsonPath, JSON.stringify(regenerated.data, null, 2) + "\n");
-              writeFileSync(join(runDir, "summary.md"), regenerated.md);
-              warnings.push(
-                `warning: ${runId}/summary.json: summary drift FIXED — summary.json + summary.md regenerated from the committed records (--fix)`,
-              );
-            } else {
-              problems.push(
-                `${runId}/summary.json: summary drift — committed summary differs from the harness-regenerated canonical summary (rerun with --fix to regenerate)`,
-              );
-            }
+          jsonDrift = stableStringify(committed) !== stableStringify(regenerated.data);
+        }
+        if (existsSync(summaryMdPath)) {
+          try {
+            mdDrift = !readFileSync(summaryMdPath).equals(Buffer.from(regenerated.md, "utf8"));
+          } catch (e) {
+            problems.push(`${runId}/summary.md: unreadable (${e.message})`);
+          }
+        }
+        if (jsonDrift || mdDrift) {
+          const which = [jsonDrift && "summary.json", mdDrift && "summary.md"].filter(Boolean).join(" + ");
+          if (fixMode) {
+            writeFileSync(summaryJsonPath, JSON.stringify(regenerated.data, null, 2) + "\n");
+            writeFileSync(summaryMdPath, regenerated.md);
+            warnings.push(
+              `warning: ${runId}: summary drift FIXED — ${which} regenerated from the committed records (--fix)`,
+            );
+          } else {
+            problems.push(
+              `${runId}: summary drift in ${which} — committed summary differs from the harness-regenerated canonical summary (rerun with --fix to regenerate)`,
+            );
           }
         }
       }
@@ -1555,6 +1833,20 @@ function cmdVerifyEvidence(parsed) {
   }
   for (const f of ["README.md", "summary.md"]) {
     if (!existsSync(join(evalDir, f))) problems.push(`missing ${f} at eval dir root`);
+  }
+  // README/manifest date agreement (2026-09-10 re-audit P2, now enforced here
+  // so verify-evidence alone carries what tests/eval-docs-consistency.test.ts
+  // checks): every run manifest's createdAt UTC date must be claimed somewhere
+  // in the eval dir's README.md — a manifest describing a day the README does
+  // not claim is a documentation/manifest disagreement.
+  const readmePath = join(evalDir, "README.md");
+  if (existsSync(readmePath) && manifestDates.length) {
+    const claimed = new Set(readFileSync(readmePath, "utf8").match(/20\d{2}-\d{2}-\d{2}/g) ?? []);
+    for (const { runId, date } of manifestDates) {
+      if (!claimed.has(date)) {
+        problems.push(`${runId}/run.json: createdAt date ${date} is not claimed anywhere in README.md (README/manifest date agreement)`);
+      }
+    }
   }
   for (const w of warnings) console.error(w);
   if (problems.length) {
@@ -1616,7 +1908,7 @@ Commands:
       Validate a filled result JSON and register it.
   summarize --run <run-id>
       Side-by-side handoff vs baseline summary (summary.md/json).
-   verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix]
+   verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix] [--archival]
        Integrity check over a curated eval directory (e.g.
        docs/research/eval-2026-09-09): every referenced file exists relative to
        its result.json; handoff artifact sha256s match; every result belongs to
@@ -1626,19 +1918,37 @@ Commands:
        references prefixed with disposable: are tmp-only and skipped for
        existence; chronology is enforced — recordedAt must sit within 1h of the
        run manifest createdAt and no more than 1h after the newest file mtime
-       in the run dir (the harness emits all timestamps from the live clock;
-       hand-authored dates fail). Exact candidate binding (2026-09-10 re-audit):
-       each record's tagSha, refName and environment.ref must EQUAL the run
-       manifest's values; a run manifest whose refName is a tag or 40-hex
-       commit sha is re-resolved via git rev-parse "<refName>^{commit}" in the
-       repo (default: the repo this script lives in; override with --repo) and
-       must match tagSha — unresolvable or mutable refs produce a WARNING, not
-       a silent pass. Summary drift: the committed summary.json of every run
+       in the run dir (the harness emits all timestamps from the live clock);
+       the v2 run manifest itself must be complete (validateRunV2: non-empty
+       repo, ref, refName, tagSha 40-hex, createdAt, node, platform, tasks) and
+       its runId must encode the execution timestamp (UTC, eval-<YYYYMMDD>T<HHMM>[SS])
+       agreeing with createdAt within +/-10 min in BOTH directions, while
+       createdAt must not be future-dated vs the verifier clock; each eval
+       README.md must claim every manifest's createdAt date. Exact candidate
+       binding (2026-09-10 re-audit): each record's tagSha, refName and
+       environment.ref (required, 40-hex in v2) must EQUAL the run manifest's
+       values; a run manifest whose refName is a tag or 40-hex commit sha is
+       re-resolved via git rev-parse "<refName>^{commit}" in the repo (default:
+       the repo this script lives in; override with --repo) and must match
+       tagSha — unresolvable or mutable refs produce a WARNING, not a silent
+       pass. Handoff-generated provenance (handoffGeneratedByRef/Sha) must be
+       PAIRED and the ref must resolve in git to the recorded sha; a
+       release-qualifying run (status "ran" + condition "handoff") requires
+       handoffGeneratedBySha === tagSha (older artifacts are allowed only for
+       non-qualifying records; unresolvable generating refs error there and
+       warn otherwise). Summary drift: the committed summary.json of every run
        dir is compared against a harness regeneration of the same run dir and
-       must match structurally — pass --fix to rewrite summary.{md,json} from
-       the committed records. Warnings are printed to stderr and never fail the
-       check by themselves.
- `;
+       must match structurally, and the committed summary.md must match the
+       regenerated Markdown BYTE FOR BYTE — pass --fix to rewrite BOTH outputs
+       from the committed records. run --attest <string> records an
+       execution-time attestation (GitHub Actions env when present) into the
+       manifest, which verify-evidence then requires to be present and
+       well-formed for that manifest. --archival (explicit opt-in) downgrades
+       the post-v1-era conventions (run manifests, per-run summaries,
+       machine-path convention, runId/createdAt binding) to loud warnings for
+       the archived 2026-09-07/09-08 dirs; default mode stays strict.
+       Warnings are printed to stderr and never fail the check by themselves.
+  `;
 
 function main(argv) {
   const parsed = parseArgs(argv);

@@ -12,6 +12,14 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "..");
 
+// The chronology guarantee is deliberately NARROW (2026-09-10 re-audit P2
+// closure): the verifier detects inconsistent or future-dated timestamps and
+// cannot prove historical execution time against coordinated backdating
+// without an external attestation. The protocol must carry exactly this
+// sentence — no broader guarantee.
+const NARROWED_CHRONOLOGY_CLAIM =
+  "detects inconsistent or future-dated timestamps; it cannot prove historical execution time against coordinated backdating without an external attestation";
+
 // (a) Scope: documentation files only. Raw evidence (logs, probes, driver
 // fixtures) is never rewritten and may quote machine paths that happen to
 // contain the old name — those are not docs.
@@ -35,6 +43,27 @@ const evalDirs = () =>
     .sort();
 
 describe("eval docs consistency", () => {
+  it("the protocol's chronology guarantee stays narrowed (no broader claim)", () => {
+    const protocol = readFileSync(join(ROOT, "docs/internal/EVALUATION-PROTOCOL.md"), "utf8");
+    // Whitespace-normalized: the doc may wrap the sentence, the claim itself
+    // must be verbatim.
+    const normalized = protocol.replace(/\s+/g, " ");
+    expect(
+      normalized.includes(NARROWED_CHRONOLOGY_CLAIM),
+      "EVALUATION-PROTOCOL.md must carry the exact narrowed chronology guarantee",
+    ).toBe(true);
+    const broad = normalized
+      .split(". ")
+      .filter((sentence) =>
+        /proves historical|cannot be backdated|guarantees historical/i.test(sentence),
+      )
+      .filter((sentence) => !sentence.includes("cannot prove historical execution time"));
+    expect(
+      broad,
+      `broader chronology guarantees found (the verifier cannot prove historical execution time against coordinated backdating): ${broad.join(" | ")}`,
+    ).toEqual([]);
+  });
+
   it("no doc references the corrected-away eval-2026-09-10 directory name", () => {
     const offenders: string[] = [];
     for (const file of [...DOC_ROOTS.flatMap((d) => listMdFiles(join(ROOT, d))), join(ROOT, "README.md")]) {

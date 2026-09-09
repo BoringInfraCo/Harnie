@@ -1,0 +1,87 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260908T2133-legB-r3",
+  "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "pi",
+      "model": "openrouter/moonshotai/kimi-k2.5",
+      "sourceHarness": null,
+      "targetHarness": "pi",
+      "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+      "refName": "v0.1.0-rc.2",
+      "handoffArtifactSha": null,
+      "timedOut": false,
+      "exitCode": 1,
+      "filesEdited": [],
+      "outOfScopeFiles": [],
+      "verificationPassed": false,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": false,
+      "packageSizeChars": null,
+      "notRunReason": null,
+      "notes": "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); no edits"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    }
+  ]
+}

@@ -54,6 +54,24 @@ invocation hit the 10-minute kill timeout (probes exit immediately). No
 pre-existing and sha-pinned; nothing needed rendering), so no Harnie home —
 temp or otherwise — was exercised; `~/.harnie` was never touched.
 
+### Re-probe (post-rc.6 re-audit P1 status check, 2026-09-09T21:33Z)
+
+A fifth independent probe pass — two cheap `pi -p` calls, **one per candidate
+model**, appended verbatim to the existing probe files with live-clock
+separators (never overwritten); no receiver legs run:
+
+| Probe (UTC 21:33Z) | Result | Evidence |
+| --- | --- | --- |
+| pi / `openrouter/moonshotai/kimi-k2.5` (paid) | **402 `openrouter_credits`** — shortfall now "You requested up to 4096 tokens, but can only afford 2549" (the balance still cannot fund the model's max_tokens; credits do not reset) | `probes/pi-kimi-k2.5-probe.{out,err}`, appended re-probe section |
+| pi / `openrouter/cohere/north-mini-code:free` (free tier) | **429 `openrouter_free_tier_daily`** — `X-RateLimit-Remaining: 0`, reset still 2026-09-10T00:00:00Z (the account-wide 50/day key resets within hours; expected still-blocked) | `probes/pi-free-probe.{out,err}`, appended re-probe section |
+
+**Status for the orchestrator: still BLOCKED — do not sequence full
+candidate-bound legs.** Both probes failed exactly as the 13:54Z and 15:35Z
+passes did (6th and 7th consecutive independent confirmations of the funding
+blocker; 2 live probe invocations, ~5s total wall, no receiver legs, no
+`harnie` command — nothing rendered, `~/.harnie` untouched). The four not-run
+records below carry this re-probe outcome in their `notes`.
+
 ## Per-leg table (all bound to the candidate)
 
 | Leg (source→target) | Task | Condition | tagSha (refName) | Status | Evidence / reason |
@@ -71,8 +89,8 @@ handoff-condition records additionally carry the optional
 post-rc.5 re-audit P2 remediation): both referenced artifacts were **rendered
 by Harnie `v0.1.0-rc.2`** (`0231dd77ce909d04fcb60692ae48a47df04c9b68`) during
 the eval-2026-09-09 pass — derived from the generating runs' manifests
-(`eval-20260909T1700-legB` for `handoff-opencode_pi-version-flag.md`,
-`eval-20260909T1700-legC1` for `handoff-codex_pi-sprint024.md`; the rc.3-era
+(`eval-20260908T2117-legB` for `handoff-opencode_pi-version-flag.md`,
+`eval-20260908T2139-legC1` for `handoff-codex_pi-sprint024.md`; the rc.3-era
 eval-2026-09-09b pass re-declared both sha-pinned artifacts without
 re-rendering) — and both differ from this run's evaluated candidate
 `v0.1.0-rc.5`. The baseline records carry explicit nulls (no handoff artifact,
@@ -155,8 +173,9 @@ same way as 2026-09-09) and changed no completed-run facts.
 ## Raw evidence map
 
 - `probes/` — the two availability probes (stdout + stderr preserved verbatim,
-  exit codes recorded above) **plus the 2026-09-09T15:35Z re-probe sections
-  appended verbatim with live-clock separators** (never overwritten).
+  exit codes recorded above), the 2026-09-09T15:35Z re-probe sections AND the
+  2026-09-09T21:33Z re-probe sections, all appended verbatim with live-clock
+  separators (never overwritten).
 - `runs/eval-20260909T1354-pi-blocked/` — `run.json` (`refName:
   "v0.1.0-rc.5"`, `tagSha 6ac02e3…`), four `status: "not-run"` result records
   (strict v2, registered via harness `record`, handoff-condition records now
@@ -169,13 +188,18 @@ same way as 2026-09-09) and changed no completed-run facts.
 
 Integrity: `node scripts/eval-continuation.mjs verify-evidence --dir
 docs/research/eval-2026-09-09c` → OK (1 run dir, 4 result records) under the
-STRICTER post-rc.5 re-audit rules (exact candidate binding incl. git
-re-resolution of the `v0.1.0-rc.5` tag; summary regeneration compared with the
-committed summary.json — one drift finding after the provenance edits, fixed
-via `--fix`); the same check passes on `eval-2026-09-09` (10 run dirs, 17
-records) and `eval-2026-09-09b` (2 run dirs, 6 records).
+STRICTER post-rc.6 re-audit rules (exact candidate binding incl. git
+re-resolution of the `v0.1.0-rc.5` tag; `validateRunV2` manifest validation
+with the runId↔createdAt stamp binding ±10 min; paired + git-resolved
+`handoffGeneratedBy` provenance with the release-qualifying tagSha pin;
+README/manifest date agreement; committed `summary.md` compared BYTE FOR BYTE
+with the harness regeneration — drift findings after each remediation edit
+were fixed via `--fix`); the same check passes on `eval-2026-09-09` (10 run
+dirs, 17 records) and `eval-2026-09-09b` (2 run dirs, 6 records), and the two
+archived v1-era dirs pass under explicit `--archival` (post-v1 conventions
+downgraded to loud warnings).
 `tests/eval-harness.test.ts` and `tests/eval-docs-consistency.test.ts` are
-green (35/35).
+green (47/47).
 
 ## Limitations
 

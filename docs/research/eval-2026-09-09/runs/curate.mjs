@@ -44,16 +44,16 @@ const edits = [];
 
 // ---- Leg A: Pi -> Harnie -> OpenCode (version-flag) ----
 edits.push({
-  dir: R("eval-20260909T1700-legA", "version-flag", "handoff"),
+  dir: R("eval-20260908T2106-legA", "version-flag", "handoff"),
   apply: (r) => {
     Object.assign(r, providerFail("openrouter/opencode-go provider error: 'message at position 5 with role assistant must not be empty' after 525.7s, no edits (agent-stderr.log)"));
     r.verification.details = "receiver died on an upstream provider error (empty assistant message) after reading src/cli.ts and package.json; made no edits; no completion claim";
     r.metrics.packageSizeChars = r.handoff?.chars ?? null;
-    r.notes = "attempt 1 of the legA handoff condition; retried as eval-20260909T1700-legA-r2";
+    r.notes = "attempt 1 of the legA handoff condition; retried as eval-20260908T2116-legA-r2";
   },
 });
 edits.push({
-  dir: R("eval-20260909T1700-legA-r2", "version-flag", "handoff"),
+  dir: R("eval-20260908T2116-legA-r2", "version-flag", "handoff"),
   apply: (r) => {
     r.metrics = {
       developerReExplanation: "not-needed", repeatedInvestigation: "none", repeatedFinishedEdits: "none",
@@ -71,11 +71,11 @@ edits.push({
       passed: true,
       details: "receiver reported pass; evaluator independently re-ran in the clone: build ok, `node dist/cli.js --version` prints 0.1.0-rc.2 exit 0, cli-init tests 7/7; diff = single --version branch reading package.json",
     };
-    r.notes = "retry of the legA handoff condition after the provider error in eval-20260909T1700-legA";
+    r.notes = "retry of the legA handoff condition after the provider error in eval-20260908T2106-legA";
   },
 });
 edits.push({
-  dir: R("eval-20260909T1700-legA", "version-flag", "baseline"),
+  dir: R("eval-20260908T2106-legA", "version-flag", "baseline"),
   apply: (r) => {
     r.metrics = {
       developerReExplanation: "not-needed", repeatedInvestigation: "none", repeatedFinishedEdits: "none",
@@ -98,7 +98,7 @@ edits.push({
 
 // ---- Leg B: OpenCode -> Harnie -> Pi (version-flag) ----
 edits.push({
-  dir: R("eval-20260909T1700-legB", "version-flag", "handoff"),
+  dir: R("eval-20260908T2117-legB", "version-flag", "handoff"),
   apply: (r) => {
     r.metrics = {
       developerReExplanation: "not-needed", repeatedInvestigation: "none", repeatedFinishedEdits: "none",
@@ -115,13 +115,13 @@ edits.push({
   },
 });
 for (const [runId, task, condition, note] of [
-  ["eval-20260909T1700-legB", "version-flag", "baseline", "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); partial edits before death: src/cli.ts + out-of-scope package-lock.json (recorded honestly)"],
-  ["eval-20260909T1700-legB-r2", "version-flag", "handoff", "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); partial edits: package-lock.json + src/cli.ts"],
-  ["eval-20260909T1700-legB-r3", "version-flag", "baseline", "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); no edits"],
-  ["eval-20260909T1700-legC1", "shebang-guard", "handoff", "openrouter 402 openrouter_credits: balance could not fund the model's max_tokens request (agent-stderr.log); no edits"],
-  ["eval-20260909T1700-legC1", "shebang-guard", "baseline", "openrouter 402 openrouter_credits: balance could not fund the model's max_tokens request (agent-stderr.log); no edits"],
-  ["eval-20260909T1700-legB-m2", "version-flag", "handoff", "provider finish_reason: error after 150.0s (agent-stderr.log); no edits"],
-  ["eval-20260909T1700-legB-m2", "version-flag", "baseline", "openrouter 429 free-models-per-day: daily free-tier limit (50) exhausted, resets 2026-09-09T20:00Z (agent-stderr.log); no edits"],
+  ["eval-20260908T2117-legB", "version-flag", "baseline", "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); partial edits before death: src/cli.ts + out-of-scope package-lock.json (recorded honestly)"],
+  ["eval-20260908T2128-legB-r2", "version-flag", "handoff", "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); partial edits: package-lock.json + src/cli.ts"],
+  ["eval-20260908T2133-legB-r3", "version-flag", "baseline", "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); no edits"],
+  ["eval-20260908T2139-legC1", "shebang-guard", "handoff", "openrouter 402 openrouter_credits: balance could not fund the model's max_tokens request (agent-stderr.log); no edits"],
+  ["eval-20260908T2139-legC1", "shebang-guard", "baseline", "openrouter 402 openrouter_credits: balance could not fund the model's max_tokens request (agent-stderr.log); no edits"],
+  ["eval-20260908T2140-legB-m2", "version-flag", "handoff", "provider finish_reason: error after 150.0s (agent-stderr.log); no edits"],
+  ["eval-20260908T2140-legB-m2", "version-flag", "baseline", "openrouter 429 free-models-per-day: daily free-tier limit (50) exhausted, resets 2026-09-09T20:00Z (agent-stderr.log); no edits"],
 ]) {
   edits.push({
     dir: R(runId, task, condition),
@@ -136,7 +136,7 @@ for (const [runId, task, condition, note] of [
 // ---- Leg C2: Codex -> Harnie -> OpenCode (help-regression-test) ----
 for (const cond of ["handoff", "baseline"]) {
   edits.push({
-    dir: R("eval-20260909T1700-legC2", "help-regression-test", cond),
+    dir: R("eval-20260908T2132-legC2", "help-regression-test", cond),
     apply: (r) => {
       r.metrics = {
         developerReExplanation: "not-needed", repeatedInvestigation: "none", repeatedFinishedEdits: "none",
@@ -162,7 +162,7 @@ for (const cond of ["handoff", "baseline"]) {
 // ---- Continuation leg: OpenCode -> Harnie -> Codex (greeting-command, 3-step) ----
 for (const cond of ["handoff", "baseline"]) {
   edits.push({
-    dir: R("eval-20260909T1700-cont", "greeting-command", cond),
+    dir: R("eval-20260909T0006-cont", "greeting-command", cond),
     apply: (r) => {
       r.metrics = {
         developerReExplanation: "not-needed", repeatedInvestigation: "none", repeatedFinishedEdits: "none",

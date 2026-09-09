@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -10,6 +10,7 @@ interface EvalMod {
   validateResult: (r: unknown) => { ok: boolean; errors: string[] };
   validateResultV1: (r: unknown) => { ok: boolean; errors: string[] };
   validateResultV2: (r: unknown) => { ok: boolean; errors: string[] };
+  validateRunV2: (run: unknown, opts?: { now?: number }) => { ok: boolean; errors: string[] };
   generateSummary: (runDir: string, run: unknown) => { data: unknown; md: string };
   buildPrompt: (
     task: { id: string; statement: string; details: string; verify: string[]; endState: string },
@@ -58,8 +59,13 @@ writeFileSync(
 const agentCommand = (mark: string) =>
   `node ${fakeAgentPath} --mark ${mark} --clone {clone} --prompt-file {prompt_file}`;
 
+// Run ids must embed the execution timestamp in the canonical
+// eval-<YYYYMMDD>T<HHMM>[-suffix] form (UTC) — verify-evidence binds the id
+// stamp to the manifest's createdAt within +/-10 min, so test ids follow the
+// same convention the harness generates (uniqueness via pid + counter).
 const uniqueRun = () => {
-  const id = `eval-test-${Date.now()}-${process.pid}-${cleanupDirs.length}`;
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13);
+  const id = `eval-${stamp}-t${process.pid}-${cleanupDirs.length}`;
   cleanupDirs.push(join(EVAL_BASE, id));
   return id;
 };
@@ -421,6 +427,11 @@ describe("eval harness — manual-run mode", () => {
       stdoutLog: "agent-stdout.log",
       stderrLog: "agent-stderr.log",
     };
+    // Release-qualifying (ran + handoff): pin the generating provenance to the
+    // evaluated candidate.
+    const runJson = JSON.parse(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8"));
+    good.handoffGeneratedByRef = runJson.refName;
+    good.handoffGeneratedBySha = runJson.tagSha;
     good.metrics.taskCompleted = true;
     good.metrics.falseCompletion = false;
     good.metrics.repeatedFinishedEdits = "none";
@@ -640,6 +651,10 @@ describe("eval harness — v2 invariants (condition, provenance, nested fields)"
           condition: "handoff",
           sourceHarness: "codex",
           handoffArtifactSha: "b".repeat(64),
+          // release-qualifying: the generating provenance must be pinned to
+          // the evaluated candidate (status "ran" + condition "handoff").
+          handoffGeneratedByRef: "v0.1.0-rc.3",
+          handoffGeneratedBySha: "a".repeat(40),
           handoff: { path: "../../driver/h.md", chars: 1907, sha256: "b".repeat(64) },
           metrics: {
             developerReExplanation: "unknown",
@@ -656,14 +671,20 @@ describe("eval harness — v2 invariants (condition, provenance, nested fields)"
     ).toBe(true);
   });
 
-  it("validates the optional handoffGeneratedBy provenance fields when present", () => {
-    // Canonical form: 40-hex git commit sha of the generating ref.
+  it("validates the paired handoffGeneratedBy provenance fields when present", () => {
+    // Canonical form: 40-hex git commit sha of the generating ref, equal to
+    // the evaluated tagSha for a release-qualifying record.
     const withGen = (o: Record<string, unknown>) => makeV2({ condition: "handoff", sourceHarness: "codex", handoffArtifactSha: "b".repeat(64), handoff: { path: "h.md", chars: 10, sha256: "b".repeat(64) }, ...o });
-    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(40) })).ok).toBe(true);
-    // 64-hex sha256 form is also accepted.
-    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(64) })).ok).toBe(true);
-    // Explicit nulls (generating ref equals the candidate / unknown) stay valid.
-    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: null, handoffGeneratedBySha: null })).ok).toBe(true);
+    expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "a".repeat(40) })).ok).toBe(true);
+    // Explicit nulls (generating ref equals the candidate / unknown) stay
+    // valid — but only for NON-qualifying records: a status "ran" + "handoff"
+    // record must pin the generating sha to tagSha (tested below).
+    const notQualifying = (o: Record<string, unknown>) =>
+      withGen({ status: "not-run", notRunReason: "provider unfunded (402)", ...o });
+    expect(mod.validateResultV2(notQualifying({ handoffGeneratedByRef: null, handoffGeneratedBySha: null })).ok).toBe(true);
+    // The 64-hex sha256 form is only valid for NON-qualifying records
+    // (status "ran" + "handoff" pins the generating sha to tagSha).
+    expect(mod.validateResultV2(notQualifying({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(64) })).ok).toBe(true);
     // Non-hex or short shas are rejected.
     const badSha = withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "nothex" });
     expect(mod.validateResultV2(badSha).ok).toBe(false);
@@ -672,10 +693,48 @@ describe("eval harness — v2 invariants (condition, provenance, nested fields)"
     expect(mod.validateResultV2(shortSha).ok).toBe(false);
     // Empty ref strings are rejected.
     expect(mod.validateResultV2(withGen({ handoffGeneratedByRef: "" })).ok).toBe(false);
+    // PAIRING (2026-09-10 re-audit P2 closure): a half-filled pair is rejected.
+    const refOnly = withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: null });
+    expect(mod.validateResultV2(refOnly).ok).toBe(false);
+    expect(mod.validateResultV2(refOnly).errors.join("\n")).toContain("must be paired");
+    const shaOnly = withGen({ handoffGeneratedByRef: null, handoffGeneratedBySha: "c".repeat(40) });
+    expect(mod.validateResultV2(shaOnly).ok).toBe(false);
+    expect(mod.validateResultV2(shaOnly).errors.join("\n")).toContain("must be paired");
+    // RELEASE-QUALIFYING RECORDS (status "ran" + condition "handoff") must pin
+    // the generating sha to the evaluated tagSha; older artifacts are allowed
+    // only for non-qualifying records.
+    const staleArtifact = withGen({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(40) });
+    expect(mod.validateResultV2(staleArtifact).ok).toBe(false);
+    expect(mod.validateResultV2(staleArtifact).errors.join("\n")).toContain("must equal tagSha");
+    const missingProvenance = withGen({});
+    expect(mod.validateResultV2(missingProvenance).ok).toBe(false);
+    expect(mod.validateResultV2(missingProvenance).errors.join("\n")).toContain("requires handoffGeneratedBySha === tagSha");
+    // The stale artifact IS registrable once the record is non-qualifying.
+    expect(
+      mod.validateResultV2(notQualifying({ handoff: { path: "h.md", chars: 10, sha256: "b".repeat(64) }, handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(40) })).ok,
+    ).toBe(true);
     // A baseline has no handoff artifact, so it cannot name a generating ref.
     const baselineGen = makeV2({ handoffGeneratedByRef: "v0.1.0-rc.2", handoffGeneratedBySha: "c".repeat(40) });
     expect(mod.validateResultV2(baselineGen).ok).toBe(false);
     expect(mod.validateResultV2(baselineGen).errors.join("\n")).toContain('condition "baseline" requires handoffGeneratedBySha null');
+  });
+
+  it("requires environment.ref to be a 40-hex commit sha in v2 records", () => {
+    // 2026-09-10 re-audit P2 closure: `environment.ref: null` used to pass.
+    const nullRef = makeV2({ environment: { ...makeV2().environment, ref: null } });
+    expect(mod.validateResultV2(nullRef).ok).toBe(false);
+    const errs = mod.validateResultV2(nullRef).errors.join("\n");
+    expect(errs).toContain("environment.ref must be a non-null string");
+    expect(errs).toContain("environment.ref must be a 40-hex commit sha");
+    // A missing environment.ref key fails too.
+    const missing = makeV2();
+    delete (missing.environment as Record<string, unknown>).ref;
+    expect(mod.validateResultV2(missing).ok).toBe(false);
+    expect(mod.validateResultV2(missing).errors.join("\n")).toContain("environment.ref must be present");
+    // A non-40-hex value fails.
+    const shortRef = makeV2({ environment: { ...makeV2().environment, ref: "0231dd7" } });
+    expect(mod.validateResultV2(shortRef).ok).toBe(false);
+    expect(mod.validateResultV2(shortRef).errors.join("\n")).toContain("must be a 40-hex commit sha");
   });
 
   it("rejects the OLD malformed baseline shape (non-null sourceHarness on baseline)", () => {
@@ -774,8 +833,9 @@ describe("eval harness — v2 invariants (condition, provenance, nested fields)"
 describe("eval harness — verify-evidence integrity check", () => {
   // Builds a curated eval-dir fixture from a real harness run (baseline +
   // handoff with a driver artifact), then returns its root path.
-  const makeFixture = (handoffFile: string) => {
-    const runId = uniqueRun();
+  // sourceRunId re-curates an EXISTING run (e.g. one --attest'd earlier).
+  const makeFixture = (handoffFile: string, sourceRunId?: string) => {
+    const runId = sourceRunId ?? uniqueRun();
     const res = runHarness([
       "run",
       "--task",
@@ -814,21 +874,33 @@ describe("eval harness — verify-evidence integrity check", () => {
     // Move the handoff artifact into the fixture's driver/ dir and re-point
     // the record at it with a fixture-relative path (the recorded relative
     // path resolves against the original EVAL_ROOT, not the fixture).
+    const runJson = JSON.parse(readFileSync(join(runsDir, "run.json"), "utf8"));
     const driverCopy = join(fixtureRoot, "driver", "fake-handoff-ve.md");
     cpSync(handoffFile, driverCopy);
     const handoffResultPath = join(runsDir, "version-flag", "handoff", "result.json");
     const handoffResult = JSON.parse(readFileSync(handoffResultPath, "utf8"));
     handoffResult.handoff.path = relative(join(runsDir, "version-flag", "handoff"), driverCopy);
+    // Release-qualifying provenance (2026-09-10 re-audit P2 closure): a
+    // status:"ran" + condition:"handoff" record must pin handoffGeneratedBySha
+    // to the evaluated tagSha; the fixture declares the candidate as the
+    // generating ref (its 40-hex sha is resolvable in any repo holding it).
+    handoffResult.handoffGeneratedByRef = runJson.tagSha;
+    handoffResult.handoffGeneratedBySha = runJson.tagSha;
+    handoffResult.notes = `${handoffResult.notes ? `${handoffResult.notes} ` : ""}handoffGeneratedBy provenance (fixture): the artifact is declared as generated by the evaluated candidate (${runJson.refName} / ${runJson.tagSha.slice(0, 12)}).`;
     writeFileSync(handoffResultPath, JSON.stringify(handoffResult, null, 2) + "\n");
-    writeFileSync(join(runsDir, "summary.md"), "# fixture summary\n");
-    writeFileSync(join(runsDir, "summary.json"), JSON.stringify({ rows: [] }));
     // The committed per-run summary must be the canonical regeneration (the
     // drift check compares it against one); build it with the shared code path.
-    const runJson = JSON.parse(readFileSync(join(runsDir, "run.json"), "utf8"));
     const { data, md } = mod.generateSummary(runsDir, runJson);
     writeFileSync(join(runsDir, "summary.md"), md);
     writeFileSync(join(runsDir, "summary.json"), JSON.stringify(data, null, 2) + "\n");
-    writeFileSync(join(fixtureRoot, "README.md"), "# fixture eval\n");
+    // The eval-root README must claim every manifest's createdAt UTC date
+    // (README/manifest date agreement is enforced by verify-evidence). Claim
+    // both the manifest date and today so the fixture cannot straddle a UTC
+    // midnight boundary flakily.
+    const createdDate = new Date(Date.parse(runJson.createdAt)).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    const dates = [...new Set([createdDate, today])].sort().join(" and ");
+    writeFileSync(join(fixtureRoot, "README.md"), `# fixture eval\n\nExecuted ${dates}; run manifest createdAt ${createdDate}.\n`);
     writeFileSync(join(fixtureRoot, "summary.md"), "# fixture eval summary\n");
     return fixtureRoot;
   };
@@ -961,7 +1033,9 @@ describe("eval harness — verify-evidence integrity check", () => {
 
   // Exact candidate binding (2026-09-10 re-audit P2): the git re-resolution
   // tests run against a throwaway repo (never the working repo) passed via
-  // --repo, so the check is hermetic and deterministic.
+  // --repo, so the check is hermetic and deterministic. The repo has an OLDER
+  // commit/tag and a CANDIDATE commit/tag: an artifact "generated" by the
+  // older build is valid provenance only for non-qualifying records.
   const makeHermeticRepo = () => {
     const repoDir = join(scratch, `binding-repo-${cleanupDirs.length}`);
     execFileSync("git", ["init", "-q", repoDir]);
@@ -969,17 +1043,18 @@ describe("eval harness — verify-evidence integrity check", () => {
       execFileSync("git", ["-C", repoDir, "-c", "user.name=t", "-c", "user.email=t@example.test", ...args], {
         encoding: "utf8",
       });
+    writeFileSync(join(repoDir, "f.txt"), "older commit\n");
+    g(["add", "-A"]);
+    g(["commit", "-q", "-m", "older"]);
+    const shaOld = g(["rev-parse", "HEAD"]).trim();
     writeFileSync(join(repoDir, "f.txt"), "candidate commit\n");
     g(["add", "-A"]);
     g(["commit", "-q", "-m", "candidate"]);
-    const shaTagged = g(["rev-parse", "HEAD"]).trim();
-    writeFileSync(join(repoDir, "f.txt"), "other commit\n");
-    g(["add", "-A"]);
-    g(["commit", "-q", "-m", "other"]);
-    const shaOther = g(["rev-parse", "HEAD"]).trim();
-    // tag the CANDIDATE commit (the first one), not HEAD
-    g(["tag", "candidate", shaTagged]);
-    return { repoDir, shaTagged, shaOther };
+    const shaCand = g(["rev-parse", "HEAD"]).trim();
+    // tag the OLDER commit and the CANDIDATE commit (not HEAD)
+    g(["tag", "older", shaOld]);
+    g(["tag", "candidate", shaCand]);
+    return { repoDir, shaOld, shaCand };
   };
 
   const rebind = (runDir: string, refName: string, tagSha: string) => {
@@ -995,6 +1070,11 @@ describe("eval harness — verify-evidence integrity check", () => {
       rec.refName = refName;
       rec.tagSha = tagSha;
       rec.environment.ref = tagSha;
+      // keep the release-qualifying provenance pinned to the rebound candidate
+      if (cond === "handoff") {
+        rec.handoffGeneratedByRef = tagSha;
+        rec.handoffGeneratedBySha = tagSha;
+      }
       writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
     }
     // keep the committed summary consistent with the rebound records
@@ -1004,33 +1084,146 @@ describe("eval harness — verify-evidence integrity check", () => {
   };
 
   it("re-resolves a tag refName in git and rejects a tagSha binding mismatch (--repo)", () => {
-    const { repoDir, shaTagged, shaOther } = makeHermeticRepo();
+    const { repoDir, shaCand, shaOld } = makeHermeticRepo();
     const fixture = makeFixture(handoffSource);
     const runDir = soleRunDir(fixture);
-    rebind(runDir, "candidate", shaOther);
+    rebind(runDir, "candidate", shaOld);
     const res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
     expect(res.code).not.toBe(0);
     expect(res.stderr).toContain("exact candidate binding mismatch");
     expect(res.stderr).toContain("candidate");
-    expect(shaTagged).toMatch(/^[0-9a-f]{40}$/);
+    expect(shaCand).toMatch(/^[0-9a-f]{40}$/);
   }, 30000);
 
   it("accepts a consistent tag binding (--repo) and warns on an unresolvable ref instead of passing silently", () => {
-    const { repoDir, shaTagged } = makeHermeticRepo();
+    const { repoDir, shaCand } = makeHermeticRepo();
     const fixture = makeFixture(handoffSource);
-    rebind(soleRunDir(fixture), "candidate", shaTagged);
+    rebind(soleRunDir(fixture), "candidate", shaCand);
     const ok = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
     expect(ok.code).toBe(0);
     expect(ok.stdout).toContain("verify-evidence: OK");
 
     const warnFixture = makeFixture(handoffSource);
-    rebind(soleRunDir(warnFixture), "no-such-tag-anywhere", shaTagged);
+    rebind(soleRunDir(warnFixture), "no-such-tag-anywhere", shaCand);
     const warned = runHarness(["verify-evidence", "--dir", warnFixture, "--repo", repoDir]);
     expect(warned.code).toBe(0);
     expect(warned.stdout).toContain("verify-evidence: OK");
     expect(warned.stderr).toContain("warning");
     expect(warned.stderr).toContain("no-such-tag-anywhere");
     expect(warned.stderr).toContain("not re-verifiable against git");
+  }, 30000);
+
+  it("requires handoffGeneratedBy to be paired and the generating ref to resolve to the recorded sha (audit repro: unrelated valid-looking sha)", () => {
+    const { repoDir, shaCand, shaOld } = makeHermeticRepo();
+    // (1) EXACT audit repro: handoffGeneratedBySha replaced with an unrelated
+    // but valid-looking 40-hex sha -> git resolution mismatch + (qualifying)
+    // tagSha inequality, both errors.
+    let fixture = makeFixture(handoffSource);
+    let runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    let rp = join(runDir, "version-flag", "handoff", "result.json");
+    let rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.handoffGeneratedBySha = shaOld;
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    let res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("generating-ref binding mismatch");
+    expect(res.stderr).toContain("does not equal the evaluated tagSha");
+
+    // (2) half-filled pair: ref present, sha null
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    rp = join(runDir, "version-flag", "handoff", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.handoffGeneratedBySha = null;
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("must be paired");
+    // ... and sha present, ref null
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    rp = join(runDir, "version-flag", "handoff", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.handoffGeneratedByRef = null;
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("must be paired");
+
+    // (3) missing provenance on a release-qualifying record is an error too
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    rp = join(runDir, "version-flag", "handoff", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    delete rec.handoffGeneratedByRef;
+    delete rec.handoffGeneratedBySha;
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("requires handoffGeneratedBySha === tagSha");
+
+    // (4) a fully consistent generating binding passes
+    fixture = makeFixture(handoffSource);
+    rebind(soleRunDir(fixture), "candidate", shaCand);
+    const ok = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(ok.code).toBe(0);
+    expect(ok.stdout).toContain("verify-evidence: OK");
+  }, 30000);
+
+  it("errors on an unresolvable generating ref for a qualifying record; a non-qualifying record with an older artifact passes", () => {
+    const { repoDir, shaCand, shaOld } = makeHermeticRepo();
+    // release-qualifying (status "ran" + condition "handoff"): unresolvable
+    // generating ref = ERROR
+    let fixture = makeFixture(handoffSource);
+    let runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    let rp = join(runDir, "version-flag", "handoff", "result.json");
+    let rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.handoffGeneratedByRef = "no-such-ref-anywhere";
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    let res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("generating-ref resolution required for a release-qualifying record");
+
+    // non-qualifying (status "not-run"): older artifact generated by an older
+    // ref is allowed, with the generating ref RESOLVING to the recorded sha
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    rp = join(runDir, "version-flag", "handoff", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.status = "not-run";
+    rec.notRunReason = "pi receiver provider unfunded (402); artifact ready for the funded rerun";
+    rec.execution = { invocation: null, exitCode: null, signal: null, timedOut: null, wallMs: null, stdoutLog: null, stderrLog: null };
+    rec.handoffGeneratedByRef = "older";
+    rec.handoffGeneratedBySha = shaOld;
+    rec.notes = "non-qualifying record (not-run): consumes an artifact generated by the older ref";
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    // the record changed — regenerate the committed summary with the shared path
+    const runJsonAfter = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+    const { data: dataAfter, md: mdAfter } = mod.generateSummary(runDir, runJsonAfter);
+    writeFileSync(join(runDir, "summary.json"), JSON.stringify(dataAfter, null, 2) + "\n");
+    writeFileSync(join(runDir, "summary.md"), mdAfter);
+    res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain("verify-evidence: OK");
+
+    // the same stale provenance on a QUALIFYING record stays an error
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rebind(runDir, "candidate", shaCand);
+    rp = join(runDir, "version-flag", "handoff", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.handoffGeneratedByRef = "older";
+    rec.handoffGeneratedBySha = shaOld;
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    res = runHarness(["verify-evidence", "--dir", fixture, "--repo", repoDir]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("does not equal the evaluated tagSha");
   }, 30000);
 
   it("rejects a record whose tagSha / refName / environment.ref do not match the run manifest", () => {
@@ -1094,9 +1287,229 @@ describe("eval harness — verify-evidence integrity check", () => {
     expect(after.code).toBe(0);
     expect(after.stdout).toContain("verify-evidence: OK");
   }, 30000);
+
+  it("detects a tampered summary.md by byte comparison and --fix repairs BOTH outputs (audit repro)", () => {
+    // EXACT audit repro: append "FULL MATRIX PASS (tampered)" to summary.md —
+    // summary.json still matches, so only the byte comparison catches it.
+    let fixture = makeFixture(handoffSource);
+    let runDir = soleRunDir(fixture);
+    appendFileSync(join(runDir, "summary.md"), "\nFULL MATRIX PASS (tampered)\n");
+    let res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("summary drift in summary.md");
+
+    // --fix repairs BOTH outputs from the canonical regeneration
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    appendFileSync(join(runDir, "summary.md"), "\nFULL MATRIX PASS (tampered)\n");
+    res = runHarness(["verify-evidence", "--dir", fixture, "--fix"]);
+    expect(res.code).toBe(0);
+    expect(res.stderr).toContain("summary drift FIXED");
+    const runJson = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+    const { data, md } = mod.generateSummary(runDir, runJson);
+    expect(readFileSync(join(runDir, "summary.md"), "utf8")).toBe(md);
+    expect(JSON.parse(readFileSync(join(runDir, "summary.json"), "utf8"))).toEqual(data);
+    expect(readFileSync(join(runDir, "summary.md"), "utf8")).not.toContain("FULL MATRIX PASS (tampered)");
+    const after = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(after.code).toBe(0);
+    expect(after.stdout).toContain("verify-evidence: OK");
+  }, 30000);
+
+  it("rejects the EXACT audit repro: run.json.refName removed (missing mandatory manifest field)", () => {
+    const fixture = makeFixture(handoffSource);
+    const rjp = join(soleRunDir(fixture), "run.json");
+    const runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    delete runJson.refName;
+    writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("refName must be a non-empty string");
+  }, 30000);
+
+  it("validates the v2 run manifest: empty mandatory fields, bad tagSha, bad tasks, ref/tagSha drift fail", () => {
+    const valid = {
+      schema: "harnie-eval-run/v2",
+      runId: "eval-20260908T2106-leg",
+      repo: "Harnie",
+      ref: "a".repeat(40),
+      refName: "v0.1.0-rc.2",
+      tagSha: "a".repeat(40),
+      createdAt: "2026-09-08T21:06:05.755Z",
+      node: "v22.23.0",
+      platform: "darwin",
+      tasks: ["version-flag"],
+    };
+    expect(mod.validateRunV2(valid).ok).toBe(true);
+    // non-empty mandatory fields
+    for (const key of ["repo", "ref", "refName", "createdAt", "node", "platform"] as const) {
+      const empty = { ...valid, [key]: "" };
+      expect(mod.validateRunV2(empty).ok).toBe(false);
+      expect(mod.validateRunV2(empty).errors.join("\n")).toContain(`${key} must be a non-empty string`);
+      const gone = { ...valid };
+      delete (gone as Record<string, unknown>)[key];
+      expect(mod.validateRunV2(gone).ok).toBe(false);
+      expect(mod.validateRunV2(gone).errors.join("\n")).toContain(`${key} must be a non-empty string`);
+    }
+    // tagSha must be 40-hex
+    expect(mod.validateRunV2({ ...valid, tagSha: "nothex" }).errors.join("\n")).toContain(
+      "tagSha must be a resolved 40-hex commit sha",
+    );
+    // ref must equal tagSha
+    expect(mod.validateRunV2({ ...valid, ref: "b".repeat(40) }).errors.join("\n")).toContain("ref must equal tagSha");
+    // tasks must be a non-empty array of registered task ids
+    expect(mod.validateRunV2({ ...valid, tasks: [] }).errors.join("\n")).toContain("tasks must be a non-empty array");
+    expect(mod.validateRunV2({ ...valid, tasks: ["version-flag", "no-such-task"] }).errors.join("\n")).toContain(
+      "is not a registered task id",
+    );
+    expect(mod.validateRunV2({ ...valid, tasks: [""] }).errors.join("\n")).toContain("tasks[0] must be a non-empty string");
+
+    // end-to-end: the same classes of tampering fail verify-evidence
+    const tamper = (mutate: (r: Record<string, unknown>) => void, expectIn: string) => {
+      const fixture = makeFixture(handoffSource);
+      const rjp = join(soleRunDir(fixture), "run.json");
+      const runJson = JSON.parse(readFileSync(rjp, "utf8"));
+      mutate(runJson);
+      writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+      const res = runHarness(["verify-evidence", "--dir", fixture]);
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toContain(expectIn);
+    };
+    tamper((r) => { r.repo = ""; }, "repo must be a non-empty string");
+    tamper((r) => { r.node = null; }, "node must be a non-empty string");
+    tamper((r) => { r.platform = ""; }, "platform must be a non-empty string");
+    tamper((r) => { r.createdAt = null; }, "createdAt must be a non-empty string");
+    tamper((r) => { r.tagSha = "0231dd7"; }, "tagSha must be a resolved 40-hex commit sha");
+    tamper((r) => { r.ref = "b".repeat(40); }, "ref must equal tagSha");
+    tamper((r) => { r.tasks = []; }, "tasks must be a non-empty array");
+    tamper((r) => { r.tasks = ["no-such-task"]; }, "is not a registered task id");
+  }, 30000);
+
+  it("rejects the EXACT audit repro: v2 record with environment.ref null", () => {
+    const fixture = makeFixture(handoffSource);
+    const rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    const rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.environment.ref = null;
+    writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("environment.ref must be a 40-hex commit sha");
+  }, 30000);
+
+  it("rejects the EXACT audit repro: a coordinated 2020 backdate of manifest + records", () => {
+    const fixture = makeFixture(handoffSource);
+    const runDir = soleRunDir(fixture);
+    const rjp = join(runDir, "run.json");
+    const runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    runJson.createdAt = "2020-01-01T00:00:00.000Z";
+    writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+    for (const cond of ["handoff", "baseline"]) {
+      const rp = join(runDir, "version-flag", cond, "result.json");
+      const rec = JSON.parse(readFileSync(rp, "utf8"));
+      rec.recordedAt = "2020-01-01T00:00:00.000Z";
+      writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    }
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    // the runId encodes the real execution stamp; the backdated createdAt sits
+    // ~6 years earlier — the binding check fires (stamp more than 10 min AFTER
+    // the fabricated createdAt), and the README date-agreement check fails the
+    // unclaimed 2020 date too.
+    expect(res.stderr).toContain("runId/createdAt binding");
+    expect(res.stderr).toContain("more than 10 min after");
+    expect(res.stderr).toContain("not claimed anywhere in README.md");
+  }, 30000);
+
+  it("rejects a runId whose encoded stamp is more than 10 min after/before createdAt (both directions)", () => {
+    // runId stamp LATER than createdAt (e.g. the id encodes a planned slot)
+    let fixture = makeFixture(handoffSource);
+    let runDir = soleRunDir(fixture);
+    let rjp = join(runDir, "run.json");
+    let runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    runJson.createdAt = new Date(Date.parse(runJson.createdAt) - 3600 * 1000).toISOString();
+    writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+    for (const cond of ["handoff", "baseline"]) {
+      const rp = join(runDir, "version-flag", cond, "result.json");
+      const rec = JSON.parse(readFileSync(rp, "utf8"));
+      rec.recordedAt = runJson.createdAt;
+      writeFileSync(rp, JSON.stringify(rec, null, 2) + "\n");
+    }
+    let res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("more than 10 min after");
+    expect(res.stderr).toContain("runId/createdAt binding");
+
+    // unparseable runId (no encoded stamp) is an error, never a silent pass
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rjp = join(runDir, "run.json");
+    runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    runJson.runId = "eval-hand-authored-label";
+    writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+    const newDir = join(dirname(runDir), runJson.runId);
+    renameSync(runDir, newDir);
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("does not encode a UTC execution timestamp");
+  }, 30000);
+
+  it("rejects a future-dated createdAt at verification time (live-clock check)", () => {
+    const fixture = makeFixture(handoffSource);
+    const runDir = soleRunDir(fixture);
+    const rjp = join(runDir, "run.json");
+    const runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    runJson.createdAt = new Date(Date.now() + 3600 * 1000).toISOString();
+    writeFileSync(rjp, JSON.stringify(runJson, null, 2) + "\n");
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("future-dated manifest");
+  }, 30000);
+
+  it("requires the eval README to claim every manifest createdAt date (date agreement)", () => {
+    const fixture = makeFixture(handoffSource);
+    writeFileSync(join(fixture, "README.md"), "# fixture eval — dates deliberately omitted\n");
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("not claimed anywhere in README.md");
+  }, 30000);
+
+  it("records an execution-time attestation via --attest and verifies its presence and shape", () => {
+    const runId = uniqueRun();
+    const res = runHarness([
+      "run",
+      "--task",
+      "version-flag",
+      "--condition",
+      "baseline",
+      "--run",
+      runId,
+      "--agent-command",
+      agentCommand("AT"),
+      "--attest",
+      "ci-run-12345",
+    ]);
+    expect(res.code).toBe(0);
+    const runJson = JSON.parse(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8"));
+    expect(runJson.attestation).toMatchObject({ source: "provided", attestation: "ci-run-12345" });
+    expect(typeof runJson.attestation.capturedAt).toBe("string");
+
+    // the attested manifest verifies; a stripped attestation fails the shape check
+    const fixture = makeFixture(handoffSource, runId);
+    const ok = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(ok.code).toBe(0);
+    expect(ok.stdout).toContain("verify-evidence: OK");
+
+    const stripped = makeFixture(handoffSource, runId);
+    const sp = join(soleRunDir(stripped), "run.json");
+    const rj = JSON.parse(readFileSync(sp, "utf8"));
+    delete rj.attestation.capturedAt;
+    writeFileSync(sp, JSON.stringify(rj, null, 2) + "\n");
+    const bad = runHarness(["verify-evidence", "--dir", stripped]);
+    expect(bad.code).not.toBe(0);
+    expect(bad.stderr).toContain("attestation.capturedAt must be an ISO timestamp");
+  }, 30000);
 });
 
 afterAll(() => {
   for (const dir of cleanupDirs) rmSync(dir, { recursive: true, force: true });
   rmSync(scratch, { recursive: true, force: true });
-});
+}, 60000);

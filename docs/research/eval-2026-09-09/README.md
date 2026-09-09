@@ -8,15 +8,26 @@
 > paths, per-run summaries generated) and verified by
 > `node scripts/eval-continuation.mjs verify-evidence --dir docs/research/eval-2026-09-09`
 > → OK; the verdict section below now reports two verdicts per protocol §4.
+> In the post-rc.6 re-audit remediation the release-qualifying handoff records
+> additionally carry `handoffGeneratedByRef`/`handoffGeneratedBySha` pinned to
+> this pass's own candidate (`v0.1.0-rc.2` / `0231dd77…`) — every leg of this
+> pass consumed an artifact rendered by the same evaluated candidate — and the
+> per-run summaries were regenerated (`--fix`) after those provenance edits.
 >
-> **Chronology note (2026-09-09 re-audit):** the `recordedAt`/`createdAt`
-> values in these records are genuine harness-emitted live-clock timestamps;
-> the runs executed 2026-09-08T21:06Z → 2026-09-09T00:08Z (17:06–20:08 local,
-> spanning the UTC date boundary). The `eval-20260909T1700-*` run-ids are
-> hand-authored local-time labels whose date component reads one day ahead of
-> the local start; the dir name `eval-2026-09-09` matches the UTC recording
-> tail. Labels kept for minimal churn — the embedded timestamps themselves
-> were never falsified.
+> **Chronology note (2026-09-09 re-audit, updated by the post-rc.6
+> re-audit remediation):** the `recordedAt`/`createdAt` values in these
+> records are genuine harness-emitted live-clock timestamps; the runs executed
+> 2026-09-08T21:06Z → 2026-09-09T00:08Z (17:06–20:08 local, spanning the UTC
+> date boundary). The `eval-20260909T1700-*` run-ids were hand-authored
+> local-time labels whose date component read one day ahead of the local
+> start; under the post-rc.6 re-audit's runId/createdAt binding rule
+> (`verify-evidence` requires the id to encode the execution timestamp, UTC,
+> within ±10 min of the manifest `createdAt`) they were **renamed to the
+> UTC stamps derived from each manifest's genuine `createdAt`**
+> (`eval-20260908T2106-*` … `eval-20260909T0006-*`). The embedded timestamps
+> were never falsified — the renames only made the ids agree with them; the
+> disposable tmp-store dirs keep their original names (raw evidence, e.g.
+> `.../harnie-eval3/eval-20260909T1700-.../clone`).
 
 Raw outcome evidence for the **directed** cross-harness continuation matrix
 required by `docs/internal/ROADMAP.md:200`:
@@ -121,20 +132,20 @@ rendered for the planned OpenCode → Pi continuation run that could not execute
 
 | Leg (source→target) | Task | Condition | Run dir | Receiver / model | Exit | Wall | Files edited | Out-of-scope | Verified | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Pi→OpenCode | version-flag | handoff | `runs/eval-20260909T1700-legA/` | opencode / kimi-k2.7-code | 1 | 525.7s | none | none | n/a | **FAIL — provider error** (empty assistant message upstream; no edits; no completion claim) |
-| Pi→OpenCode (retry) | version-flag | handoff | `runs/eval-20260909T1700-legA-r2/` | opencode / kimi-k2.7-code | 0 | 30.7s | src/cli.ts | none | pass (receiver + evaluator) | **PASS** |
-| Pi→OpenCode | version-flag | baseline | `runs/eval-20260909T1700-legA/` | opencode / kimi-k2.7-code | 0 | 42.5s | src/cli.ts | none | pass (receiver + evaluator) | **PASS** |
-| OpenCode→Pi | version-flag | handoff (trial 1) | `runs/eval-20260909T1700-legB/` | pi / kimi-k2.5 | 0 | 368.4s | src/cli.ts | none | pass (evaluator; receiver sandbox reported verification blocked — honest, no false completion) | **PASS** |
-| OpenCode→Pi | version-flag | baseline | `runs/eval-20260909T1700-legB/` | pi / kimi-k2.5 | 1 | 261.8s | package-lock.json (oos), src/cli.ts | package-lock.json | n/a | **FAIL — openrouter 402 in-flight budget** mid-run |
-| OpenCode→Pi trial 2 | version-flag | handoff | `runs/eval-20260909T1700-legB-r2/` | pi / kimi-k2.5 | 1 | 220.6s | package-lock.json, src/cli.ts | package-lock.json | n/a | **FAIL — openrouter 402 in-flight budget** |
-| OpenCode→Pi baseline retry | version-flag | baseline | `runs/eval-20260909T1700-legB-r3/` | pi / kimi-k2.5 | 1 | 58.9s | none | none | n/a | **FAIL — openrouter 402 in-flight budget** |
-| OpenCode→Pi (model fallback) | version-flag | handoff + baseline | `runs/eval-20260909T1700-legB-m2/` | pi / cohere-north-mini-code:free | 1 / 1 | 150.0s / 72.4s | none | none | n/a | **FAIL — provider finish_reason error / 429 free-tier daily limit** |
-| OpenCode→Pi (after daily reset) | version-flag | handoff + baseline | `runs/eval-20260909T1700-legB-m3/` | pi / cohere-north-mini-code:free | 1 / 1 | 150.4s / 150.3s | none | none | n/a | **FAIL — free-tier daily limit exhausted again** (key is account-wide and contested; reset next UTC midnight) |
-| Codex→Pi | shebang-guard | handoff + baseline | `runs/eval-20260909T1700-legC1/` | pi / kimi-k2.5 | 1 / 1 | 0.6s / 0.5s | none | none | n/a | **FAIL — openrouter 402 credits: balance cannot fund the model's max_tokens** |
-| Codex→OpenCode | help-regression-test | handoff | `runs/eval-20260909T1700-legC2/` | opencode / kimi-k2.7-code | 0 | 36.5s | tests/regression-help.test.ts (new) | none | pass (receiver + evaluator) | **PASS** |
-| Codex→OpenCode | help-regression-test | baseline | `runs/eval-20260909T1700-legC2/` | opencode / kimi-k2.7-code | 0 | 28.2s | tests/regression-help.test.ts (new) | none | pass (receiver + evaluator) | **PASS** |
-| OpenCode→Codex (continuation) | greeting-command | handoff | `runs/eval-20260909T1700-cont/` | codex / default | 0 | 129.1s | src/cli.ts | none | pass (receiver + evaluator) | **PASS — completed step 3 only** |
-| OpenCode→Codex (continuation) | greeting-command | baseline | `runs/eval-20260909T1700-cont/` | codex / default | 0 | 129.9s | src/cli.ts | none | pass (receiver + evaluator) | **PASS — completed step 3 only** |
+| Pi→OpenCode | version-flag | handoff | `runs/eval-20260908T2106-legA/` | opencode / kimi-k2.7-code | 1 | 525.7s | none | none | n/a | **FAIL — provider error** (empty assistant message upstream; no edits; no completion claim) |
+| Pi→OpenCode (retry) | version-flag | handoff | `runs/eval-20260908T2116-legA-r2/` | opencode / kimi-k2.7-code | 0 | 30.7s | src/cli.ts | none | pass (receiver + evaluator) | **PASS** |
+| Pi→OpenCode | version-flag | baseline | `runs/eval-20260908T2106-legA/` | opencode / kimi-k2.7-code | 0 | 42.5s | src/cli.ts | none | pass (receiver + evaluator) | **PASS** |
+| OpenCode→Pi | version-flag | handoff (trial 1) | `runs/eval-20260908T2117-legB/` | pi / kimi-k2.5 | 0 | 368.4s | src/cli.ts | none | pass (evaluator; receiver sandbox reported verification blocked — honest, no false completion) | **PASS** |
+| OpenCode→Pi | version-flag | baseline | `runs/eval-20260908T2117-legB/` | pi / kimi-k2.5 | 1 | 261.8s | package-lock.json (oos), src/cli.ts | package-lock.json | n/a | **FAIL — openrouter 402 in-flight budget** mid-run |
+| OpenCode→Pi trial 2 | version-flag | handoff | `runs/eval-20260908T2128-legB-r2/` | pi / kimi-k2.5 | 1 | 220.6s | package-lock.json, src/cli.ts | package-lock.json | n/a | **FAIL — openrouter 402 in-flight budget** |
+| OpenCode→Pi baseline retry | version-flag | baseline | `runs/eval-20260908T2133-legB-r3/` | pi / kimi-k2.5 | 1 | 58.9s | none | none | n/a | **FAIL — openrouter 402 in-flight budget** |
+| OpenCode→Pi (model fallback) | version-flag | handoff + baseline | `runs/eval-20260908T2140-legB-m2/` | pi / cohere-north-mini-code:free | 1 / 1 | 150.0s / 72.4s | none | none | n/a | **FAIL — provider finish_reason error / 429 free-tier daily limit** |
+| OpenCode→Pi (after daily reset) | version-flag | handoff + baseline | `runs/eval-20260909T0001-legB-m3/` | pi / cohere-north-mini-code:free | 1 / 1 | 150.4s / 150.3s | none | none | n/a | **FAIL — free-tier daily limit exhausted again** (key is account-wide and contested; reset next UTC midnight) |
+| Codex→Pi | shebang-guard | handoff + baseline | `runs/eval-20260908T2139-legC1/` | pi / kimi-k2.5 | 1 / 1 | 0.6s / 0.5s | none | none | n/a | **FAIL — openrouter 402 credits: balance cannot fund the model's max_tokens** |
+| Codex→OpenCode | help-regression-test | handoff | `runs/eval-20260908T2132-legC2/` | opencode / kimi-k2.7-code | 0 | 36.5s | tests/regression-help.test.ts (new) | none | pass (receiver + evaluator) | **PASS** |
+| Codex→OpenCode | help-regression-test | baseline | `runs/eval-20260908T2132-legC2/` | opencode / kimi-k2.7-code | 0 | 28.2s | tests/regression-help.test.ts (new) | none | pass (receiver + evaluator) | **PASS** |
+| OpenCode→Codex (continuation) | greeting-command | handoff | `runs/eval-20260909T0006-cont/` | codex / default | 0 | 129.1s | src/cli.ts | none | pass (receiver + evaluator) | **PASS — completed step 3 only** |
+| OpenCode→Codex (continuation) | greeting-command | baseline | `runs/eval-20260909T0006-cont/` | codex / default | 0 | 129.9s | src/cli.ts | none | pass (receiver + evaluator) | **PASS — completed step 3 only** |
 
 ### Paired baseline comparison (handoff vs baseline, same receiver model)
 
@@ -209,11 +220,11 @@ semantic continuation — the continuation-semantics evidence is the separate
 
 | ROADMAP path | Status | Evidence |
 | --- | --- | --- |
-| Pi → Harnie → OpenCode | **met** | handoff-retry PASS + paired baseline PASS (`runs/eval-20260909T1700-legA-r2/`, `...legA/...baseline/`) |
-| OpenCode → Harnie → Pi | **partially met** | handoff condition PASS (n=1, `runs/eval-20260909T1700-legB/...handoff/`); paired baseline **not run** (all 6 baseline/handoff-retry attempts failed on openrouter 402 credits / 402 in-flight budget / 429 free-tier daily limit — logs preserved in each run dir); requested 2–3 trials: 1 successful trial + 5 recorded failed attempts |
-| Codex → Harnie → Pi | **not run** | all attempts failed at startup on openrouter credit exhaustion (`runs/eval-20260909T1700-legC1/` — 402 `openrouter_credits`: balance cannot fund the model's max_tokens); pi is only authenticated against openrouter on this machine (`~/.pi/agent/auth.json`), no alternative provider key available |
-| Codex → Harnie → OpenCode | **met (transport/receiver compatibility only)** | handoff + baseline PASS (`runs/eval-20260909T1700-legC2/`); ROADMAP allows "Pi/OpenCode". Caveat: the handoff context was unrelated to the explicit benchmark task, so this is not semantic-continuation evidence |
-| Continuation semantics (next-step, not fresh edit) | **met** | `greeting-command` OpenCode→Codex leg: driver steps 1–2 pre-applied, receiver completed step 3 only (`runs/eval-20260909T1700-cont/`) |
+| Pi → Harnie → OpenCode | **met** | handoff-retry PASS + paired baseline PASS (`runs/eval-20260908T2116-legA-r2/`, `...legA/...baseline/`) |
+| OpenCode → Harnie → Pi | **partially met** | handoff condition PASS (n=1, `runs/eval-20260908T2117-legB/...handoff/`); paired baseline **not run** (all 6 baseline/handoff-retry attempts failed on openrouter 402 credits / 402 in-flight budget / 429 free-tier daily limit — logs preserved in each run dir); requested 2–3 trials: 1 successful trial + 5 recorded failed attempts |
+| Codex → Harnie → Pi | **not run** | all attempts failed at startup on openrouter credit exhaustion (`runs/eval-20260908T2139-legC1/` — 402 `openrouter_credits`: balance cannot fund the model's max_tokens); pi is only authenticated against openrouter on this machine (`~/.pi/agent/auth.json`), no alternative provider key available |
+| Codex → Harnie → OpenCode | **met (transport/receiver compatibility only)** | handoff + baseline PASS (`runs/eval-20260908T2132-legC2/`); ROADMAP allows "Pi/OpenCode". Caveat: the handoff context was unrelated to the explicit benchmark task, so this is not semantic-continuation evidence |
+| Continuation semantics (next-step, not fresh edit) | **met** | `greeting-command` OpenCode→Codex leg: driver steps 1–2 pre-applied, receiver completed step 3 only (`runs/eval-20260909T0006-cont/`) |
 
 ## Not-run / failed items and why (nothing fabricated)
 

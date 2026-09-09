@@ -1,0 +1,109 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260908T2132-legC2",
+  "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "sourceHarness": "codex",
+      "targetHarness": "opencode",
+      "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+      "refName": "v0.1.0-rc.2",
+      "handoffArtifactSha": "7e244c5d1b166910cddbbe4d217d5929e8688fe9a581c4110274619ded3be636",
+      "timedOut": false,
+      "exitCode": 0,
+      "filesEdited": [
+        "tests/regression-help.test.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 3201,
+      "notRunReason": null,
+      "notes": "handoffGeneratedBy provenance (post-rc.6 re-audit P2 closure): the referenced artifact was rendered by Harnie v0.1.0-rc.2 during this pass (generating run's manifest tagSha 0231dd77ce909d04fcb60692ae48a47df04c9b68) — the same evaluated candidate as this leg, so handoffGeneratedBySha === tagSha."
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "opencode",
+      "model": "opencode-go/kimi-k2.7-code",
+      "sourceHarness": null,
+      "targetHarness": "opencode",
+      "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+      "refName": "v0.1.0-rc.2",
+      "handoffArtifactSha": null,
+      "timedOut": false,
+      "exitCode": 0,
+      "filesEdited": [
+        "tests/regression-help.test.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": null,
+      "notRunReason": null,
+      "notes": null
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    }
+  ]
+}

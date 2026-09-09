@@ -85,7 +85,11 @@ explicit benchmark task this time (see driver note below).
   `0.1.0-rc.3`) in the temp Harnie home:
   `driver/handoff-codex_opencode-first-run-recovery.md`, 1907 chars,
   sha256-12 `a6fe4003c09e` (recorded in both handoff-condition records and
-  re-verified by `verify-evidence`).
+  re-verified by `verify-evidence`). The release-qualifying handoff record
+  pins `handoffGeneratedByRef`/`handoffGeneratedBySha` to this pass's own
+  candidate (`v0.1.0-rc.3` / `cbe5399…`, added in the post-rc.6 re-audit P2
+  remediation; `verify-evidence` requires `handoffGeneratedBySha === tagSha`
+  for status "ran" + condition "handoff" records).
 - Unlike the 2026-09-09 Codex→OpenCode leg, this handoff context **matches**
   the explicit benchmark task — so this pair demonstrates directed handoff
   consumption with matching context; it is still a single-step fresh-edit
@@ -126,13 +130,22 @@ the multi-step continuation-semantics evidence remains the 2026-09-09
   `agent-stderr.log`, `edits.diff`, harness `summary.{md,json}`.
 - `runs/eval-20260909T0145-pi-blocked/` — explicit `status: "not-run"`
   records for every pi-targeted leg, each with the probe-based notRunReason
-  and (where applicable) the ready handoff artifact reference + verified sha.
+  and (where applicable) the ready handoff artifact reference + verified sha;
+  the handoff-condition records carry the older-artifact provenance
+  explicitly (`handoffGeneratedByRef: "v0.1.0-rc.2"` / `0231dd77…`, added in
+  the post-rc.6 re-audit P2 remediation — non-qualifying records may consume
+  older artifacts; qualifying ones may not).
 - `probes/` — the four availability probes (stdout+stderr preserved).
 - `driver/` — driver generators, synthetic driver sessions, and the rendered
   handoff artifact with size/sha256-12 recorded above.
 
 Integrity: `node scripts/eval-continuation.mjs verify-evidence --dir
-docs/research/eval-2026-09-09b` → OK (2 run dirs, 6 result records).
+docs/research/eval-2026-09-09b` → OK (2 run dirs, 6 result records) under the
+STRICTER post-rc.6 re-audit rules (`validateRunV2` manifest validation with
+the runId↔createdAt stamp binding ±10 min; paired + git-resolved
+`handoffGeneratedBy` provenance with the release-qualifying tagSha pin;
+README/manifest date agreement; committed `summary.{md,json}` byte-compared
+with the harness regeneration after the provenance edits via `--fix`).
 
 ## Limitations
 

@@ -58,11 +58,11 @@ Commands:
 | --- | --- |
 | `tasks [--json]` | Print the benchmark registry. |
 | `prepare --task <id> [--condition handoff,baseline] [--ref HEAD\|worktree\|<sha>] [--run <id>]` | Create disposable clones only (for manual setups). |
-| `run --task <id> [--condition ...] [--agent opencode\|codex\|pi] [--handoff <path>] [--model <provider/model>] [--agent-arg <a>]... [--ref HEAD\|worktree\|<sha>] [--run <id>] [--timeout <ms>] [--agent-command "<argv...>"]` | Prepare clone(s) → write prompt → invoke receiver non-interactively (or degrade to manual mode) → collect evidence → write `result.json`. |
+| `run --task <id> [--condition ...] [--agent opencode\|codex\|pi] [--handoff <path>] [--model <provider/model>] [--agent-arg <a>]... [--ref HEAD\|worktree\|<sha>] [--run <id>] [--timeout <ms>] [--agent-command "<argv...>"] [--attest <string>]` | Prepare clone(s) → write prompt → invoke receiver non-interactively (or degrade to manual mode) → collect evidence → write `result.json`. `--attest <string>` records an execution-time attestation (plus the GitHub Actions env when present) into the manifest once, at manifest-creation time. |
 | `collect --dir <condition dir>` | Re-collect git status/diff + handoff size into `result.json` (after a manual run). |
 | `record --dir <condition dir> --file <result.json>` | Validate a filled result against the schema and register it. |
 | `summarize --run <run-id>` | Side-by-side `summary.md`/`summary.json`, incl. the preview-gate line. |
-| `verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix]` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt); chronology enforced (`recordedAt` within ±1h of the run manifest, ≤1h past the newest file mtime — hand-authored dates fail); **exact candidate binding** enforced (below); **summary drift** detected (the committed `summary.json` of every run dir is compared against a harness regeneration and must match structurally; `--fix` rewrites `summary.{md,json}` from the committed records). Warnings are printed to stderr and never fail the check by themselves. Non-zero exit on any finding. |
+| `verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix] [--archival]` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt); chronology enforced (`recordedAt` within ±1h of the run manifest, ≤1h past the newest file mtime); the v2 run manifest must be complete (`validateRunV2`, below) and its `runId` must encode the execution timestamp agreeing with `createdAt` within ±10 min in both directions, while `createdAt` must not be future-dated vs the verifier clock; each eval `README.md` must claim every manifest's `createdAt` UTC date; **exact candidate binding** enforced (below); **summary drift** detected — the committed `summary.json` of every run dir is compared against a harness regeneration and must match structurally, and the committed `summary.md` must match the regenerated Markdown **byte for byte** (`--fix` rewrites BOTH outputs from the committed records); `--attest`-captured execution attestations (below) are required present and well-formed; `--archival` (explicit opt-in) downgrades the post-v1-era conventions (run manifests, per-run summaries, machine-path convention, runId/createdAt binding) to loud warnings for the archived 2026-09-07/09-08 dirs — default mode stays strict. Warnings are printed to stderr and never fail the check by themselves. Non-zero exit on any finding. |
 
 Key properties:
 
@@ -74,7 +74,7 @@ Key properties:
 ## 4. Results schema (`harnie-eval-result/v1` and `v2`)
 
 One JSON per task/condition. Validated by `record` (and by `validateResult`,
-unit-tested). Versioning (2026-09-10 re-audit remediation):
+unit-tested). Versioning (2026-09-09 re-audit remediation):
 
 - **`harnie-eval-result/v1`** — the original schema, retained for **archived**
   results (2026-09-07 / 2026-09-08 evidence). Does not require the
@@ -110,7 +110,7 @@ unit-tested). Versioning (2026-09-10 re-audit remediation):
 | `notes` | free text — failures and anything surprising | required | required |
 
 **Condition invariants (v2, enforced by `validateResultV2` since the
-2026-09-10 re-audit):** the condition, the provenance and the handoff block
+2026-09-09 re-audit):** the condition, the provenance and the handoff block
 must agree — contradictory or half-filled provenance is rejected, not merely
 incomplete:
 
@@ -131,22 +131,59 @@ incomplete:
   the generating ref equals the evaluated candidate or is genuinely unknown.
 
 **Handoff-generation provenance (`handoffGeneratedByRef` /
-`handoffGeneratedBySha`, 2026-09-10 re-audit P2):** identifies **which ref
+`handoffGeneratedBySha`, 2026-09-09 re-audit P2):** identifies **which ref
 GENERATED a handoff artifact** when that ref differs from the evaluated
 candidate — e.g. an artifact rendered by Harnie `v0.1.0-rc.2` and consumed by
 an `rc.5`-bound leg records `handoffGeneratedByRef: "v0.1.0-rc.2"` plus the
 rc.2 manifest's resolved `tagSha`. Fill both from the generating run's
 manifest (`refName` + `tagSha`); when the generating ref is genuinely
 unresolvable, set both explicitly to `null` and record the reason in `notes`.
-Validated whenever present: the ref must be a non-empty string and the sha a
-40-hex commit sha (64-hex sha256 also accepted); anything else is rejected.
 
-**Exact candidate binding (2026-09-10 re-audit P2, enforced by
+**Paired + resolved + pinned (2026-09-09 re-audit P2 closure, enforced by
+`validateResultV2` and `verify-evidence`):** the fields are no longer merely
+syntax-checked.
+
+- **Paired:** the two fields must be both null/absent or both present — a
+  half-filled provenance pair is rejected.
+- **Resolved:** for a 40-hex `handoffGeneratedBySha`, `verify-evidence`
+  re-resolves `handoffGeneratedByRef` via git
+  (`git rev-parse "<ref>^{commit}"`, against the repo the harness lives in or
+  the `--repo` override) and the peeled commit must equal the recorded sha —
+  an unrelated valid-looking sha is rejected. A 64-hex sha256 form (of the
+  generated artifact bytes) cannot be re-resolved against git and only carries
+  a warning. An **unresolvable** ref is an **error for release-qualifying
+  records** and a **warning** otherwise (never a silent pass).
+- **Pinned for release-qualifying runs:** a **release-qualifying** record
+  (schema v2, `status: "ran"`, `condition: "handoff"`) requires
+  `handoffGeneratedBySha === tagSha` — the consumed artifact must have been
+  generated by the evaluated candidate itself. **Older artifacts are allowed
+  only for non-qualifying records** (status `not-run`/`manual`, condition
+  `baseline`, or archived v1). A leg whose artifact was rendered by an older
+  build cannot be registered as release-qualifying at all: it must either be
+  re-run with an artifact rendered at the candidate, or recorded `not-run`
+  with its reason (the record's own `status`/`condition`/`schema` fields ARE
+  the explicit non-qualifying marker — no extra schema field is added, so no
+  second source of truth can contradict `status`).
+
+**Run-manifest validation (`validateRunV2`, 2026-09-09 re-audit P2 closure):**
+the v2 manifest is the anchor of the exact-candidate-binding and chronology
+checks, so a manifest missing or emptying a mandatory field would let a
+tampered record pass by leaving nothing to compare against. Every mandatory
+field must be present and non-empty: `repo` (a repo NAME, never an absolute
+path), `ref` (equal to `tagSha` in v2), `refName`, `tagSha` (40-hex commit
+sha), `createdAt` (ISO timestamp), `node`, `platform`, and a non-empty
+`tasks` array whose entries are registered task ids. Missing, null, empty or
+wrong-typed mandatory fields are verification errors.
+
+**Exact candidate binding (2026-09-09 re-audit P2, enforced by
 `verify-evidence`):** every result record must describe the candidate its run
 dir sits under — no half-bound provenance.
 
-- Per record: `tagSha`, `refName`, and `environment.ref` (when present) must
-  **EQUAL** the run manifest's (`run.json`) values. Any mismatch is an error.
+- Per record: `tagSha`, `refName`, and — for v2 records **required, non-null,
+  40-hex** — `environment.ref` must **EQUAL** the run manifest's (`run.json`)
+  values. Any mismatch is an error; a v2 record with a missing, null or
+  non-40-hex `environment.ref` is an error (archived v1 records keep the soft
+  when-both-present check).
 - Per run manifest: when `refName` is **immutable** (a tag name or a 40-hex
   commit sha), `verify-evidence` re-resolves it in git
   (`git rev-parse <refName>^{commit}`) against a repository — default: the
@@ -159,13 +196,20 @@ dir sits under — no half-bound provenance.
   false failure. Warnings do not fail the check by themselves.
 - Additionally, the run's committed `summary.json` is regenerated from the
   committed records via the harness's single summary-generation code path and
-  compared **structurally** with the committed file; any difference is a
-  **summary drift error** (`--fix` rewrites `summary.{md,json}` from the
-  committed records). This catches hand-edited records whose curated summary
-  was not regenerated, and stale summaries after record corrections.
+  compared **structurally** with the committed file, and the committed
+  `summary.md` is compared **byte for byte** with the regenerated Markdown;
+  any difference in either output is a **summary drift error** (`--fix`
+  rewrites BOTH `summary.{md,json}` from the committed records). The byte
+  comparison closes the 2026-09-09 re-audit P2 bypass where a hand-edited
+  `summary.md` (e.g. an appended "FULL MATRIX PASS") passed while only
+  `summary.json` was checked. This catches hand-edited records whose curated
+  summary was not regenerated, stale summaries after record corrections, and
+  tampered summary prose.
 
-**Documentation consistency rules (2026-09-10 re-audit P2, enforced by
-`tests/eval-docs-consistency.test.ts`):**
+**Documentation consistency rules (2026-09-09 re-audit P2, enforced by
+`tests/eval-docs-consistency.test.ts` AND — since the post-rc.6 re-audit
+remediation — by `verify-evidence` itself, so the subcommand alone enforces
+what the repository test checks):**
 
 - No documentation file (`docs/internal/**/*.md`, `docs/research/**/*.md`,
   `README.md`) may reference a corrected-away eval directory name (e.g. the
@@ -190,7 +234,7 @@ dir sits under — no half-bound provenance.
   non-empty string; `edits.files`, `edits.outOfScopeFiles`,
   `verification.commands` and `commandsRun` must be arrays.
 
-**Path convention in records (v2, 2026-09-10):** every file reference
+**Path convention in records (v2, 2026-09-09):** every file reference
 (`stdoutLog`, `stderrLog`, `edits.diffPath`, `handoff.path`, `patch.path`) is a
 path **relative to the directory containing `result.json`**; `environment.clonePath`
 is prefixed `disposable:` and is relative to the run dir (clones live only in
@@ -201,9 +245,17 @@ never rewritten, so quoted machine paths inside log/prompt **content** are
 acceptable; the path fields themselves must be portable. `verify-evidence`
 enforces all of this.
 
-**Chronology rules (2026-09-10 re-audit, mandatory):** the harness EMITS every
+**Chronology rules (2026-09-09 re-audit, mandatory):** the harness EMITS every
 timestamp (`run.json` `createdAt`, `recordedAt`) from the live clock at run
-time. Hand-authored dates are forbidden and are detectable:
+time. What the checks detect is inconsistent or future-dated timestamps. The
+guarantee, stated exactly (and tested verbatim by
+`tests/eval-docs-consistency.test.ts`):
+
+> chronology verification detects inconsistent or future-dated timestamps; it cannot prove historical execution time against coordinated backdating without an external attestation.
+
+(A fully coordinated backdate — manifest, records, run id and README edited
+together on a fresh checkout whose mtimes reset — is self-consistent and
+would pass; only an external, execution-time attestation can rule that out.)
 
 - A record's `recordedAt` must sit within **±1h** of its run manifest's
   `createdAt` (records are written during the run; a value hours after the
@@ -213,7 +265,35 @@ time. Hand-authored dates are forbidden and are detectable:
   are checkout-time — always later than the run — so only a timestamp claiming
   to be *longer than 1h after every file's actual last write* trips this;
   that is exactly the fabricated-date case.)
-- `verify-evidence` enforces all three checks and fails the dir on any
+- **runId/createdAt binding (2026-09-09 re-audit P2 closure):** the runId must
+  encode the execution timestamp in the canonical form
+  `eval-<YYYYMMDD>T<HHMM>[SS][-suffix]` (UTC — the harness default derives the
+  id from `new Date().toISOString()`), and the encoded stamp must agree with
+  the manifest's `createdAt` within **±10 min, checked in both directions**.
+  A runId without a parseable stamp, or a manifest whose `createdAt` disagrees
+  with the id's stamp, is a verification error — a backdated manifest under an
+  honestly-stamped run id fails.
+- **Future-dating rejected at verification time (same closure):** a manifest's
+  `createdAt` must be `<= verifier clock + 10 min` — a manifest dated in the
+  future relative to the live clock at verification time fails, even when
+  every other timestamp agrees with it.
+- **README/manifest date agreement enforced by `verify-evidence` (same
+  closure):** every curated dir's `README.md` must claim each run manifest's
+  `createdAt` UTC date; the subcommand alone now enforces what
+  `tests/eval-docs-consistency.test.ts` checks.
+- **Execution-time attestation (`--attest`, 2026-09-09 re-audit P2, minimal):**
+  `run --attest <string>` records the provided attestation string — plus the
+  GitHub Actions environment (`GITHUB_RUN_ID`/`GITHUB_REPOSITORY`/
+  `GITHUB_ACTOR`) when present — into the manifest's `attestation` block ONCE
+  at manifest-creation time. `verify-evidence` requires a recorded block to be
+  complete (non-empty `source`/`attestation`, ISO `capturedAt` within ±10 min
+  of the manifest `createdAt`; `source: "github-actions"` also requires
+  `githubRunId`). This is **self-recorded** provenance captured at execution
+  time — it is **not** a cryptographic attestation and does not change the
+  narrowed guarantee above; it only lets a CI-hosted run carry its run id
+  forward so a discrepancy between the claimed CI provenance and the manifest
+  is detectable.
+- `verify-evidence` enforces all of these checks and fails the dir on any
   violation.
 - **Synthetic driver/fixture session timestamps are fixture data, not
   execution times.** Driver files may carry fictional session stamps (e.g.
@@ -223,8 +303,9 @@ time. Hand-authored dates are forbidden and are detectable:
 
 Run manifest schema: `harnie-eval-run/v2` (same shape as v1; `repo` is now the
 repo name instead of an absolute path — the evaluated commit is identified by
-`refName` + `tagSha`). The per-run `summary.json` schema
-(`harnie-eval-summary/v1`) is unchanged — no shape change, no bump.
+`refName` + `tagSha`; validated by `validateRunV2` above). The per-run
+`summary.json` schema (`harnie-eval-summary/v1`) is unchanged — no shape
+change, no bump.
 
 `metrics` enums (honest defaults are `unknown`/`null`):
 
@@ -239,7 +320,7 @@ repo name instead of an absolute path — the evaluated commit is identified by
 
 **Initial preview gate** (per audit line 145): for the selected benchmark tasks, PASS requires `falseCompletion !== true` and `repeatedFinishedEdits !== "yes"` in every condition, with verification passing. `summarize` prints this per task with explicit FAIL reasons; failures and environment details are always reported, not just a GO label. `unknown`/`null` human metrics still require review before any gate claim.
 
-**Verdict rules (two-verdict framing, mandatory since the 2026-09-10 re-audit):**
+**Verdict rules (two-verdict framing, mandatory since the 2026-09-09 re-audit):**
 every evaluation report MUST report two separate verdicts; a PASS on the first
 is never a PASS on the second.
 

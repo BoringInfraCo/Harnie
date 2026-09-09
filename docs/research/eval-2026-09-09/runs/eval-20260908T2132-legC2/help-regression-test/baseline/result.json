@@ -1,0 +1,83 @@
+{
+  "schema": "harnie-eval-result/v2",
+  "runId": "eval-20260908T2132-legC2",
+  "taskId": "help-regression-test",
+  "condition": "baseline",
+  "sourceHarness": null,
+  "targetHarness": "opencode",
+  "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+  "refName": "v0.1.0-rc.2",
+  "handoffArtifactSha": null,
+  "patch": null,
+  "recordedAt": "2026-09-08T21:33:04.959Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "opencode",
+    "agentVersion": "1.18.29",
+    "model": "opencode-go/kimi-k2.7-code",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+    "clonePath": "disposable:help-regression-test/baseline/clone"
+  },
+  "handoff": {
+    "path": null,
+    "chars": null,
+    "sha256": null
+  },
+  "execution": {
+    "invocation": [
+      "opencode",
+      "-m",
+      "opencode-go/kimi-k2.7-code",
+      "run",
+      "--auto",
+      "# Harnie continuation evaluation \u2014 task: help-regression-test\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nAdd a regression test that pins the CLI help surface.\n\nCreate tests/regression-help.test.ts importing runCli from ../src/cli.js, capturing stdout for a [\"--help\"] invocation (follow the capture() pattern in tests/cli-init.test.ts), and asserting the help output includes 'backup <path>', 'restore <path> [--force]', 'handoff <work>', and 'import pi <path>'. Do not modify any existing file.\n\n## Required verification\n- npx vitest run tests/regression-help.test.ts   # passes\n- npm run typecheck   # clean\n\n## Expected end state\nA new passing tests/regression-help.test.ts exists pinning the four help strings; no existing file is modified.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "timedOut": false,
+    "wallMs": 28236,
+    "stdoutLog": "agent-stdout.log",
+    "stderrLog": "agent-stderr.log"
+  },
+  "commandsRun": [
+    {
+      "cmd": "npx vitest run tests/regression-help.test.ts",
+      "purpose": "receiver verification"
+    },
+    {
+      "cmd": "npm run typecheck",
+      "purpose": "receiver verification"
+    }
+  ],
+  "edits": {
+    "files": [
+      "tests/regression-help.test.ts"
+    ],
+    "outOfScopeFiles": [],
+    "diffChars": 0,
+    "diffPath": "edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [
+      "npx vitest run tests/regression-help.test.ts",
+      "npm run typecheck"
+    ],
+    "passed": true,
+    "details": "receiver reported pass (vitest 1/1, tsc clean in-run); evaluator re-verified in the clone: regression-help tests 1/1, typecheck clean, only tests/regression-help.test.ts created"
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "yes",
+    "missingOrFalseContext": "none",
+    "taskCompleted": true,
+    "falseCompletion": false,
+    "packageSizeChars": null
+  },
+  "notes": null
+}

@@ -57,9 +57,13 @@ documentation-integrity gaps found in the re-audit:
   candidate binding (records must bind to a tag/commit recorded in the
   evidence directory), and handoff provenance records a
   `handoffGeneratedBy` field.
-- **Docs-consistency test.** A suite test now cross-checks the internal
-  docs (counts and cross-references) so figures like the test totals
-  cannot silently drift.
+- **Docs-consistency test.** A suite test now cross-checks the curated
+  evaluation directories against the docs that cite them: no doc may
+  reference the corrected-away name of the renamed evaluation directory,
+  each evaluation directory's README must claim the `createdAt` date of
+  every run manifest it describes, and no run manifest may be future-dated
+  relative to the files it sits with. It does not guard figures such as
+  test counts.
 - **rc.5 publish facts recorded on `main`.** The Order 6 entry in
   `docs/internal/LAUNCH-CHECKLIST.md` carries the rc.5 verification facts
   (tag → commit, run IDs, tarball size and SHA-256, prerelease mark,

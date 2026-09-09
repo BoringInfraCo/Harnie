@@ -16,7 +16,7 @@ Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Cod
 Harnie captures the agent-work handoff graph (sessions → observed work → continuation targets) into a local SQLite DB at `$HARNIE_HOME/harnie.db`. Run `harnie init` + `harnie import pi <session.jsonl>` to build a normalized work archive. All data stays on your machine; core functionality requires no internet. Think of it as "git log" for agent work states—preserving what was accomplished so it can be restored or handed off later.
 
 **For technical product folks:**
-A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is complete; Phase 2 adds import/handoff tooling.
+A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is validated in limited scenarios, not established as complete: the safety sub-gate (Verdict A) passes, the full cross-harness matrix (Verdict B) is PARTIAL — Pi-receiver legs remain not-run pending a funded provider — and reduced developer re-explanation is NOT established (waiver and verdicts: `docs/internal/RELEASE-0.1.0-rc.7.md`; evidence: `docs/research/eval-2026-09-09c/`). The import/handoff tooling above is what this preview delivers.
 
 ## First run
 
@@ -28,7 +28,7 @@ Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie 
 npm ci
 npm pack
 npm install --global ./harnie-*.tgz
-harnie --version   # e.g. 0.1.0-rc.6
+harnie --version   # e.g. 0.1.0-rc.7
 harnie --help
 ```
 

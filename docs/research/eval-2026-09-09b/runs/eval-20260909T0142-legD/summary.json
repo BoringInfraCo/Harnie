@@ -53,7 +53,7 @@
       "taskCompleted": true,
       "packageSizeChars": 1907,
       "notRunReason": null,
-      "notes": "funded rerun (2026-09-09) of the unrelated-task pair bound to v0.1.0-rc.3 (cbe5399); driver context MATCHES the explicit benchmark task (synthetic codex driver for first-run-recovery, declared synthetic), unlike the 2026-09-09 Codex->OpenCode leg whose handoff context was unrelated"
+      "notes": "funded rerun (2026-09-09) of the unrelated-task pair bound to v0.1.0-rc.3 (cbe5399); driver context MATCHES the explicit benchmark task (synthetic codex driver for first-run-recovery, declared synthetic), unlike the 2026-09-09 Codex->OpenCode leg whose handoff context was unrelated handoffGeneratedBy provenance (post-rc.6 re-audit P2 closure): the referenced artifact was rendered by Harnie v0.1.0-rc.3 during this pass (generating run's manifest tagSha cbe5399346a27d43a13dc8856dfe54ff039936fe) — the same evaluated candidate as this leg, so handoffGeneratedBySha === tagSha."
     },
     {
       "taskId": "first-run-recovery",

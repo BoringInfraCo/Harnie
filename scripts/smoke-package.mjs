@@ -34,6 +34,7 @@ try {
     /pending tag/i,
     /prepared, pending/i,
     /what remains to publish/i,
+    /latest full run/i,
   ];
   for (const entry of readdirSync(docs, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;

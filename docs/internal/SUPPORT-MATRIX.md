@@ -50,11 +50,10 @@ We do not claim native resume, universal session compatibility, or quantified pr
 ## Deliberately untested / unknown (do not promise)
 
 - Suite greenness and size: `npm run check` (typecheck + tests + package
-  smoke) on the current tree — typecheck clean, 63 test files /
-  415 tests passed, package smoke passed on v22.23.0 (including the
-  packaged-docs lifecycle check, the strict-flag and `--version` packed
-  repros), latest full run 2026-09-09. Counts move with the code — run the
-  suite (or consult the repository status checks) for the current figures.
+  smoke) on the current tree. This file deliberately quotes no suite
+  figures: counts move with the code and any quoted figure goes stale —
+  run `npm run check` or consult repository status checks for current
+  figures.
 - Suite size: the audit's "191 tests" figure predates the `sessions` work and
   other uncommitted changes; do not quote a count without running the suite.
 - Concurrent-write behavior (multiple simultaneous `harnie` processes against

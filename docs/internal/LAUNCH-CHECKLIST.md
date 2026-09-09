@@ -4,7 +4,7 @@ Date: 2026-09-08. Maps the audit's Orders 1–6
 (`docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md`, "Recommended launch
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
-on the `0.1.0-rc.6` tree on 2026-09-09 (typecheck clean, 63 test files /
+on the `0.1.0-rc.7` tree on 2026-09-09 (typecheck clean, 64 test files /
 415 tests passed, package smoke passed on v22.23.0 including the expanded
 packaged-docs lifecycle check, strict-flag (help-mode parse-before-help)
 and `--version` repros); for the current counts see the latest CI run —
@@ -54,11 +54,17 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   README (both refreshed; install command version-agnostic `harnie-*.tgz`).
   Honesty: SUPPORT-MATRIX.md evidence-backed and refreshed for RC2 (machine
   contract and budgeted handoffs now listed as supported; permissions and
-  JSON redaction rows updated). Package now carries the user docs
-  (`FIRST-RUN`, `BACKUP-RECOVERY`, `MACHINE-CONTRACT`, `SUPPORT-MATRIX`,
-  `RELEASE-0.1.0-rc.2`) and the example fixture
-  `tests/fixtures/pi/coding.jsonl` (verified via `npm pack --dry-run`);
-  internal strategy material is excluded.
+  JSON redaction rows updated; suite counts later removed from the packaged
+  file — figures live in `npm run check` output and repository status
+  checks, recorded in this checklist's header). Packaging (current reality,
+  re-verified via `npm pack --dry-run`): the tarball carries the user docs
+  (`FIRST-RUN`, `BACKUP-RECOVERY`, `MACHINE-CONTRACT`, `SUPPORT-MATRIX`),
+  the single lifecycle-neutral release note for the version being packed
+  (`RELEASE-0.1.0-rc.7.md`), and the example fixture
+  `tests/fixtures/pi/coding.jsonl`; internal strategy material and the
+  historical rc.1–rc.6 release notes are excluded. (At this order's
+  original closure on the rc.2 tree, the packaged release note was
+  `RELEASE-0.1.0-rc.2`.)
   How to verify: follow `docs/internal/FIRST-RUN.md` on a clean checkout with
   a scratch `HARNIE_HOME`; confirm `harnie sessions`, fixture import, own-session
   import, `show`, `handoff`, and continuation-from-handoff with no other help;
@@ -81,8 +87,9 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   Gate: unrelated-repository tasks, bidirectional paths, baseline comparison,
   raw outcome evidence; no false completion or repeated completed edits in the
   benchmark tasks for the initial preview gate.
-  Status: extended 2026-09-08, PASS (initial gate 2026-09-07
-  `docs/research/eval-2026-09-07/`).
+  Status: extended 2026-09-08 (initial gate 2026-09-07
+  `docs/research/eval-2026-09-07/`); superseded by the two-verdict framing
+  below — order status Verdict A PASS / Verdict B PARTIAL/INCONCLUSIVE.
   Evidence: `docs/research/eval-2026-09-08/` — all three receivers exercised
   (pi 0.84.4 -p, codex 0.149.1 exec --sandbox workspace-write, opencode
   1.18.29 run --auto); bidirectional paths (--to pi→pi, --to codex driven by
@@ -95,13 +102,17 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   How to verify: `node scripts/eval-continuation.mjs tasks --json`;
   inspect `docs/research/eval-2026-09-08/`.
 - Order 5 — Directed cross-harness matrix (2026-09-09, ref v0.1.0-rc.2/0231dd7,
-  plus funded rerun pass bound to v0.1.0-rc.3/cbe5399, plus final
-  candidate-bound pass bound to v0.1.0-rc.5/6ac02e3). Two-verdict framing per
+  plus funded rerun pass bound to v0.1.0-rc.3/cbe5399, plus newest
+  candidate-bound pass bound to v0.1.0-rc.5/6ac02e3) — order status:
+  **Verdict A PASS / Verdict B PARTIAL/INCONCLUSIVE**. The released
+  candidate is now v0.1.0-rc.6 (tagSha a81f5840ef17ab42e08119f34591c2a7cf6b1e64);
+  no receiver runs are bound to rc.6 — the rc.6 round was docs-integrity
+  only and changed no evaluation behavior. Two-verdict framing per
   `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A is not a PASS
   on Verdict B):
 
   - [x] Verdict A (safety among completed runs): PASS — 9 successful receiver runs total (rc.2: eval-2026-09-09, 7; rc.3: eval-2026-09-09b, 2); zero false completion / repeated finished edits / out-of-scope edits. The rc.5 candidate itself has no receiver runs (probe-gated).
-  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — confirmed for v0.1.0-rc.5 (tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc); release ships under an explicit waiver (docs/internal/RELEASE-0.1.0-rc.5.md)
+  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — newest candidate-bound confirmation v0.1.0-rc.5 (tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc); released candidate v0.1.0-rc.6 (tagSha a81f5840ef17ab42e08119f34591c2a7cf6b1e64) and the rc.7 preview carry the same waiver (docs/internal/RELEASE-0.1.0-rc.5.md → RELEASE-0.1.0-rc.6.md → RELEASE-0.1.0-rc.7.md); no rc.6- or rc.7-bound evaluation legs exist
     - [x] Pi → Harnie → OpenCode: met (09-09, rc.2; handoff+baseline verified)
     - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials 2-3 NOT RUN — pi provider unfunded (402 openrouter_credits / 429 free-tier daily; re-probed 2026-09-09T13:54Z), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/
     - [ ] Codex → Harnie → Pi: NOT RUN — same provider blocker (handoff + baseline recorded not-run, ready artifact sha-pinned), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/
@@ -109,9 +120,9 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
       - 09-09 leg: handoff context unrelated to the benchmark task → no semantic-continuation claim
       - leg D (rc.3, first-run-recovery, task-matching driver context): handoff + baseline PASS
     - [x] Continuation semantics: met via OpenCode→Codex greeting-command leg (09-09; steps 1-2 → step 3 only)
-  - [x] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts ready + sha-pinned in docs/research/eval-2026-09-{09,09b}/driver/, all four missing legs recorded not-run with reasons in docs/research/eval-2026-09-09c/
+  - [x] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts ready + sha-pinned in docs/research/eval-2026-09-{09,09b}/driver/, all four missing legs recorded not-run with reasons in docs/research/eval-2026-09-09c/ (those records are bound to v0.1.0-rc.5/6ac02e3, tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc; the ready handoff artifacts were generated by v0.1.0-rc.2 — handoffGeneratedBy=rc.2/0231dd77; no rc.6- or rc.7-bound records exist)
   - [x] Developer re-explanation threshold ("substantially less re-explanation"): NOT ESTABLISHED — 4 n=1 pairs, mean Δ ≈ −0.6s mixed sign, newest 35.1s vs 33.3s (docs/research/eval-2026-09-09c/{README,summary}.md); no productivity claim made
-  - [x] Release waiver (docs/internal/RELEASE-0.1.0-rc.5.md) accurate at re-verification 2026-09-09T13:54Z
+  - [x] Release waiver: carried by the current release note (docs/internal/RELEASE-0.1.0-rc.6.md, carried forward by RELEASE-0.1.0-rc.7.md for the rc.7 preview); the rc.5 note (docs/internal/RELEASE-0.1.0-rc.5.md) was accurate at re-verification 2026-09-09T13:54Z; pi probes re-verified unfunded 2026-09-09T15:35Z (docs/research/eval-2026-09-09c/probes/)
   - [x] Integrity: verify-evidence OK on eval-2026-09-09, eval-2026-09-09b, eval-2026-09-09c (run after any new evidence)
 - [x] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
@@ -165,6 +176,4 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   SHA-256 `b75e5eaf69094a5af0711c988dcc8329dd96b47c9e352e6293794a703c2b385d`
   (downloaded independently; sidecar match verified 2026-09-09),
   `isPrerelease` true. Packaged manifest now carries only the lifecycle-
-  neutral rc.6 release note. To record here after publishing (on `main`,
-  not in the packaged file): tag → commit, CI/release run IDs, asset +
-  sidecar SHA-256, `isPrerelease`, independent verification results.
+  neutral rc.6 release note.
