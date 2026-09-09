@@ -389,7 +389,7 @@ function sha256File(path) {
 function applyDriverPatch(cloneDir, patchPath) {
   execFileSync("git", ["-C", cloneDir, "apply", "--whitespace=nowarn", patchPath]);
   execFileSync("git", ["-C", cloneDir, "add", "-A"]);
-  execFileSync("git", ["-C", cloneDir, "commit", "--quiet", "--no-gpg-sign", "-m", "eval driver pre-applied steps (harness --patch)"]);
+  execFileSync("git", ["-C", cloneDir, "-c", "user.name=harnie-eval", "-c", "user.email=eval@harnie.local", "commit", "--quiet", "--no-gpg-sign", "-m", "eval driver pre-applied steps (harness --patch)"]);
   return { path: patchPath, sha256: sha256File(patchPath), committed: true };
 }
 
