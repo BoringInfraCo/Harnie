@@ -157,19 +157,14 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   2026-09-09.
    How to verify: `npm run check`, `npm run test:package`,
    release tag + published GitHub Release.
-- [ ] **Order 6 — `v0.1.0-rc.6` pending.** RC6 = RC5 + post-rc.5
-  documentation-integrity round: lifecycle-neutral capability matrix
-  (`docs/internal/SUPPORT-MATRIX.md` — capabilities, evidence, limitations
-  only; no release-status or publication chronology; candidate binding
-  cited from the evidence's per-`tagSha` records), expanded packaged-docs
-  lifecycle ban in `scripts/smoke-package.mjs` (nine phrase families),
-  chronology corrections in the historical rc.3–rc.5 notes (runs dated
-  2026-09-09 ~01:41–01:46Z, pre-rc.4-publish, recorded in
-  `docs/research/eval-2026-09-09b/`; the pi re-probes of 13:54Z in
-  `docs/research/eval-2026-09-09c/`), verify-evidence candidate-binding
-  enforcement + `handoffGeneratedBy` provenance, docs-consistency test,
-  version bump to `0.1.0-rc.6` (historical release notes rc.1–rc.5 removed
-  from the packaged `files`; only the current rc.6 note ships).
-  To record here after publishing (on `main`, not in the packaged file):
-  tag → commit, CI/release run IDs, asset + sidecar SHA-256,
-  `isPrerelease`, independent verification results.
+- [x] **Order 6 — `v0.1.0-rc.6` published 2026-09-09.** Tag `v0.1.0-rc.6` →
+  commit `a81f584`; CI green on main (run 34372131890) and the tag (run
+  34372133228); Release workflow green (run 34372133323); GitHub Release
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.6 with
+  assets `harnie-0.1.0-rc.6.tgz` (92.7 kB) and its `.sha256` sidecar,
+  SHA-256 `b75e5eaf69094a5af0711c988dcc8329dd96b47c9e352e6293794a703c2b385d`
+  (downloaded independently; sidecar match verified 2026-09-09),
+  `isPrerelease` true. Packaged manifest now carries only the lifecycle-
+  neutral rc.6 release note. To record here after publishing (on `main`,
+  not in the packaged file): tag → commit, CI/release run IDs, asset +
+  sidecar SHA-256, `isPrerelease`, independent verification results.
