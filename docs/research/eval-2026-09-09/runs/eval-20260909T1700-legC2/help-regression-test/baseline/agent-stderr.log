@@ -1,0 +1,33 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m→ [0mRead tests/cli-init.test.ts
+[0m✗ [0mRead src/cli.js failed
+[91m[1mError: [0mFile not found: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC2/help-regression-test/baseline/clone/src/cli.js
+
+Did you mean one of these?
+/private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC2/help-regression-test/baseline/clone/src/cli
+[0m→ [0mRead src/cli
+[0m✱ [0mGlob "src/cli/**/*"[90m 12 matches[0m
+[0m✱ [0mGlob "src/*"[90m 4 matches[0m
+[0m→ [0mRead package.json
+[0m→ [0mRead src/cli.ts
+[0m
+[0m← [0mWrite tests/regression-help.test.ts
+Wrote file successfully.
+[0m
+[0m$ [0mnpx vitest run tests/regression-help.test.ts
+RUN  v4.1.11 /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC2/help-regression-test/baseline/clone
+
+(node:32201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:33:00
+   Duration  201ms (transform 112ms, setup 0ms, import 140ms, tests 1ms, environment 0ms)
+[0m
+[0m$ [0mnpm run typecheck
+> harnie@0.1.0-rc.2 typecheck
+> tsc --noEmit
+[0m

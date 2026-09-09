@@ -1,0 +1,11 @@
+Task complete.
+
+**Report:**
+1. **Files edited:** Created `tests/regression-help.test.ts`
+2. **Commands run:**
+   - `npx vitest run tests/regression-help.test.ts`
+   - `npm run typecheck`
+3. **Verification:**
+   - Vitest: **pass** (1 test passed)
+   - Typecheck: **clean**
+4. **Task complete:** Yes — new regression test pins the four help strings; no existing files were modified.

@@ -1,5 +1,17 @@
 # Extended evaluation summary — run eval-20260908T1030 (2026-09-08, Order 5)
 
+> **RECLASSIFIED 2026-09-09 (post-rc.2 re-audit, P1 finding).** The runs below
+> demonstrate **RECEIVER COMPATIBILITY**, not the directed handoff paths: every
+> handoff in this directory was rendered *for* its receiver's own harness
+> (Pi→Pi, Codex→Codex, OpenCode→OpenCode — i.e. source = same harness as the
+> target). The DIRECTED matrix required by `docs/internal/ROADMAP.md:200`
+> (Pi → Harnie → OpenCode; OpenCode → Harnie → Pi; Codex → Harnie → Pi/OpenCode)
+> lives in **[docs/research/eval-2026-09-09/](../eval-2026-09-09/README.md)**.
+> Note also that this evaluation ran against the **rc.1 commit `12dda05`**, not
+> the rc.2 candidate (`0231dd7` / tag `v0.1.0-rc.2`); the directed matrix in
+> eval-2026-09-09 evaluates `v0.1.0-rc.2`. The historical results below are
+> preserved as-is; only this header and the README header were added.
+
 Companion to [README.md](README.md) (full report). Extends — does not replace —
 `docs/research/eval-2026-09-07/` (rc.1 record). Ref: committed HEAD
 `12dda05` · Node v22.23.0 · darwin · temp Harnie home

@@ -1,9 +1,9 @@
 # Release notes — harnie 0.1.0-rc.2 (developer preview)
 
-Date: 2026-09-08. Status: **prepared, pending tag** (`v0.1.0-rc.2`). RC2 =
-RC1 (`docs/internal/RELEASE-0.1.0-rc.1.md`) plus the post-rc.1 re-audit
-remediation. The remaining release step is documented at the bottom and in
-`docs/internal/LAUNCH-CHECKLIST.md` (Order 6).
+Date: 2026-09-08. Status: **published** (tag `v0.1.0-rc.2`, see
+"Published artifact" at the bottom). RC2 = RC1
+(`docs/internal/RELEASE-0.1.0-rc.1.md`) plus the post-rc.1 re-audit
+remediation.
 
 ## What this preview does
 
@@ -136,10 +136,17 @@ Automated equivalent: `npm run check` (typecheck + tests + offline package
 smoke test), enforced by `.github/workflows/ci.yml` and re-run by
 `.github/workflows/release.yml` on tag pushes.
 
-## What remains to publish
+## Published artifact
 
-Release-engineering steps (orchestrator, user-executed): commit the working
-tree, tag `v0.1.0-rc.2`, push with tags — CI gates the tag and
-`.github/workflows/release.yml` creates the GitHub Release with the tarball
-attached. Confirm both workflows green (`docs/internal/LAUNCH-CHECKLIST.md`,
-Order 6).
+RC2 is fully published (2026-09-08):
+
+- Tag `v0.1.0-rc.2` → commit `0231dd77ce909d04fcb60692ae48a47df04c9b68`.
+- CI green: run 34245576389. Release workflow green: run 34245576530.
+- GitHub release: https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.2
+  with asset `harnie-0.1.0-rc.2.tgz` (~90 kB).
+- Verified by independent clean-prefix install on 2026-09-08.
+
+Note: the release was published before the workflow marked prereleases
+automatically; the orchestrator runs
+`gh release edit v0.1.0-rc.2 --prerelease` to backfill the prerelease marker
+(marked in `.github/workflows/release.yml` comments, not run by agents).

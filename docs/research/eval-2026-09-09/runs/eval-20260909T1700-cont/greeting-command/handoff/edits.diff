@@ -1,0 +1,32 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..f92cbd9 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -15,6 +15,7 @@ import { runInit } from "./cli/init.js";
+ import { runList } from "./cli/list.js";
+ import { runSessions } from "./cli/sessions.js";
+ import { runShow } from "./cli/show.js";
++import { greet } from "./greeting.js";
+ 
+ export interface CliWriter {
+   write(chunk: string): unknown;
+@@ -29,6 +30,7 @@ export interface RunCliOptions {
+ const usage = `Usage: harnie <command>
+ 
+ Commands:
++  greet <name>      Print a greeting
+   init              Create the Harnie home directory and SQLite store
+   import pi <path>  Import a Pi session as observed Work
+   import opencode <path|session-id>
+@@ -83,6 +85,11 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
+     return runInit(io);
+   }
+ 
++  if (command === "greet") {
++    stdout.write(`${greet(argv[1] ?? "")}\n`);
++    return 0;
++  }
++
+   if (command === "import") {
+     return runImport(argv.slice(1), io);
+   }

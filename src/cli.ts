@@ -15,6 +15,7 @@ import { runInit } from "./cli/init.js";
 import { runList } from "./cli/list.js";
 import { runSessions } from "./cli/sessions.js";
 import { runShow } from "./cli/show.js";
+import { packageVersion } from "./cli/version.js";
 
 export interface CliWriter {
   write(chunk: string): unknown;
@@ -27,6 +28,11 @@ export interface RunCliOptions {
 }
 
 const usage = `Usage: harnie <command>
+
+Top-level:
+  --version, -V     Print the CLI package version and exit
+                    (the store schema version and the harnie.cli.v1 JSON
+                    envelope schema are separate constants)
 
 Commands:
   init              Create the Harnie home directory and SQLite store
@@ -73,6 +79,11 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
     return 0;
   }
 
+  if ((command === "--version" || command === "-V") && argv.length === 1) {
+    stdout.write(`harnie ${packageVersion()}\n`);
+    return 0;
+  }
+
   const io = {
     stdout,
     stderr,
@@ -80,7 +91,7 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
   };
 
   if (command === "init") {
-    return runInit(io);
+    return runInit(argv.slice(1), io);
   }
 
   if (command === "import") {

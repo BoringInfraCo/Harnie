@@ -45,7 +45,7 @@ writeFileSync(
     "const args = process.argv.slice(2);",
     "const get = (k) => args[args.indexOf(k) + 1];",
     'const prompt = readFileSync(get("--prompt-file"), "utf8");',
-    'writeFileSync(get("--clone") + "/FAKE-" + get("--mark") + ".txt", "fake edit\\nprompt chars: " + prompt.length + "\\n");',
+    'writeFileSync(get("--clone") + "/FAKE-" + get("--mark") + ".txt", "fake edit\\nprompt chars: " + prompt.length + "\\nHARNIE_HOME=" + (process.env.HARNIE_HOME ?? "(unset)") + "\\nPWD=" + process.env.PWD + "\\n");',
     'writeFileSync(get("--clone") + "/README.md", readFileSync(get("--clone") + "/README.md", "utf8") + "\\n<!-- fake edit -->\\n");',
     'console.log("fake agent done");',
   ].join("\n"),
@@ -154,6 +154,140 @@ describe("eval harness — mocked agent run", () => {
     const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
     expect(prompt).toContain(mod.TASKS[0]!.statement);
     expect(prompt).toContain("## Required verification");
+
+    // Directed-matrix provenance fields (2026-09-09).
+    expect(result.sourceHarness).toBeNull();
+    expect(result.targetHarness).toBe("node");
+    expect(result.tagSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(result.refName).toBe("HEAD");
+    expect(result.handoffArtifactSha).toBeNull();
+    const runJson = JSON.parse(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8"));
+    expect(runJson.tagSha).toBe(result.tagSha);
+    expect(runJson.refName).toBe("HEAD");
+  });
+
+  it("contains receivers: clone cwd, sandboxed HARNIE_HOME, no repo-tree writes", () => {
+    const runId = uniqueRun();
+    const res = runHarness([
+      "run",
+      "--task",
+      "version-flag",
+      "--condition",
+      "baseline",
+      "--run",
+      runId,
+      "--agent-command",
+      agentCommand("CT"),
+    ]);
+    expect(res.code).toBe(0);
+    const dir = join(EVAL_BASE, runId, "version-flag", "baseline");
+    const fake = readFileSync(join(dir, "clone", "FAKE-CT.txt"), "utf8");
+    const harnieHome = /HARNIE_HOME=(\S*)/.exec(fake)?.[1] ?? "";
+    // HARNIE_HOME must be pinned inside the eval sandbox, never the real home.
+    expect(harnieHome).not.toBe("");
+    expect(harnieHome.startsWith(EVAL_BASE)).toBe(true);
+    expect(harnieHome).not.toContain(".harnie");
+    expect(harnieHome).not.toBe(process.env.HARNIE_HOME ?? "");
+    // The receiver's PWD must be the clone, not the Harnie working tree.
+    const pwd = /PWD=(\S*)/.exec(fake)?.[1] ?? "";
+    expect(pwd).toBe(join(dir, "clone"));
+    expect(pwd.startsWith(process.cwd())).toBe(false);
+  });
+
+  it("records --source-harness/--target-harness provenance (handoff condition only for source)", () => {
+    const runId = uniqueRun();
+    const handoffFile = join(scratch, "fake-handoff-prov.md");
+    writeFileSync(handoffFile, "# provenance test handoff\n");
+    const res = runHarness([
+      "run",
+      "--task",
+      "version-flag",
+      "--condition",
+      "handoff,baseline",
+      "--run",
+      runId,
+      "--agent-command",
+      agentCommand("PV"),
+      "--source-harness",
+      "pi",
+      "--handoff",
+      handoffFile,
+    ]);
+    expect(res.code).toBe(0);
+    const base = join(EVAL_BASE, runId, "version-flag");
+    const handoffResult = JSON.parse(readFileSync(join(base, "handoff", "result.json"), "utf8"));
+    const baselineResult = JSON.parse(readFileSync(join(base, "baseline", "result.json"), "utf8"));
+    expect(handoffResult.sourceHarness).toBe("pi");
+    expect(baselineResult.sourceHarness).toBeNull();
+    expect(handoffResult.targetHarness).toBe("node");
+    expect(handoffResult.handoffArtifactSha).toBe(handoffResult.handoff.sha256);
+    expect(baselineResult.handoffArtifactSha).toBeNull();
+    expect(mod.validateResult(handoffResult).ok).toBe(true);
+    expect(mod.validateResult(baselineResult).ok).toBe(true);
+  });
+
+  it("validates the new provenance fields (missing tagSha / bad sha rejected)", () => {
+    const runId = uniqueRun();
+    runHarness(["run", "--task", "first-run-recovery", "--condition", "handoff", "--run", runId]);
+    const dir = join(EVAL_BASE, runId, "first-run-recovery", "handoff");
+    const template = JSON.parse(readFileSync(join(dir, "result-template.json"), "utf8"));
+
+    const noTag = { ...template, status: "ran", recordedAt: new Date().toISOString(), tagSha: undefined };
+    const noTagPath = join(scratch, "no-tag.json");
+    writeFileSync(noTagPath, JSON.stringify(noTag));
+    const rejected = runHarness(["record", "--dir", dir, "--file", noTagPath]);
+    expect(rejected.code).not.toBe(0);
+    expect(rejected.stderr).toContain("tagSha");
+
+    const badSha = { ...template, status: "ran", recordedAt: new Date().toISOString(), handoffArtifactSha: "nothex" };
+    const badShaPath = join(scratch, "bad-sha.json");
+    writeFileSync(badShaPath, JSON.stringify(badSha));
+    const rejectedSha = runHarness(["record", "--dir", dir, "--file", badShaPath]);
+    expect(rejectedSha.code).not.toBe(0);
+    expect(rejectedSha.stderr).toContain("handoffArtifactSha");
+  });
+
+  it("--patch applies the driver pre-state as a commit (continuation semantics)", async () => {
+    const runId = uniqueRun();
+    // New-file patch: applies cleanly against any checkout.
+    const patchPath = join(scratch, "driver-steps.patch");
+    writeFileSync(
+      patchPath,
+      [
+        "diff --git a/DRIVER-STEPS.md b/DRIVER-STEPS.md",
+        "new file mode 100644",
+        "index 0000000..d6b4a90",
+        "--- /dev/null",
+        "+++ b/DRIVER-STEPS.md",
+        "@@ -0,0 +1 @@",
+        "+driver steps 1-2 pre-applied",
+      ].join("\n") + "\n",
+    );
+    const res = runHarness([
+      "run",
+      "--task",
+      "greeting-command",
+      "--condition",
+      "baseline",
+      "--run",
+      runId,
+      "--agent-command",
+      agentCommand("PT"),
+      "--patch",
+      patchPath,
+    ]);
+    expect(res.code).toBe(0);
+    const dir = join(EVAL_BASE, runId, "greeting-command", "baseline");
+    const clone = join(dir, "clone");
+    expect(existsSync(join(clone, "DRIVER-STEPS.md"))).toBe(true);
+    // Pre-state is committed: the receiver's own edit list must not include it.
+    const { execFileSync } = await import("node:child_process");
+    const status = execFileSync("git", ["-C", clone, "status", "--porcelain"], { encoding: "utf8" });
+    expect(status).not.toContain("DRIVER-STEPS.md");
+    const result = JSON.parse(readFileSync(join(dir, "result.json"), "utf8"));
+    expect(result.patch).toEqual({ path: patchPath, sha256: expect.stringMatching(/^[0-9a-f]{64}$/), committed: true });
+    expect(result.edits.files).not.toContain("DRIVER-STEPS.md");
+    expect(mod.validateResult(result).ok).toBe(true);
   });
 
   it("does not contaminate tasks run in the same run dir", () => {

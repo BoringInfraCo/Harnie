@@ -1,4 +1,5 @@
 import { databasePath, initHarnieStore, resolveHarnieHome } from "../store/database.js";
+import { FlagParseError, parseFlags } from "../contract/flags.js";
 
 export interface RunInitOptions {
   readonly home?: string;
@@ -6,7 +7,22 @@ export interface RunInitOptions {
   readonly stderr: { write(chunk: string): unknown };
 }
 
-export const runInit = async (options: RunInitOptions): Promise<number> => {
+const usage = "Usage: harnie init\n";
+
+export const runInit = async (argv: readonly string[], options: RunInitOptions): Promise<number> => {
+  try {
+    const parsed = parseFlags(argv, {});
+    if (parsed.positionals.length > 0) {
+      options.stderr.write(usage);
+      return 1;
+    }
+  } catch (error) {
+    if (error instanceof FlagParseError) {
+      options.stderr.write(`${error.message}\n${usage}`);
+      return 1;
+    }
+    throw error;
+  }
   try {
     const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
     const store = initHarnieStore({ home });

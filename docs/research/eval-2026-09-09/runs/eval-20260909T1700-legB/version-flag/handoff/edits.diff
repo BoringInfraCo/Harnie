@@ -1,0 +1,35 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..dc1b58a 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
++import { readFileSync, realpathSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+@@ -58,11 +58,22 @@ Commands:
+                      Restore the store from a backup file
+ `;
+ 
++const getVersion = (): string => {
++  const pkgPath = new URL("../package.json", import.meta.url);
++  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version: string };
++  return pkg.version;
++};
++
+ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<number> => {
+   const stdout = options?.stdout ?? process.stdout;
+   const stderr = options?.stderr ?? process.stderr;
+   const command = argv[0];
+ 
++  if (command === "--version" || command === "-v") {
++    stdout.write(getVersion() + "\n");
++    return 0;
++  }
++
+   if (command === undefined || command === "") {
+     stderr.write(usage);
+     return 1;

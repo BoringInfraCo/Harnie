@@ -1,0 +1,74 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m→ [0mRead src/cli.ts
+[0m→ [0mRead package.json
+[0m→ [0mRead tests/cli-init.test.ts
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone/src/cli.ts
+@@ -1,9 +1,13 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
+-import { resolve } from "node:path";
++import { readFileSync, realpathSync } from "node:fs";
++import { dirname, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
++
++const version = JSON.parse(
++  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf8"),
++).version;
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+ import { runDiff } from "./cli/diff.js";
+ import { runExecutions } from "./cli/executions.js";
+
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone/src/cli.ts
+@@ -66,8 +66,13 @@
+ const stdout = options?.stdout ?? process.stdout;
+ const stderr = options?.stderr ?? process.stderr;
+ const command = argv[0];
+ 
++if (command === "--version" || command === "-v") {
++  stdout.write(`${version}\n`);
++  return 0;
++}
++
+ if (command === undefined || command === "") {
+   stderr.write(usage);
+   return 1;
+ }
+
+[0m
+[0m$ [0mnpm run build
+> harnie@0.1.0-rc.2 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.1.0-rc.2 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+[0m
+[0m$ [0mnode dist/cli.js --version && echo "exit:$?"
+0.1.0-rc.2
+exit:0
+[0m
+[0m$ [0mnpx vitest run tests/cli-init.test.ts
+RUN  v4.1.11 /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA-r2/version-flag/handoff/clone
+
+(node:29125) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  17:17:04
+   Duration  214ms (transform 116ms, setup 0ms, import 145ms, tests 8ms, environment 0ms)
+[0m

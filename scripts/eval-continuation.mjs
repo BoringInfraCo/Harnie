@@ -84,6 +84,30 @@ export const TASKS = [
     endState:
       "A new passing tests/regression-help.test.ts exists pinning the four help strings; no existing file is modified.",
   },
+  {
+    // Continuation-semantics task (added 2026-09-09, directed-matrix eval):
+    // the driver session completes steps 1-2 of a 3-step task; the receiver
+    // must do the NEXT step, not a fresh small edit. The pre-state (steps 1-2)
+    // is applied to the clone by the harness `--patch` flag as a driver commit.
+    // If a clone lacks src/greeting.ts the precondition is missing — a correct
+    // receiver stops and reports it instead of fabricating the pre-state.
+    id: "greeting-command",
+    area: "cli-continuation",
+    files: ["src/cli.ts", "src/greeting.ts", "tests/greeting.test.ts"],
+    statement:
+      "Complete step 3 of the 3-step greeting-command task: wire the existing greet() into the CLI as a `greet <name>` command.",
+    details:
+      "Steps 1 and 2 are already done and committed in this checkout: src/greeting.ts exports greet(name: string): string (returns `Hello, <name>!`; trims the name; defaults to \"world\" when empty/missing), and tests/greeting.test.ts covers basic/default/trim cases (vitest green). Your job is STEP 3 ONLY: add a `greet <name>` subcommand to src/cli.ts that prints greet(name) to stdout and exits 0, add `greet <name>` to the help/usage text, and do NOT modify src/greeting.ts or tests/greeting.test.ts. If src/greeting.ts is absent from your checkout, the precondition is missing: stop and report that instead of creating it. Then run the verification commands.",
+    verify: [
+      "npm run build",
+      "node dist/cli.js greet Ada   # prints 'Hello, Ada!', exit 0",
+      "node dist/cli.js greet '  Bob '   # prints 'Hello, Bob!', exit 0",
+      "node dist/cli.js --help   # usage lists 'greet <name>'",
+      "npx vitest run tests/greeting.test.ts   # still green",
+    ],
+    endState:
+      "`greet <name>` prints greet(name) and exits 0; the usage text lists 'greet <name>'; src/greeting.ts and tests/greeting.test.ts are unchanged; the greeting vitest suite is still green.",
+  },
 ];
 
 // Verified 2026-09-07 against installed versions:
@@ -127,6 +151,9 @@ function parseArgs(argv) {
     "timeout",
     "file",
     "dir",
+    "source-harness",
+    "target-harness",
+    "patch",
   ]);
   const parsed = { _: [], flags: {}, multi: {} };
   for (let i = 0; i < argv.length; i++) {
@@ -305,6 +332,24 @@ export function validateResult(r) {
     errors.push("edits.files must be an array");
   }
   if (!r.verification || typeof r.verification !== "object") errors.push("verification must be an object");
+  // Directed-matrix provenance (2026-09-09): which harness produced the driver
+  // session, which harness consumed the handoff, and exactly which commit was
+  // evaluated. sourceHarness is null only when there is no driver (baseline).
+  if (r.sourceHarness !== null && (typeof r.sourceHarness !== "string" || !r.sourceHarness)) {
+    errors.push("sourceHarness must be a non-empty string or null");
+  }
+  if (typeof r.targetHarness !== "string" || !r.targetHarness) {
+    errors.push("targetHarness must be a non-empty string");
+  }
+  if (typeof r.tagSha !== "string" || !/^[0-9a-f]{40}$/.test(r.tagSha)) {
+    errors.push("tagSha must be a resolved 40-hex commit sha");
+  }
+  if (typeof r.refName !== "string" || !r.refName) {
+    errors.push("refName must be a non-empty string");
+  }
+  if (r.handoffArtifactSha !== null && !/^[0-9a-f]{64}$/.test(r.handoffArtifactSha ?? "")) {
+    errors.push("handoffArtifactSha must be a 64-hex sha256 or null");
+  }
   const m = r.metrics;
   if (!m || typeof m !== "object") {
     errors.push("metrics must be an object");
@@ -335,6 +380,19 @@ function sha256File(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+// Continuation-semantics support: apply the driver's completed steps (steps
+// 1-2 of the task) to the receiver clone BEFORE the receiver runs, as a real
+// commit. Without this, a receiver would be handed a handoff describing work
+// that is not in the repo — testing instruction-following, not continuation.
+// Committing (rather than leaving the patch uncommitted) keeps collectEvidence
+// honest: git status then shows only the receiver's own edits.
+function applyDriverPatch(cloneDir, patchPath) {
+  execFileSync("git", ["-C", cloneDir, "apply", "--whitespace=nowarn", patchPath]);
+  execFileSync("git", ["-C", cloneDir, "add", "-A"]);
+  execFileSync("git", ["-C", cloneDir, "commit", "--quiet", "--no-gpg-sign", "-m", "eval driver pre-applied steps (harness --patch)"]);
+  return { path: patchPath, sha256: sha256File(patchPath), committed: true };
+}
+
 function ensureRun({ repo, refInput, runId }) {
   const runDir = join(EVAL_ROOT, runId);
   const runJsonPath = join(runDir, "run.json");
@@ -343,14 +401,26 @@ function ensureRun({ repo, refInput, runId }) {
   }
   mkdirSync(runDir, { recursive: true });
   let ref = refInput || "HEAD";
+  const refName = refInput || "HEAD";
   if (ref === "worktree") {
     ref = snapshotWorkTree(repo, runDir);
+  }
+  // Resolve the ref to the exact commit the receivers will be checked out at
+  // (recorded as tagSha). `git checkout --detach <tag>` is equivalent, but the
+  // resolved sha makes every result row auditable against the candidate.
+  let tagSha = null;
+  try {
+    tagSha = git(repo, ["rev-parse", `${ref}^{commit}`]).trim();
+  } catch {
+    tagSha = null; // invalid ref: prepareClone will fail loudly below
   }
   const run = {
     schema: "harnie-eval-run/v1",
     runId,
     repo,
-    ref,
+    ref: tagSha ?? ref,
+    refName,
+    tagSha,
     refInput: refInput || "HEAD",
     createdAt: new Date().toISOString(),
     node: process.version,
@@ -361,12 +431,20 @@ function ensureRun({ repo, refInput, runId }) {
   return { runDir, run };
 }
 
-function resultTemplate({ task, condition, run, dirName, handoffPath }) {
+function resultTemplate({ task, condition, run, dirName, handoffPath, sourceHarness, targetHarness }) {
   return {
     schema: RESULT_SCHEMA,
     runId: run.runId,
     taskId: task.id,
     condition,
+    // Directed-matrix provenance: sourceHarness=null for baseline (no driver);
+    // targetHarness is the receiver harness that consumes the run.
+    sourceHarness: sourceHarness ?? null,
+    targetHarness: targetHarness ?? "human",
+    tagSha: run.tagSha,
+    refName: run.refName,
+    handoffArtifactSha: null,
+    patch: null,
     recordedAt: null,
     status: "not-run",
     notRunReason: "receiver has not run yet — fill this template after the manual run",
@@ -481,6 +559,18 @@ function cmdRun(parsed) {
     }
     handoffContent = readFileSync(handoffPath, "utf8");
   }
+  const patchPath = parsed.flags.patch ? resolve(parsed.flags.patch) : null;
+  if (patchPath && !existsSync(patchPath)) {
+    console.error(`Patch file not found: ${patchPath}`);
+    return 1;
+  }
+  // Directed-matrix provenance: sourceHarness names the harness the driver
+  // session came from (pi/opencode/codex); targetHarness names the receiver.
+  // targetHarness defaults to the receiver agent; for `custom:<bin>` agent
+  // commands the prefix is stripped so the value stays a harness name.
+  const sourceHarness = parsed.flags["source-harness"]
+    ? String(parsed.flags["source-harness"])
+    : null;
   // `--handoff` is the prior-session context for the handoff condition only.
   // A baseline run must never inherit the handoff artifact (path, size, sha):
   // the 2026-09-07 summary showed handoff char counts on baseline rows purely
@@ -497,13 +587,23 @@ function cmdRun(parsed) {
     console.error(`Unknown agent "${agentName}". Available: ${Object.keys(AGENTS).join(", ")}`);
     return 1;
   }
+  let targetHarness = parsed.flags["target-harness"]
+    ? String(parsed.flags["target-harness"])
+    : agentName
+      ? agentName.replace(/^custom:/, "")
+      : "human";
+  if (!targetHarness) targetHarness = "human";
 
   for (const condition of conditions) {
     const { path: condHandoffPath, content: condHandoffContent } = conditionHandoff(condition);
+    // sourceHarness describes the driver of the handoff condition only; a
+    // baseline run has no driver, so its provenance is null there too.
+    const condSourceHarness = condition === "handoff" ? sourceHarness : null;
     const dir = join(runDir, task.id, condition);
     mkdirSync(dir, { recursive: true });
     const cloneDir = join(dir, "clone");
     const prep = prepareClone({ repo: run.repo, ref: run.ref, dir: cloneDir });
+    const patchInfo = patchPath ? applyDriverPatch(cloneDir, patchPath) : null;
     const promptPath = join(dir, "prompt.md");
     writeFileSync(promptPath, buildPrompt(task, condition, condHandoffContent));
 
@@ -546,9 +646,10 @@ function cmdRun(parsed) {
 
     if (!canRun) {
       writeFileSync(join(dir, "manual-instructions.md"), manual);
-      writeFileSync(join(dir, "result-template.json"), JSON.stringify(resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath }), null, 2) + "\n");
+      writeFileSync(join(dir, "result-template.json"), JSON.stringify(resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath, sourceHarness: condSourceHarness, targetHarness }), null, 2) + "\n");
       const result = {
-        ...resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath }),
+        ...resultTemplate({ task, condition, run, dirName: cloneDir, handoffPath: condHandoffPath, sourceHarness: condSourceHarness, targetHarness }),
+        patch: patchInfo,
         status: "manual",
         recordedAt: new Date().toISOString(),
         notRunReason: "no agent CLI available/selected; manual-run mode — see manual-instructions.md",
@@ -576,6 +677,14 @@ function cmdRun(parsed) {
     delete childEnv.OPENCODE;
     delete childEnv.OPENCODE_PID;
     delete childEnv.AGENT;
+    // Never let a receiver touch the real Harnie home: pin HARNIE_HOME to a
+    // disposable per-run directory so any receiver-initiated `harnie` call
+    // (or stray HARNIE_HOME inherited from the outer session) lands in the
+    // eval sandbox, never in ~/.harnie. Verified 2026-09-09 via the fake-agent
+    // containment test in tests/eval-harness.test.ts.
+    const sandboxHarnieHome = join(runDir, "harnie-home");
+    mkdirSync(sandboxHarnieHome, { recursive: true });
+    childEnv.HARNIE_HOME = sandboxHarnieHome;
     childEnv.PWD = cloneDir;
     childEnv.OLDPWD = cloneDir;
     const res = spawnSync(invocation[0], invocation.slice(1), {
@@ -587,6 +696,7 @@ function cmdRun(parsed) {
     closeSync(outFd);
     closeSync(errFd);
     const wallMs = Date.now() - started;
+    const timedOut = res.error?.code === "ETIMEDOUT" || res.signal === "SIGTERM";
 
     const evidence = collectEvidence(dir, cloneDir, task, condHandoffPath, run);
     const result = {
@@ -594,6 +704,12 @@ function cmdRun(parsed) {
       runId: run.runId,
       taskId: task.id,
       condition,
+      sourceHarness: condSourceHarness,
+      targetHarness,
+      tagSha: run.tagSha,
+      refName: run.refName,
+      handoffArtifactSha: evidence.handoff.sha256,
+      patch: patchInfo,
       recordedAt: new Date().toISOString(),
       status: "ran",
       notRunReason: null,
@@ -611,6 +727,7 @@ function cmdRun(parsed) {
         invocation,
         exitCode: res.status,
         signal: res.signal || null,
+        timedOut,
         wallMs,
         stdoutLog: outPath,
         stderrLog: errPath,
@@ -627,7 +744,7 @@ function cmdRun(parsed) {
       notes: null,
     };
     const resultPath = writeResult(dir, result);
-    console.log(`[ran] ${task.id}/${condition} exit=${res.status} wallMs=${wallMs}`);
+    console.log(`[ran] ${task.id}/${condition} exit=${res.status} wallMs=${wallMs}${timedOut ? " TIMED OUT" : ""}`);
     console.log(`Result: ${resultPath}`);
   }
   return 0;
@@ -678,6 +795,7 @@ function cmdCollect(parsed) {
     diffPath: evidence.diffPath,
   };
   result.handoff = evidence.handoff;
+  result.handoffArtifactSha = evidence.handoff.sha256;
   const written = writeResult(dir, result);
   console.log(`Collected evidence into ${written}`);
   return 0;
@@ -740,6 +858,12 @@ function cmdSummarize(parsed) {
         status: r.status,
         agent: r.environment?.agent ?? null,
         model: r.environment?.model ?? null,
+        sourceHarness: r.sourceHarness ?? null,
+        targetHarness: r.targetHarness ?? r.environment?.agent ?? null,
+        tagSha: r.tagSha ?? run.tagSha ?? null,
+        refName: r.refName ?? run.refName ?? null,
+        handoffArtifactSha: r.handoffArtifactSha ?? r.handoff?.sha256 ?? null,
+        timedOut: r.execution?.timedOut ?? null,
         exitCode: r.execution?.exitCode ?? null,
         filesEdited: r.edits?.files ?? [],
         outOfScopeFiles: r.edits?.outOfScopeFiles ?? [],
@@ -766,21 +890,23 @@ function cmdSummarize(parsed) {
   const md = [];
   md.push(`# Continuation evaluation summary — run ${runId}`);
   md.push("");
-  md.push(`Ref: \`${run.ref}\` · Node: ${run.node} · Platform: ${run.platform} · Repo: ${run.repo}`);
+  md.push(`Ref: \`${run.refName}\` → \`${run.ref}\` · tagSha \`${run.tagSha}\` · Node: ${run.node} · Platform: ${run.platform} · Repo: ${run.repo}`);
   md.push("");
-  md.push("| Task | Condition | Status | Agent | Model | Exit | Files edited | Out-of-scope | Verification | Repeated finished edits | False completion | Completed | Handoff chars |");
-  md.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  md.push("| Task | Condition | Source→Target | Status | Agent | Model | tagSha | Handoff sha256 (first 12) | Exit | Files edited | Out-of-scope | Verification | Repeated finished edits | False completion | Completed | Handoff chars |");
+  md.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const r of rows) {
     if (!r.present) {
-      md.push(`| ${r.taskId} | ${r.condition} | missing | | | | | | | | | | |`);
+      md.push(`| ${r.taskId} | ${r.condition} | | missing | | | | | | | | | | | | |`);
       continue;
     }
     const sizeCell =
       r.condition === "baseline" && r.packageSizeChars === null
         ? "N/A"
         : (r.packageSizeChars ?? "");
+    const directed = r.sourceHarness ? `${r.sourceHarness}→${r.targetHarness}` : `baseline→${r.targetHarness}`;
+    const sha12 = r.handoffArtifactSha ? r.handoffArtifactSha.slice(0, 12) : "";
     md.push(
-      `| ${r.taskId} | ${r.condition} | ${r.status} | ${r.agent ?? ""} | ${r.model ?? ""} | ${r.exitCode ?? ""} | ${r.filesEdited.join(", ")} | ${r.outOfScopeFiles.join(", ")} | ${r.verificationPassed ?? "unknown"} | ${r.repeatedFinishedEdits} | ${r.falseCompletion ?? "unknown"} | ${r.taskCompleted ?? "unknown"} | ${sizeCell} |`,
+      `| ${r.taskId} | ${r.condition} | ${directed} | ${r.status} | ${r.agent ?? ""} | ${r.model ?? ""} | ${r.tagSha ? String(r.tagSha).slice(0, 12) : ""} | ${sha12} | ${r.exitCode ?? ""}${r.timedOut ? " (timeout)" : ""} | ${r.filesEdited.join(", ")} | ${r.outOfScopeFiles.join(", ")} | ${r.verificationPassed ?? "unknown"} | ${r.repeatedFinishedEdits} | ${r.falseCompletion ?? "unknown"} | ${r.taskCompleted ?? "unknown"} | ${sizeCell} |`,
     );
   }
   md.push("");
@@ -835,11 +961,18 @@ Commands:
   run --task <id> [--condition handoff|baseline|handoff,baseline] [--agent opencode|codex|pi]
       [--handoff <path>] [--model <provider/model>] [--agent-arg <arg>]...
       [--ref HEAD|worktree|<sha>] [--run <id>] [--timeout <ms>]
-      [--agent-command "<argv...>"]
+      [--source-harness pi|opencode|codex] [--target-harness <name>]
+      [--patch <diff>] [--agent-command "<argv...>"]
       Prepare the clone(s), invoke the agent non-interactively (or fall back to
       manual-run mode), and record result.json with collected evidence.
-      {prompt_text}, {prompt_file} and {clone} placeholders are supported in
-      --agent-command / --agent-arg.
+      --source-harness records which harness produced the driver session
+      (handoff condition only; baseline records null); --target-harness
+      records the receiver harness (defaults to the agent). --patch applies a
+      driver diff to the clone and commits it before the receiver runs
+      (continuation-semantics tasks). The receiver environment pins PWD/OLDPWD
+      to the clone and HARNIE_HOME to a per-run sandbox dir; ~/.harnie is never
+      reachable. {prompt_text}, {prompt_file} and {clone} placeholders are
+      supported in --agent-command / --agent-arg.
   collect --dir <condition dir>
       Re-collect git status/diff + handoff size into result.json.
   record --dir <condition dir> --file <result.json>

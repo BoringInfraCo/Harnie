@@ -1,0 +1,27 @@
+## Report
+
+### Files edited
+- `src/cli.ts` — added `--version` / `-v` flag support
+
+### Changes made
+1. Added `readFileSync` import from `node:fs`
+2. Added `getVersion()` helper that reads `package.json` relative to `src/cli.ts` and returns its `version` field
+3. Inserted a `--version` / `-v` check as the **first** branch in `runCli()`, before empty/undefined command handling and before `--help`. It prints the version to stdout with a newline and returns exit code 0.
+4. No other command handling was modified.
+
+### Commands run
+Attempted to run `npm run build`, but **Node.js and npm are not available in this environment**, so the following verification commands could not be executed:
+- `npm run build`
+- `node dist/cli.js --version`
+- `npx vitest run tests/cli-init.test.ts`
+
+### Verification status
+**Partially verified** — the implementation logic is correct:
+- `--version` and `-v` are handled as `argv[0]`, matching the requirement to act on the first argument
+- The version is read dynamically from `package.json` (currently `0.1.0-rc.2`), not hardcoded
+- The check appears before all other argument handling, so it exits early with code 0
+- Existing behavior for `--help`, `init`, `import`, and all other commands is unchanged
+- The existing `cli-init.test.ts` tests do not test `--version` and should remain green
+
+### Task completion
+**Implementation is complete**, but the required build/test verification could not be performed due to the absence of a Node.js runtime in this environment. The working tree is dirty with the edits.

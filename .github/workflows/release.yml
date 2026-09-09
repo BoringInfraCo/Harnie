@@ -5,6 +5,11 @@
 #   `npm run check` as a final gate before packing.
 # - `prepack` (npm run build) runs automatically during `npm pack`, producing dist/.
 # - Releases are published with auto-generated notes; the tarball is attached.
+# - Pre-release tags (v*-rc*, v*-alpha*, v*-beta*) are marked as prereleases;
+#   the tag is verified against the pushed SHA (--verify-tag).
+# - One-off backfill: the existing v0.1.0-rc.2 release (published before this
+#   workflow marked prereleases) is flipped to prerelease by the orchestrator
+#   via `gh release edit v0.1.0-rc.2 --prerelease` — not done in-workflow.
 # - GitHub CLI (`gh`) is preinstalled on ubuntu runners and authenticated with
 #   GITHUB_TOKEN; `permissions: contents: write` is required to create the release.
 name: Release
@@ -29,7 +34,12 @@ jobs:
       - name: Create release and upload tarball
         env:
           GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}
         run: |
           TARBALL="$(ls harnie-*.tgz)"
-          gh release create "$GITHUB_REF_NAME" --generate-notes
+          FLAG=""
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAG="--prerelease"
+          fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes $FLAG
           gh release upload "$GITHUB_REF_NAME" "$TARBALL" --clobber

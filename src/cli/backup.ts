@@ -16,19 +16,28 @@ export const runBackup = async (argv: string[], options: RunBackupOptions): Prom
     options.stdout.write(backupUsage);
     return 0;
   }
-  const dest = argv[0];
-  if (dest === undefined || dest === "" || dest.startsWith("-")) {
-    options.stderr.write(backupUsage);
-    return 1;
-  }
   try {
-    const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
-    const written = backupHarnieStore(home, dest);
-    options.stdout.write(`Backup\n${written}\n`);
-    return 0;
+    const parsed = parseFlags(argv, {});
+    const dest = parsed.positionals[0];
+    if (dest === undefined || dest === "" || parsed.positionals.length > 1) {
+      options.stderr.write(backupUsage);
+      return 1;
+    }
+    try {
+      const home = resolveHarnieHome(options.home ?? process.env.HARNIE_HOME);
+      const written = backupHarnieStore(home, dest);
+      options.stdout.write(`Backup\n${written}\n`);
+      return 0;
+    } catch (error) {
+      options.stderr.write(`${messageOf(error)}\n`);
+      return 1;
+    }
   } catch (error) {
-    options.stderr.write(`${messageOf(error)}\n`);
-    return 1;
+    if (error instanceof FlagParseError) {
+      options.stderr.write(`${error.message}\n${backupUsage}`);
+      return 1;
+    }
+    throw error;
   }
 };
 

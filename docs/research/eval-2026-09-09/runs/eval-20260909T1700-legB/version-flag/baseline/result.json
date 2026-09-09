@@ -1,0 +1,73 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260909T1700-legB",
+  "taskId": "version-flag",
+  "condition": "baseline",
+  "sourceHarness": null,
+  "targetHarness": "pi",
+  "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+  "refName": "v0.1.0-rc.2",
+  "handoffArtifactSha": null,
+  "patch": null,
+  "recordedAt": "2026-09-08T21:27:48.164Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "pi",
+    "agentVersion": "0.84.4",
+    "model": "openrouter/moonshotai/kimi-k2.5",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legB/version-flag/baseline/clone"
+  },
+  "handoff": {
+    "path": null,
+    "chars": null,
+    "sha256": null
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.local/bin/pi",
+      "--model",
+      "openrouter/moonshotai/kimi-k2.5",
+      "--print",
+      "# Harnie continuation evaluation — task: version-flag\n\nNo prior-session context is provided. Complete the task from the statement below.\n\n## Task\nAdd a --version flag to the Harnie CLI that prints the package version.\n\nWhen the CLI is invoked with --version (or -v) as its first argument, print the version declared in package.json (read it, do not hardcode) to stdout and exit with code 0, before any other argument handling. All other flags and commands must behave exactly as before.\n\n## Required verification\n- npm run build\n- node dist/cli.js --version   # prints 0.0.0, exit 0\n- npx vitest run tests/cli-init.test.ts   # still green\n\n## Expected end state\n`node dist/cli.js --version` prints 0.0.0 and exits 0; existing CLI behavior and the cli-init tests are unchanged.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n"
+    ],
+    "exitCode": 1,
+    "signal": null,
+    "timedOut": false,
+    "wallMs": 261793,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legB/version-flag/baseline/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legB/version-flag/baseline/agent-stderr.log"
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [
+      "package-lock.json",
+      "src/cli.ts"
+    ],
+    "outOfScopeFiles": [
+      "package-lock.json"
+    ],
+    "diffChars": 17424,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legB/version-flag/baseline/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [],
+    "passed": false,
+    "details": "receiver died before completing the task — model/provider failure — openrouter 402 in_flight_budget_exhausted (agent-stderr.log); partial edits before death: src/cli.ts + out-of-scope package-lock.json (recorded honestly)"
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "unknown",
+    "missingOrFalseContext": "none",
+    "taskCompleted": false,
+    "falseCompletion": false,
+    "packageSizeChars": null
+  },
+  "notes": "openrouter 402 in_flight_budget_exhausted (agent-stderr.log); partial edits before death: src/cli.ts + out-of-scope package-lock.json (recorded honestly)"
+}

@@ -1,5 +1,17 @@
 # Continuation evaluation results — 2026-09-08 (Order 5 extended)
 
+> **RECLASSIFIED 2026-09-09 (post-rc.2 re-audit, P1 finding).** The runs below
+> demonstrate **RECEIVER COMPATIBILITY**, not the directed handoff paths: every
+> handoff here was rendered *for* its receiver's own harness (Pi→Pi,
+> Codex→Codex, OpenCode→OpenCode — source harness = target harness). The
+> DIRECTED matrix required by `docs/internal/ROADMAP.md:200` (Pi → Harnie →
+> OpenCode; OpenCode → Harnie → Pi; Codex → Harnie → Pi/OpenCode) lives in
+> **[docs/research/eval-2026-09-09/](../eval-2026-09-09/README.md)**. This
+> evaluation also ran against the **rc.1 commit `12dda05`**, not the rc.2
+> candidate (`0231dd7` / tag `v0.1.0-rc.2`); the directed matrix in
+> eval-2026-09-09 evaluates `v0.1.0-rc.2`. Historical results below are
+> preserved unchanged apart from this header.
+
 Raw outcome evidence for the extended Order 5 continuation evaluation, closing
 the coverage gaps flagged by the 2026-09-08 re-audit of the rc.1 evaluation
 (`docs/research/eval-2026-09-07/`, which remains the rc.1 record and is NOT

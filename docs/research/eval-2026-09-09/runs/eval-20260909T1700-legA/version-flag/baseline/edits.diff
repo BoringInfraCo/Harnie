@@ -1,0 +1,25 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index ea40478..1c2f2d4 100755
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
++import { readFileSync, realpathSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+@@ -73,6 +73,12 @@ export const runCli = async (argv: string[], options?: RunCliOptions): Promise<n
+     return 0;
+   }
+ 
++  if (command === "--version" || command === "-v") {
++    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
++    stdout.write(`${pkg.version}\n`);
++    return 0;
++  }
++
+   const io = {
+     stdout,
+     stderr,

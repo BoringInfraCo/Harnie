@@ -1,0 +1,17 @@
+I'll explore the repo and implement the --version flag.
+Done.
+
+Report:
+1. Files edited: `src/cli.ts`
+2. Commands run:
+   - `npm run build`
+   - `node dist/cli.js --version`
+   - `node dist/cli.js -v`
+   - `node dist/cli.js --help`
+   - `npx vitest run tests/cli-init.test.ts`
+3. Verification:
+   - `npm run build`: pass
+   - `node dist/cli.js --version`: prints `0.1.0-rc.2` (the version declared in `package.json`) and exits 0
+   - `node dist/cli.js -v`: prints version and exits 0
+   - `npx vitest run tests/cli-init.test.ts`: pass (7 tests)
+4. Task complete: yes. The `--version`/`-v` flag is handled before other argument handling, reads `package.json` at runtime, and existing CLI behavior and tests are unchanged.

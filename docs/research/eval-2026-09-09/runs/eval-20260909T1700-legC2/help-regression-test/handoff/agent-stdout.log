@@ -1,0 +1,10 @@
+## Report
+
+1. **Files edited:** `tests/regression-help.test.ts` (new file; no existing files modified)
+2. **Commands run:**
+   - `npx vitest run tests/regression-help.test.ts`
+   - `npm run typecheck`
+3. **Verification pass/fail:** Both passed.
+   - Vitest: 1 test passed
+   - TypeScript: clean (`tsc --noEmit` with no errors)
+4. **Task complete:** Yes. The new regression test pins the CLI help surface for `--help`, asserting it includes `backup <path>`, `restore <path> [--force]`, `handoff <work>`, and `import pi <path>`.

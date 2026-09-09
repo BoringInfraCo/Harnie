@@ -24,9 +24,25 @@ try {
   assert.equal(existsSync(join(installedPackage, "src")), false, "The installed CLI must not rely on TypeScript sources");
   const executable = join(installation, "node_modules", ".bin", process.platform === "win32" ? "harnie.cmd" : "harnie");
   const cli = (...args) => run(executable, args, installation);
+  const attempt = (args) => {
+    try {
+      return { code: 0, stdout: run(executable, args, installation), stderr: "" };
+    } catch (error) {
+      return { code: error.status ?? 1, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
+    }
+  };
   assert.match(cli("--help"), /Usage: harnie/);
+  assert.match(cli("--version"), /^harnie \S+/);
+  assert.equal(cli("--version").trim(), `harnie ${version}`);
+  assert.equal(cli("-V").trim(), `harnie ${version}`);
   assert.match(cli("init"), /Initialized Harnie/);
   assert.ok(existsSync(join(home, "harnie.db")));
+  const bogusInit = attempt(["init", "--bogus"]);
+  assert.notEqual(bogusInit.code, 0, "init must reject unknown flags");
+  assert.match(bogusInit.stderr, /Unknown flag: --bogus/);
+  const bogusBackup = attempt(["backup", "backup.db", "--bogus"]);
+  assert.notEqual(bogusBackup.code, 0, "backup must reject unknown flags");
+  assert.match(bogusBackup.stderr, /Unknown flag: --bogus/);
   const fixture = join(temporary, "session.jsonl");
   copyFileSync(join(repository, "tests", "fixtures", "pi", "coding.jsonl"), fixture);
   const imported = cli("import", "pi", fixture);
@@ -38,7 +54,9 @@ try {
   const artifacts = readdirSync(join(home, "handoffs"));
   assert.equal(artifacts.length, 1, "Handoff must write one discoverable artifact");
   assert.equal(readFileSync(join(home, "handoffs", artifacts[0]), "utf8"), handoff);
-  console.log(`Packed CLI smoke passed on ${process.version}: --help, init, fixture import, handoff.`);
+  console.log(
+    `Packed CLI smoke passed on ${process.version}: --help, --version, init, strict flags, fixture import, handoff.`,
+  );
 } catch (error) {
   if (error.stdout) process.stderr.write(error.stdout);
   if (error.stderr) process.stderr.write(error.stderr);

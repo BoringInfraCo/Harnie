@@ -1,0 +1,68 @@
+{
+  "schema": "harnie-eval-result/v1",
+  "runId": "eval-20260909T1700-legC1",
+  "taskId": "shebang-guard",
+  "condition": "handoff",
+  "sourceHarness": "codex",
+  "targetHarness": "pi",
+  "tagSha": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+  "refName": "v0.1.0-rc.2",
+  "handoffArtifactSha": "da0b1468e96be2ad432bf72c857b594df1561b77087d3f1b32d68d97c3aece79",
+  "patch": null,
+  "recordedAt": "2026-09-08T21:39:21.791Z",
+  "status": "ran",
+  "notRunReason": null,
+  "environment": {
+    "agent": "pi",
+    "agentVersion": "0.84.4",
+    "model": "openrouter/moonshotai/kimi-k2.5",
+    "node": "v22.23.0",
+    "platform": "darwin",
+    "ref": "0231dd77ce909d04fcb60692ae48a47df04c9b68",
+    "clonePath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC1/shebang-guard/handoff/clone"
+  },
+  "handoff": {
+    "path": "/Users/sergio/Documents/Developer/BoringInfraCo/Harnie/docs/research/eval-2026-09-09/driver/handoff-codex_pi-sprint024.md",
+    "chars": 3225,
+    "sha256": "da0b1468e96be2ad432bf72c857b594df1561b77087d3f1b32d68d97c3aece79"
+  },
+  "execution": {
+    "invocation": [
+      "/Users/sergio/.local/bin/pi",
+      "--model",
+      "openrouter/moonshotai/kimi-k2.5",
+      "--print",
+      "# Harnie continuation evaluation — task: shebang-guard\n\nA previous agent session already worked on this task in this repository. The Harnie handoff package produced from that session appears at the bottom of this message. Use it as your context; do not re-investigate from scratch.\n\n## Task\nMake scripts/prepare-bin.mjs fail with a clear message when dist/cli.js lacks a shebang.\n\nBefore chmodding dist/cli.js, the script must check that dist/cli.js exists and begins with '#!'. If the file is missing or lacks the shebang, print a clear error to stderr naming dist/cli.js and the missing shebang, and exit non-zero. Otherwise chmod 0o755 and exit 0 as today. Edit only scripts/prepare-bin.mjs.\n\n## Required verification\n- npm run build && node scripts/prepare-bin.mjs   # exits 0 (shebang present)\n- node -e \"const fs=require('fs');const s=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js',s.replace(/^#![^\n]*\\n/,''))\" && node scripts/prepare-bin.mjs   # exits non-zero with the shebang error\n- npm run build   # restores dist/cli.js\n- npm run test:package   # still green\n\n## Expected end state\nprepare-bin.mjs exits 0 when dist/cli.js has a shebang and exits non-zero with a clear stderr message when it does not; the normal build and package smoke test still pass.\n\n## Working rules\n- Work directly in this repository checkout (your current directory).\n- Make the required edits yourself and run the verification commands.\n- Do not commit; leave the working tree dirty with your edits.\n- When finished, print a report: (1) files edited, (2) commands run, (3) verification pass/fail, (4) whether the task is complete.\n\n## Continuation handoff (from prior session)\n# Harnie handoff for Pi\n\nContinue this work. Do not re-investigate from scratch. Do not invent Pi JSONL session files.\n\n## Goal\n<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Alpaca (alpaca@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Spotify (app-68de829bf76… [+4254 chars omitted]\n\n## Workspace\n/Users/sergio/Documents/Developer/BoringInfraCo/Harnie\n\n## Test state\nconst r = await tools.exec_command({cmd: … — succeeded\n\n## Execution\ncodex / gpt-5.6-sol\ncodex-rollout-v1\n01a06ce3-76bb-7832-ac8c-81b53bc09a0a\n\n## Findings\n- - Full: 39 files, 191 tests passed (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- - `git diff --check`: clean (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- - Final subagent review: no actionable issues (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- - Vet was invoked repeatedly but could not run due missing credentials and an installed-CLI crash on untracked files (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n- Sprint 025 currently changes 7 files and is ready to commit. (evidence: codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:577:message)\n\n## Operations\n- wait_agent — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Add … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.write_stdin({sessi … — succeeded\n- wait_agent — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Upda … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Upda … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- followup_task — succeeded\n- wait_agent — succeeded\n- wait_agent — succeeded\n- wait_agent — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const patch = \"*** Begin Patch\\n*** Upda … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- exec const r = await tools.write_stdin({sessi … — succeeded\n- followup_task — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- wait_agent — succeeded\n- wait_agent — succeeded\n- exec const r = await tools.exec_command({cmd: … — succeeded\n- [+47 more omitted]\n\n## Event summary\n- message: 15\n- tool_call: 72\n- tool_result: 72\n- unknown: 89\n\n## Evidence\n- codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:329:tool_call\n- codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a:331:tool_result\n\n## Provenance\nWork work:codex:01a06ce3-76bb-7832-ac8c-81b53bc09a0a\nSource codex session 01a06ce3-76bb-7832-ac8c-81b53bc09a0a\n\n## Receiver instructions\n- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.\n- Handing this artifact to another agent may transmit its contents through that agent's provider.\n\n"
+    ],
+    "exitCode": 1,
+    "signal": null,
+    "timedOut": false,
+    "wallMs": 574,
+    "stdoutLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC1/shebang-guard/handoff/agent-stdout.log",
+    "stderrLog": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC1/shebang-guard/handoff/agent-stderr.log"
+  },
+  "commandsRun": [],
+  "edits": {
+    "files": [],
+    "outOfScopeFiles": [],
+    "diffChars": 0,
+    "diffPath": "/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legC1/shebang-guard/handoff/edits.diff"
+  },
+  "verification": {
+    "ran": true,
+    "commands": [],
+    "passed": false,
+    "details": "receiver died before completing the task — model/provider failure — openrouter 402 openrouter_credits: balance could not fund the model's max_tokens request (agent-stderr.log); no edits"
+  },
+  "metrics": {
+    "developerReExplanation": "not-needed",
+    "repeatedInvestigation": "none",
+    "repeatedFinishedEdits": "none",
+    "nextActionCorrect": "unknown",
+    "missingOrFalseContext": "none",
+    "taskCompleted": false,
+    "falseCompletion": false,
+    "packageSizeChars": 3225
+  },
+  "notes": "openrouter 402 openrouter_credits: balance could not fund the model's max_tokens request (agent-stderr.log); no edits"
+}

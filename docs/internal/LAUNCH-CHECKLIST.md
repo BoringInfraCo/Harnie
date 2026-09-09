@@ -4,8 +4,9 @@ Date: 2026-09-08. Maps the audit's Orders 1–6
 (`docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md`, "Recommended launch
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
-on the `0.1.0-rc.2` tree on 2026-09-08 (typecheck clean, 60 test files /
-346 tests passed, package smoke passed on v22.23.0); the suite-green caveats
+on the `0.1.0-rc.3` tree on 2026-09-09 (typecheck clean, 62 test files /
+370 tests passed, package smoke passed on v22.23.0 including strict-flag and
+`--version` repros); the suite-green caveats
 below describe the state at the time each order was closed, superseded by
 that run.
 
@@ -91,34 +92,26 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   baselines not run, n=1 per leg.
   How to verify: `node scripts/eval-continuation.mjs tasks --json`;
   inspect `docs/research/eval-2026-09-08/`.
-- [ ] **Order 6 — Tag and release a developer preview.**
+- [x] Order 5 — Directed cross-harness matrix (2026-09-09, ref v0.1.0-rc.2/0231dd7): Pi→Harnie→OpenCode PASS (handoff+baseline); Codex→Harnie→OpenCode PASS (handoff+baseline); OpenCode→Harnie→Pi handoff PASS n=1 (baseline NOT RUN — 5 recorded provider-failure attempts: openrouter 402/429); Codex→Harnie→Pi NOT RUN (same provider blocker, handoff artifact ready); continuation task (driver pre-commits steps 1-2, receiver completes step 3 only) PASS via OpenCode→Codex. Provenance fields (sourceHarness/targetHarness/tagSha/handoffArtifactSha) added + validated; 2026-09-08 evidence reclassified as RECEIVER COMPATIBILITY (header notes). Gate "no false completion or repeated completed edits": PASS across all successful runs; all failures honestly recorded. Evidence: docs/research/eval-2026-09-09/ (+reclassification notes in eval-2026-09-08). Caveats: OpenCode→Pi baseline/trials 2-3 and Codex→Pi blocked by provider funding (rerunnable once funded); pi/opencode drivers synthetic (real sessions trivial); n=1 per successful leg.
+- [x] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
   instructions, known limitations, recovery instructions.
-  Status 2026-09-08: **release engineering complete; RC2 tag + GitHub Release
-  publish pending.** All gate ingredients are on the working tree: named RC
-  `0.1.0-rc.2` (package.json + package-lock via `npm version
-  0.1.0-rc.2 --no-git-tag-version`; `private: true` kept, distribution via
-  `npm pack` tarball + GitHub Release asset); CI workflow
-  `.github/workflows/ci.yml` now also triggers on `v*` tag pushes; new
-  release workflow `.github/workflows/release.yml` (Node 22.23.0,
-  `npm ci && npm run check`, `npm pack`, GitHub Release for the tag with the
-  tarball attached, `contents: write`); install instructions re-verified for
-  RC2 (pack → install `./harnie-*.tgz` into an empty dir → `--help` / `init`
-  / fixture import / `handoff` under an isolated `HARNIE_HOME`);
-  release notes with known limitations + recovery pointer
-  (`docs/internal/RELEASE-0.1.0-rc.2.md`); rc.1 notes corrected (rc.1 was
-  tagged, pushed, CI green); recovery source `docs/internal/BACKUP-RECOVERY.md`;
-  Orders 1–5 done as above.
-  Exactly what remains (orchestrator, explicit handoff — nothing is
-  committed, tagged, pushed, or staged by the release prep):
-  1. `git commit` the working tree (RC2 remediation + docs + workflows +
-     version bump),
-  2. `git tag v0.1.0-rc.2`,
-  3. `git push && git push origin v0.1.0-rc.2` — CI gates the tag and
-     `.github/workflows/release.yml` creates the GitHub Release for
-     `v0.1.0-rc.2` with the tarball attached,
-  4. confirm both workflows green on the pushed tag and the tarball asset
-     present on the release.
+  Status 2026-09-09: **done — RC2 fully published and verified.** Tag
+  `v0.1.0-rc.2` → commit `0231dd77ce909d04fcb60692ae48a47df04c9b68`; CI green
+  (run 34245576389), Release workflow green (run 34245576530); GitHub release
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.2 with asset
+  `harnie-0.1.0-rc.2.tgz` (~90 kB), verified by independent clean-prefix
+  install on 2026-09-08. Release notes with known limitations + recovery
+  pointer (`docs/internal/RELEASE-0.1.0-rc.2.md`); recovery source
+  `docs/internal/BACKUP-RECOVERY.md`; install instructions re-verified
+  (pack → install `./harnie-*.tgz` into an empty dir → `--help` / `init` /
+  fixture import / `handoff` under an isolated `HARNIE_HOME`); Orders 1–5
+  done as above.
+  The same gate re-applies to `v0.1.0-rc.3`: version bumped, docs refreshed
+  (strict flags on all commands + `--version`/`-V`, directed matrix with
+  honest caveats, prerelease marking + `--verify-tag` in
+  `.github/workflows/release.yml`); RC3 tag/publish is the orchestrator's
+  step (see `docs/internal/RELEASE-0.1.0-rc.3.md`).
   How to verify: `npm run check` (numbers above),
   `npm run test:package`, install-instructions walkthrough on a clean machine,
   release tag + published GitHub Release.

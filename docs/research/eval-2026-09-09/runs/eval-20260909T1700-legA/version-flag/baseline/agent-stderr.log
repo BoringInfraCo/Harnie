@@ -1,0 +1,98 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m$ [0mls -la
+total 168
+drwxr-xr-x@ 16 sergio  staff    512 Sep  8 17:14 .
+drwxr-xr-x@  6 sergio  staff    192 Sep  8 17:14 ..
+drwxr-xr-x@ 13 sergio  staff    416 Sep  8 17:14 .git
+drwxr-xr-x@  3 sergio  staff     96 Sep  8 17:14 .github
+-rw-r--r--@  1 sergio  staff     47 Sep  8 17:14 .gitignore
+drwxr-xr-x@  4 sergio  staff    128 Sep  8 17:14 docs
+-rw-r--r--@  1 sergio  staff  11357 Sep  8 17:14 LICENSE
+lrwxr-xr-x@  1 sergio  staff     67 Sep  8 17:14 node_modules -> /Users/sergio/Documents/Developer/BoringInfraCo/Harnie/node_modules
+-rw-r--r--@  1 sergio  staff  40202 Sep  8 17:14 package-lock.json
+-rw-r--r--@  1 sergio  staff    981 Sep  8 17:14 package.json
+-rw-r--r--@  1 sergio  staff  15568 Sep  8 17:14 README.md
+drwxr-xr-x@  6 sergio  staff    192 Sep  8 17:14 scripts
+drwxr-xr-x@ 16 sergio  staff    512 Sep  8 17:14 src
+drwxr-xr-x@ 63 sergio  staff   2016 Sep  8 17:14 tests
+-rw-r--r--@  1 sergio  staff    144 Sep  8 17:14 tsconfig.build.json
+-rw-r--r--@  1 sergio  staff    385 Sep  8 17:14 tsconfig.json
+[0m
+[0m✱ [0mGlob "**/*.{json,ts,js}"[90m 100 matches[0m
+[0m→ [0mRead src/cli.ts
+[0m→ [0mRead package.json
+[0m→ [0mRead tests/cli-init.test.ts
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone/src/cli.ts
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ 
+-import { realpathSync } from "node:fs";
++import { readFileSync, realpathSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { runBackup, runRestore } from "./cli/backup.js";
+ import { runCheckpoint } from "./cli/checkpoint.js";
+
+[0m
+[0m← [0mEdit src/cli.ts
+Index: /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone/src/cli.ts
+===================================================================
+--- /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone/src/cli.ts
++++ /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone/src/cli.ts
+@@ -72,8 +72,14 @@
+   stdout.write(usage);
+   return 0;
+ }
+ 
++if (command === "--version" || command === "-v") {
++  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
++  stdout.write(`${pkg.version}\n`);
++  return 0;
++}
++
+ const io = {
+   stdout,
+   stderr,
+   ...(options?.home !== undefined ? { home: options.home } : {}),
+
+[0m
+[0m$ [0mnpm run build
+> harnie@0.1.0-rc.2 prebuild
+> node scripts/clean-dist.mjs
+
+
+> harnie@0.1.0-rc.2 build
+> tsc -p tsconfig.build.json && node scripts/prepare-bin.mjs
+[0m
+[0m$ [0mnode dist/cli.js --version
+0.1.0-rc.2
+[0m
+[0m$ [0mnpx vitest run tests/cli-init.test.ts
+RUN  v4.1.11 /private/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-eval3/eval-20260909T1700-legA/version-flag/baseline/clone
+
+(node:28261) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  17:15:27
+   Duration  228ms (transform 125ms, setup 0ms, import 154ms, tests 8ms, environment 0ms)
+[0m
+[0m$ [0mnode dist/cli.js -v; echo "exit: $?"
+0.1.0-rc.2
+exit: 0
+[0m
+[0m$ [0mnode dist/cli.js --version; echo "exit: $?"
+0.1.0-rc.2
+exit: 0
+[0m
+[0m$ [0mnode dist/cli.js --help > /dev/null; echo "exit: $?"
+exit: 0
+[0m

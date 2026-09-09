@@ -9,7 +9,7 @@ Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Cod
 
 **Preview promise:** Import supported local coding sessions, inspect evidence-backed work history, and prepare Markdown continuation packages.
 
-- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the receiver gate is not validated — no Codex session has yet continued work from a Harnie handoff in a live Codex run.
+- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the import-side live gate is a single manual datapoint. The receiver side is partially validated: a Codex receiver consumed a Harnie handoff in a live run on 2026-09-09 (`docs/research/eval-2026-09-09/`).
 - Harnie does not resume sessions natively in any harness, does not accept every session format, and makes no productivity-saving claims. Derived state (goal, decisions, findings, next steps) consists of rule-derived claims over observed events with per-claim provenance — traceable, but not necessarily true, current, or settled.
 
 **For engineers:**
@@ -28,10 +28,11 @@ Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie 
 npm ci
 npm pack
 npm install --global ./harnie-*.tgz
+harnie --version   # e.g. 0.1.0-rc.3
 harnie --help
 ```
 
-The package remains private and unpublished pending the release gates. (`npm run harnie -- <args>` builds the JavaScript CLI from this checkout and runs it — handy for development.)
+The package stays `private: true` and is **not published to npm**; distribution is via `npm pack` tarballs and the GitHub Release assets. (`npm run harnie -- <args>` builds the JavaScript CLI from this checkout and runs it — handy for development.)
 
 **2. Point at a scratch store** so the walkthrough never touches your real home:
 

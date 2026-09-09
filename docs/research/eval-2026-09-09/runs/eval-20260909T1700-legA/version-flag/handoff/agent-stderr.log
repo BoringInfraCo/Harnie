@@ -1,0 +1,7 @@
+[0m
+> build · kimi-k2.7-code
+[0m
+[0m→ [0mRead src/cli.ts
+[0m→ [0mRead package.json
+[0m✱ [0mGlob "**/package.json"[90m in . · 1 match[0m
+[91m[1mError: [0mError from provider (Console Go): Upstream request failed: [invalid_request_error] Invalid request: the message at position 5 with role 'assistant' must not be empty

@@ -1,0 +1,16 @@
+Done.
+
+**Files edited:**
+- `src/cli.ts`
+
+**Commands run:**
+- `npm run build`
+- `node dist/cli.js --version`
+- `npx vitest run tests/cli-init.test.ts`
+
+**Verification:**
+- `npm run build` — passed
+- `node dist/cli.js --version` — printed the version from `package.json` (`0.1.0-rc.2`) and exited `0`
+- `npx vitest run tests/cli-init.test.ts` — 7/7 tests passed
+
+**Task complete:** Yes. The `--version` / `-v` flag is handled first in `runCli`, reads the version from `package.json`, prints it to stdout, and exits `0`, without affecting any other CLI behavior or existing tests.

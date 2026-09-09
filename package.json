@@ -1,6 +1,6 @@
 {
   "name": "harnie",
-  "version": "0.1.0-rc.2",
+  "version": "0.1.0-rc.3",
   "private": true,
   "type": "module",
   "bin": {
@@ -29,6 +29,7 @@
     "docs/internal/MACHINE-CONTRACT.md",
     "docs/internal/SUPPORT-MATRIX.md",
     "docs/internal/RELEASE-0.1.0-rc.2.md",
+    "docs/internal/RELEASE-0.1.0-rc.3.md",
     "tests/fixtures/pi/coding.jsonl"
   ],
   "engines": {
