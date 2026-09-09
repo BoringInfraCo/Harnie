@@ -59,7 +59,7 @@ gate).** The protocol requires verification in every required condition for
 PASS; excluding failed runs is not a PASS. Not verified this pass: the
 OpenCode→Pi baseline and extra trials, and the entire Codex→Pi leg (all
 provider-blocked; logs preserved in the run dirs). See
-[`eval-2026-09-10/`](../eval-2026-09-10/README.md) for the funded rerun pass.
+[`eval-2026-09-09b/`](../eval-2026-09-09b/README.md) for the funded rerun pass.
 
 **Codex legs, stated precisely:** Codex→OpenCode executed successfully —
 transport/receiver compatibility. Codex→Pi remains provider-blocked. The

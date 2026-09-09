@@ -11,6 +11,7 @@ import {
   openSync,
   closeSync,
   readdirSync,
+  statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve, relative, basename } from "node:path";
@@ -332,7 +333,81 @@ function emptyMetrics() {
   };
 }
 
-export function validateCoreResult(r, { requireProvenance }) {
+const isNonEmptyStr = (v) => typeof v === "string" && v.length > 0;
+const isHex64 = (v) => typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
+const isFiniteNum = (v) => typeof v === "number" && Number.isFinite(v);
+
+// v2 nested-field spec (2026-09-10 re-audit): every field the schema documents
+// must be present, with the documented type. `null` is allowed where the
+// schema allows unknown/absent evidence (honest "not observed" is valid;
+// a MISSING key or a wrong-typed value is not). `required` fields must be
+// non-null regardless of status.
+const V2_NESTED_SPEC = {
+  environment: {
+    agent: { type: "string", required: true },
+    agentVersion: { type: "string" },
+    model: { type: "string" },
+    node: { type: "string" },
+    platform: { type: "string" },
+    ref: { type: "string" },
+    clonePath: { type: "string" },
+  },
+  handoff: {
+    path: { type: "string" },
+    chars: { type: "number" },
+    sha256: { type: "string" },
+  },
+  execution: {
+    invocation: { type: "array" },
+    exitCode: { type: "number" },
+    signal: { type: "string" },
+    timedOut: { type: "boolean" },
+    wallMs: { type: "number" },
+    stdoutLog: { type: "string" },
+    stderrLog: { type: "string" },
+  },
+  verification: {
+    ran: { type: "boolean" },
+    commands: { type: "array", required: true },
+    passed: { type: "boolean" },
+    details: { type: "string" },
+  },
+  edits: {
+    files: { type: "array", required: true },
+    outOfScopeFiles: { type: "array" },
+    diffChars: { type: "number" },
+    diffPath: { type: "string" },
+  },
+};
+
+function checkV2NestedFields(r, errors) {
+  for (const [objName, spec] of Object.entries(V2_NESTED_SPEC)) {
+    const obj = r[objName];
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) continue;
+    for (const [key, rule] of Object.entries(spec)) {
+      if (!(key in obj)) {
+        errors.push(`${objName}.${key} must be present (documented field; null allowed where unknown)`);
+        continue;
+      }
+      const v = obj[key];
+      if (v === null) {
+        if (rule.required) errors.push(`${objName}.${key} must be a non-null ${rule.type}`);
+        continue;
+      }
+      const typeOk =
+        rule.type === "string" ? typeof v === "string"
+        : rule.type === "number" ? isFiniteNum(v)
+        : rule.type === "boolean" ? typeof v === "boolean"
+        : Array.isArray(v);
+      if (!typeOk) errors.push(`${objName}.${key} must be a ${rule.type} or null`);
+      else if (rule.required && rule.type === "string" && !isNonEmptyStr(v)) {
+        errors.push(`${objName}.${key} must be a non-empty string`);
+      }
+    }
+  }
+}
+
+export function validateCoreResult(r, { requireProvenance, strict = false }) {
   const errors = [];
   for (const key of ["runId", "taskId", "recordedAt"]) {
     if (typeof r[key] !== "string" || !r[key]) errors.push(`${key} must be a non-empty string`);
@@ -349,6 +424,10 @@ export function validateCoreResult(r, { requireProvenance }) {
     errors.push("edits.files must be an array");
   }
   if (!r.verification || typeof r.verification !== "object") errors.push("verification must be an object");
+  if (r.status === "not-run" && !isNonEmptyStr(r.notRunReason)) {
+    errors.push('status "not-run" requires a non-empty notRunReason');
+  }
+  if (strict) checkV2NestedFields(r, errors);
   if (requireProvenance) {
     // Directed-matrix provenance (2026-09-09): which harness produced the driver
     // session, which harness consumed the handoff, and exactly which commit was
@@ -365,8 +444,62 @@ export function validateCoreResult(r, { requireProvenance }) {
     if (typeof r.refName !== "string" || !r.refName) {
       errors.push("refName must be a non-empty string");
     }
-    if (r.handoffArtifactSha !== null && !/^[0-9a-f]{64}$/.test(r.handoffArtifactSha ?? "")) {
+    if (r.handoffArtifactSha !== null && !isHex64(r.handoffArtifactSha ?? "")) {
       errors.push("handoffArtifactSha must be a 64-hex sha256 or null");
+    }
+  }
+  if (strict) {
+    // Condition invariants (2026-09-10 re-audit): the condition, the provenance
+    // and the handoff block must agree — no contradictory or half-filled
+    // provenance.
+    if (r.condition === "baseline") {
+      if (r.sourceHarness !== null) {
+        errors.push('condition "baseline" requires sourceHarness null (no driver session exists)');
+      }
+      if (r.handoffArtifactSha !== null) {
+        errors.push('condition "baseline" requires handoffArtifactSha null');
+      }
+      if (
+        r.handoff?.path !== null || r.handoff?.chars !== null || r.handoff?.sha256 !== null
+      ) {
+        errors.push('condition "baseline" requires handoff.path, handoff.chars and handoff.sha256 all null');
+      }
+    }
+    if (r.condition === "handoff") {
+      if (!isNonEmptyStr(r.sourceHarness)) {
+        errors.push('condition "handoff" requires a non-empty sourceHarness (the driver harness)');
+      }
+      if (!isHex64(r.handoffArtifactSha ?? "")) {
+        errors.push('condition "handoff" requires handoffArtifactSha (64-hex sha256 of the consumed artifact)');
+      }
+      if (!isNonEmptyStr(r.handoff?.path ?? null)) {
+        errors.push('condition "handoff" requires a non-empty handoff.path');
+      }
+      if (!isFiniteNum(r.handoff?.chars)) {
+        errors.push('condition "handoff" requires handoff.chars (measured package size)');
+      }
+      if (!isHex64(r.handoff?.sha256 ?? "")) {
+        errors.push('condition "handoff" requires handoff.sha256 (64-hex)');
+      } else if (r.handoff.sha256 !== r.handoffArtifactSha) {
+        errors.push("handoff.sha256 must equal handoffArtifactSha");
+      }
+    }
+    if (r.status === "ran") {
+      const e = r.execution ?? {};
+      if (!Array.isArray(e.invocation) || e.invocation.length === 0) {
+        errors.push('status "ran" requires execution.invocation to be a non-empty array');
+      }
+      if (!isNonEmptyStr(e.stdoutLog) || !isNonEmptyStr(e.stderrLog)) {
+        errors.push('status "ran" requires execution.stdoutLog and execution.stderrLog');
+      }
+      // A timed-out/killed run exits via signal with exitCode null; require
+      // exitCode OR an honest kill marker.
+      if (!isFiniteNum(e.exitCode) && e.timedOut !== true && e.signal === null) {
+        errors.push('status "ran" requires execution.exitCode (number), or signal/timedOut for a killed run');
+      }
+      if (!isFiniteNum(e.wallMs)) {
+        errors.push('status "ran" requires execution.wallMs (number)');
+      }
     }
   }
   const m = r.metrics;
@@ -396,22 +529,26 @@ export function validateCoreResult(r, { requireProvenance }) {
 }
 
 // v1 validator: archived 2026-09-07 / 2026-09-08 results. Same core shape, but
-// the directed-matrix provenance fields are NOT required (they did not exist).
+// the directed-matrix provenance fields are NOT required (they did not exist)
+// and nested fields are not strictly checked (archived evidence stays
+// validatable without rewriting it).
 export function validateResultV1(r) {
   if (!r || typeof r !== "object") return { ok: false, errors: ["result is not an object"] };
   if (r.schema !== RESULT_SCHEMA_V1) {
     return { ok: false, errors: [`schema must be "${RESULT_SCHEMA_V1}"`] };
   }
-  return validateCoreResult(r, { requireProvenance: false });
+  return validateCoreResult(r, { requireProvenance: false, strict: false });
 }
 
-// v2 validator: current generation; provenance is mandatory.
+// v2 validator: current generation; provenance is mandatory and every
+// documented nested field + the condition invariants (baseline ⇒ no handoff
+// provenance; handoff ⇒ complete, self-consistent provenance) are enforced.
 export function validateResultV2(r) {
   if (!r || typeof r !== "object") return { ok: false, errors: ["result is not an object"] };
   if (r.schema !== RESULT_SCHEMA) {
     return { ok: false, errors: [`schema must be "${RESULT_SCHEMA}"`] };
   }
-  return validateCoreResult(r, { requireProvenance: true });
+  return validateCoreResult(r, { requireProvenance: true, strict: true });
 }
 
 // Dispatch on the record's declared `schema` field. `record` accepts both, so
@@ -510,9 +647,9 @@ function resultTemplate({ task, condition, run, dirName, handoffPath, sourceHarn
       clonePath: dirName,
     },
     handoff: { path: handoffPath, chars: null, sha256: null },
-    execution: { invocation: null, exitCode: null, wallMs: null, stdoutLog: null, stderrLog: null },
+    execution: { invocation: null, exitCode: null, signal: null, timedOut: null, wallMs: null, stdoutLog: null, stderrLog: null },
     commandsRun: [],
-    edits: { files: [], diffChars: null, diffPath: "edits.diff" },
+    edits: { files: [], outOfScopeFiles: [], diffChars: null, diffPath: "edits.diff" },
     verification: { ran: null, commands: [], passed: null, details: null },
     metrics: emptyMetrics(),
     notes: null,
@@ -540,12 +677,18 @@ function manualInstructions({ task, condition, run, cloneDir, promptPath, handof
      "   (captures git status/diff and fills edits + handoff size into result.json; leave status as-is)",
   );
   lines.push("4. Fill the human-judged metrics in result.json (see metrics.* keys):");
-  lines.push("   developerReExplanation, repeatedInvestigation, repeatedFinishedEdits, nextActionCorrect,");
-  lines.push("   missingOrFalseContext, taskCompleted, falseCompletion. Set status to \"ran\" and recordedAt to now.");
+   lines.push("   developerReExplanation, repeatedInvestigation, repeatedFinishedEdits, nextActionCorrect,");
+   lines.push("   missingOrFalseContext, taskCompleted, falseCompletion. Set status to \"ran\" and recordedAt to the");
+   lines.push("   live clock value at fill time (`date -u +%FT%T.%3NZ`). Never hand-author a date: verify-evidence");
+   lines.push("   rejects recordedAt values that do not match the run's actual chronology.");
   lines.push("   Do NOT guess: leave \"unknown\"/null if you did not observe it.");
   lines.push("5. Register the result:");
-  lines.push(`   node scripts/eval-continuation.mjs record --dir ${dir} --file result.json`);
-  lines.push("");
+   lines.push(`   node scripts/eval-continuation.mjs record --dir ${dir} --file result.json`);
+   if (condition === "handoff") {
+     lines.push("   For a handoff-condition record, fill sourceHarness (the driver harness: pi|opencode|codex) —");
+     lines.push("   record rejects handoff-condition records without it and without the measured handoff block.");
+   }
+   lines.push("");
   lines.push("Never fabricate outcomes: unknown evidence stays \"unknown\"/\"not-run\".");
   return lines.join("\n") + "\n";
 }
@@ -707,6 +850,15 @@ function cmdRun(parsed) {
       // Path convention applies in manual mode too.
       template.environment.clonePath = `disposable:${relative(runDir, cloneDir)}`;
       template.handoff.path = condHandoffPath ? relative(dir, condHandoffPath) : null;
+      // Measure the ready handoff artifact into the skeleton (size + sha256 are
+      // measurement, not fabrication); collect re-derives them later. A
+      // handoff-condition skeleton without a declared driver/artifact stays
+      // INVALID until the human fills it — strict v2 invariants reject it.
+      if (condHandoffPath && existsSync(condHandoffPath)) {
+        template.handoff.chars = readFileSync(condHandoffPath).length;
+        template.handoff.sha256 = sha256File(condHandoffPath);
+        template.handoffArtifactSha = template.handoff.sha256;
+      }
       writeFileSync(join(dir, "result-template.json"), JSON.stringify(template, null, 2) + "\n");
       const result = {
         ...template,
@@ -715,6 +867,7 @@ function cmdRun(parsed) {
         recordedAt: new Date().toISOString(),
         notRunReason: "no agent CLI available/selected; manual-run mode — see manual-instructions.md",
       };
+      result.handoffArtifactSha = template.handoff.sha256;
       const resultPath = writeResult(dir, result);
       console.log(`[manual] ${task.id}/${condition}`);
       console.log(manual);
@@ -1026,6 +1179,35 @@ function cmdVerifyEvidence(parsed) {
   }
   const problems = [];
   const hasLocalPath = (s) => typeof s === "string" && (s.includes("/Users/") || s.includes("/var/folders/"));
+  // Chronology rules (2026-09-10 re-audit): the harness emits all timestamps
+  // from the live clock at run time; hand-authored dates are rejected.
+  // Tolerances: 1h skew allowance against the run manifest and the newest file
+  // mtime inside the run dir (mtimes on a fresh checkout are checkout-time, so
+  // only a recordedAt/createdAt claiming a time LONGER than 1h after every
+  // file's actual last write is a fabricated date).
+  const CHRONO_TOL_MS = 60 * 60 * 1000;
+  const parseIsoMs = (s) => {
+    if (typeof s !== "string") return null;
+    const t = Date.parse(s);
+    return Number.isNaN(t) ? null : t;
+  };
+  const newestMtimeMs = (dir) => {
+    let newest = 0;
+    const walk = (d) => {
+      for (const ent of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, ent.name);
+        if (ent.isSymbolicLink()) continue;
+        if (ent.isDirectory()) walk(p);
+        else newest = Math.max(newest, statSync(p).mtimeMs);
+      }
+    };
+    try {
+      walk(dir);
+    } catch {
+      return 0;
+    }
+    return newest;
+  };
   const runsDir = join(evalDir, "runs");
   const runIds = readdirSync(runsDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -1059,6 +1241,39 @@ function cmdVerifyEvidence(parsed) {
         }
       }
     }
+    // Chronology: the run manifest must not claim a time more than 1h after
+    // the newest actual file write inside the run dir, and every record's
+    // recordedAt must sit within [createdAt - 1h, createdAt + 1h] and not more
+    // than 1h after the newest file mtime. Catches hand-authored dates (the
+    // harness emits all timestamps from the live clock at run time).
+    const newestM = newestMtimeMs(runDir);
+    const createdAtMs = run ? parseIsoMs(run.createdAt) : null;
+    if (run && createdAtMs === null) {
+      problems.push(`${runId}/run.json: createdAt is missing or not an ISO timestamp`);
+    }
+    if (createdAtMs !== null && newestM > 0 && createdAtMs > newestM + CHRONO_TOL_MS) {
+      problems.push(
+        `${runId}/run.json: createdAt ${run.createdAt} is more than 1h after the newest file mtime in the run dir (hand-authored date)`,
+      );
+    }
+    const recordAtChecks = (rel, r) => {
+      const recAtMs = parseIsoMs(r.recordedAt);
+      if (recAtMs === null) {
+        problems.push(`${rel}: recordedAt is missing or not an ISO timestamp`);
+        return;
+      }
+      if (newestM > 0 && recAtMs > newestM + CHRONO_TOL_MS) {
+        problems.push(`${rel}: recordedAt ${r.recordedAt} is more than 1h after the newest file mtime in the run dir (future-dated)`);
+      }
+      if (createdAtMs !== null) {
+        if (recAtMs > createdAtMs + CHRONO_TOL_MS) {
+          problems.push(`${rel}: recordedAt ${r.recordedAt} is more than 1h after the run manifest createdAt (future-dated relative to the manifest)`);
+        }
+        if (recAtMs < createdAtMs - CHRONO_TOL_MS) {
+          problems.push(`${rel}: recordedAt ${r.recordedAt} predates the run manifest createdAt ${run.createdAt}`);
+        }
+      }
+    };
     for (const f of ["summary.md", "summary.json"]) {
       if (!existsSync(join(runDir, f))) problems.push(`${runId}: missing ${f}`);
     }
@@ -1082,6 +1297,7 @@ function cmdVerifyEvidence(parsed) {
         resultCount++;
         const v = validateResult(r);
         if (!v.ok) for (const err of v.errors) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: ${err}`);
+        recordAtChecks(`${runId}/${taskEnt.name}/${condEnt.name}/result.json`, r);
         if (r.runId !== runId) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: runId does not match run dir`);
         if (r.taskId !== taskEnt.name) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: taskId does not match directory`);
         if (r.condition !== condEnt.name) problems.push(`${runId}/${taskEnt.name}/${condEnt.name}/result.json: condition does not match directory`);
@@ -1198,14 +1414,18 @@ Commands:
       Validate a filled result JSON and register it.
   summarize --run <run-id>
       Side-by-side handoff vs baseline summary (summary.md/json).
-  verify-evidence --dir <curated eval dir>
-      Integrity check over a curated eval directory (e.g.
-      docs/research/eval-2026-09-09): every referenced file exists relative to
-      its result.json; handoff artifact sha256s match; every result belongs to
-      its run dir and matches its path; every run dir has run.json +
-      summary.{md,json}; no machine-local absolute paths (/Users/,
-      /var/folders/) in the records (raw receiver logs are never rewritten);
-      references prefixed with disposable: are tmp-only and skipped for existence.
+   verify-evidence --dir <curated eval dir>
+       Integrity check over a curated eval directory (e.g.
+       docs/research/eval-2026-09-09): every referenced file exists relative to
+       its result.json; handoff artifact sha256s match; every result belongs to
+       its run dir and matches its path; every run dir has run.json +
+       summary.{md,json}; no machine-local absolute paths (/Users/,
+       /var/folders/) in the records (raw receiver logs are never rewritten);
+       references prefixed with disposable: are tmp-only and skipped for
+       existence; chronology is enforced — recordedAt must sit within 1h of the
+       run manifest createdAt and no more than 1h after the newest file mtime
+       in the run dir (the harness emits all timestamps from the live clock;
+       hand-authored dates fail).
 `;
 
 function main(argv) {

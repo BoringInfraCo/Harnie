@@ -1,6 +1,6 @@
 {
   "schema": "harnie-eval-result/v2",
-  "runId": "eval-20260910T0150-legD",
+  "runId": "eval-20260909T0142-legD",
   "taskId": "first-run-recovery",
   "condition": "handoff",
   "sourceHarness": "codex",
@@ -79,5 +79,5 @@
     "falseCompletion": false,
     "packageSizeChars": 1907
   },
-  "notes": "funded rerun (2026-09-10) of the unrelated-task pair bound to v0.1.0-rc.3 (cbe5399); driver context MATCHES the explicit benchmark task (synthetic codex driver for first-run-recovery, declared synthetic), unlike the 2026-09-09 Codex->OpenCode leg whose handoff context was unrelated"
+  "notes": "funded rerun (2026-09-09) of the unrelated-task pair bound to v0.1.0-rc.3 (cbe5399); driver context MATCHES the explicit benchmark task (synthetic codex driver for first-run-recovery, declared synthetic), unlike the 2026-09-09 Codex->OpenCode leg whose handoff context was unrelated"
 }

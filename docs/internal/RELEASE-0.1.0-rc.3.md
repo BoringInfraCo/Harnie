@@ -100,7 +100,7 @@ failures. Verdict B — the full matrix gate — stays PARTIAL: the
 OpenCode→Pi baseline/trials and the Codex→Pi leg are provider-blocked.
 Full verdicts, trial ledger, and per-run provenance:
 `docs/research/eval-2026-09-09/` (funded rerun pass and not-run records:
-`docs/research/eval-2026-09-10/`; prior: `docs/research/eval-2026-09-08/`
+`docs/research/eval-2026-09-09b/`; prior: `docs/research/eval-2026-09-08/`
 receiver compatibility, `docs/research/eval-2026-09-07/` initial gate).
 
 ## Recovery instructions

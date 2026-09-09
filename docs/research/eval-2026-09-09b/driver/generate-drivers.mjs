@@ -1,7 +1,12 @@
 #!/usr/bin/env node
-// Generator for the synthetic OpenCode driver used by the 2026-09-10 funded
+// Generator for the synthetic OpenCode driver used by the 2026-09-09b funded
 // rerun pass (same opencode snapshot format as
 // docs/research/eval-2026-09-09/driver/generate-drivers.mjs).
+//
+// Fixture-data rule: the 2026-09-10T05:00Z base timestamp below is a
+// fictional session stamp baked into the fixture bytes that were imported.
+// It is NOT an execution time; the pass executed 2026-09-09T01:41Z–01:46Z
+// (see this dir's README chronology note).
 //
 // The driver session performs the investigation phase of the `first-run-
 // recovery` benchmark task (reads docs/internal/FIRST-RUN.md and the

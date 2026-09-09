@@ -62,7 +62,7 @@ Commands:
 | `collect --dir <condition dir>` | Re-collect git status/diff + handoff size into `result.json` (after a manual run). |
 | `record --dir <condition dir> --file <result.json>` | Validate a filled result against the schema and register it. |
 | `summarize --run <run-id>` | Side-by-side `summary.md`/`summary.json`, incl. the preview-gate line. |
-| `verify-evidence --dir <curated eval dir>` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt). Non-zero exit on any finding. |
+| `verify-evidence --dir <curated eval dir>` | Integrity check over a curated `docs/research/eval-<date>/` dir: every referenced file exists (relative to its result.json); handoff artifact sha256s match the recorded hashes; every result belongs to its run dir and matches its path; every run dir has `run.json` + `summary.{md,json}`; no machine-local absolute paths in the records (`disposable:`-prefixed tmp-only refs are skipped; raw log content is exempt); chronology enforced (`recordedAt` within ±1h of the run manifest, ≤1h past the newest file mtime — hand-authored dates fail). Non-zero exit on any finding. |
 
 Key properties:
 
@@ -91,7 +91,8 @@ unit-tested). Versioning (2026-09-10 re-audit remediation):
 | `schema` | `"harnie-eval-result/v1"` \| `"harnie-eval-result/v2"` | required (v1) | required (v2) |
 | `runId`, `taskId`, `recordedAt` | non-empty strings | required | required |
 | `condition` | `handoff` \| `baseline` | required | required |
-| `status` | `ran` \| `manual` \| `not-run` (+ `notRunReason`) | required | required |
+| `status` | `ran` \| `manual` \| `not-run` | required | required |
+| `notRunReason` | non-empty string | required iff `status: "not-run"` | required iff `status: "not-run"` |
 | `environment` | `{ agent, agentVersion, model, node, platform, ref, clonePath }` — model/environment details are mandatory, per the audit | required | required |
 | `sourceHarness` | driver harness name (`pi`/`opencode`/`codex`) or `null` for baseline | optional | **required** |
 | `targetHarness` | receiver harness name, non-empty | optional | **required** |
@@ -99,12 +100,38 @@ unit-tested). Versioning (2026-09-10 re-audit remediation):
 | `refName` | non-empty string (e.g. `v0.1.0-rc.3`) | optional | **required** |
 | `handoffArtifactSha` | 64-hex sha256 of the exact handoff file consumed, or `null` | optional | **required** |
 | `handoff` | `{ path, chars, sha256 }` — chars = **package size (chars)** | required | required |
-| `execution` | `{ invocation, exitCode, signal, wallMs, stdoutLog, stderrLog }` | required | required |
+| `execution` | `{ invocation, exitCode, signal, timedOut, wallMs, stdoutLog, stderrLog }` | required | required |
 | `commandsRun` | array of `{ cmd, purpose }` (filled by the observer, not guessed) | required | required |
 | `edits` | `{ files, outOfScopeFiles, diffChars, diffPath }` | required | required |
 | `verification` | `{ ran, commands, passed, details }` | required | required |
 | `metrics` | the audit line 145 set, below | required | required |
 | `notes` | free text — failures and anything surprising | required | required |
+
+**Condition invariants (v2, enforced by `validateResultV2` since the
+2026-09-10 re-audit):** the condition, the provenance and the handoff block
+must agree — contradictory or half-filled provenance is rejected, not merely
+incomplete:
+
+- `condition === "baseline"` ⇒ `sourceHarness` **null**, `handoffArtifactSha`
+  **null**, and `handoff.path`/`handoff.chars`/`handoff.sha256` all **null**
+  (a baseline has no driver session and no artifact).
+- `condition === "handoff"` ⇒ `sourceHarness` **non-null** (the driver
+  harness), `handoffArtifactSha` **present** (64-hex), `handoff.path`
+  **present**, `handoff.chars` **present** (measured size),
+  `handoff.sha256` **present** (64-hex), and `handoff.sha256 ===
+  handoffArtifactSha`. `verify-evidence` additionally hashes the referenced
+  artifact file and rejects a mismatch with the recorded hash.
+- `status: "not-run"` ⇒ `notRunReason` **non-empty** (why the leg did not
+  run, e.g. provider-blocked with probe evidence).
+- `status: "ran"` ⇒ `execution.invocation` non-empty array,
+  `execution.stdoutLog`/`stderrLog` non-empty, `execution.wallMs` a number,
+  and an exit code (number) or an honest kill marker (`timedOut: true` /
+  `signal`).
+- Nested fields: every field the table documents must be **present** with the
+  documented type (`null` allowed where unknown — a missing key or a
+  wrong-typed value fails validation). `environment.agent` must be a
+  non-empty string; `edits.files`, `edits.outOfScopeFiles`,
+  `verification.commands` and `commandsRun` must be arrays.
 
 **Path convention in records (v2, 2026-09-10):** every file reference
 (`stdoutLog`, `stderrLog`, `edits.diffPath`, `handoff.path`, `patch.path`) is a
@@ -116,6 +143,26 @@ the binary name, not its absolute path. Raw receiver logs are evidence and are
 never rewritten, so quoted machine paths inside log/prompt **content** are
 acceptable; the path fields themselves must be portable. `verify-evidence`
 enforces all of this.
+
+**Chronology rules (2026-09-10 re-audit, mandatory):** the harness EMITS every
+timestamp (`run.json` `createdAt`, `recordedAt`) from the live clock at run
+time. Hand-authored dates are forbidden and are detectable:
+
+- A record's `recordedAt` must sit within **±1h** of its run manifest's
+  `createdAt` (records are written during the run; a value hours after the
+  manifest, or before it, means the date was filled by hand).
+- `recordedAt` (and `run.createdAt`) must be no more than **1h after** the
+  newest file mtime inside the curated run dir. (mtimes on a fresh checkout
+  are checkout-time — always later than the run — so only a timestamp claiming
+  to be *longer than 1h after every file's actual last write* trips this;
+  that is exactly the fabricated-date case.)
+- `verify-evidence` enforces all three checks and fails the dir on any
+  violation.
+- **Synthetic driver/fixture session timestamps are fixture data, not
+  execution times.** Driver files may carry fictional session stamps (e.g.
+  the synthetic codex rollout in `eval-2026-09-09b/driver/`); every eval
+  README must label its drivers as synthetic and state the real execution
+  chronology (file mtimes + run manifests) separately.
 
 Run manifest schema: `harnie-eval-run/v2` (same shape as v1; `repo` is now the
 repo name instead of an absolute path — the evaluated commit is identified by

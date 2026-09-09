@@ -3,11 +3,20 @@
 > **2026-09-10 re-audit note:** verdict B of this pass was PARTIAL (blocked pi
 > legs). The funded rerun pass with availability probes, explicit not-run
 > records, and an rc.3-bound unrelated-task pair is
-> [`eval-2026-09-10/`](../eval-2026-09-10/README.md). Records in this dir were
+> [`eval-2026-09-09b/`](../eval-2026-09-09b/README.md). Records in this dir were
 > curated in place (schema stamped `harnie-eval-result/v2`, portable relative
 > paths, per-run summaries generated) and verified by
 > `node scripts/eval-continuation.mjs verify-evidence --dir docs/research/eval-2026-09-09`
 > → OK; the verdict section below now reports two verdicts per protocol §4.
+>
+> **Chronology note (2026-09-09 re-audit):** the `recordedAt`/`createdAt`
+> values in these records are genuine harness-emitted live-clock timestamps;
+> the runs executed 2026-09-08T21:06Z → 2026-09-09T00:08Z (17:06–20:08 local,
+> spanning the UTC date boundary). The `eval-20260909T1700-*` run-ids are
+> hand-authored local-time labels whose date component reads one day ahead of
+> the local start; the dir name `eval-2026-09-09` matches the UTC recording
+> tail. Labels kept for minimal churn — the embedded timestamps themselves
+> were never falsified.
 
 Raw outcome evidence for the **directed** cross-harness continuation matrix
 required by `docs/internal/ROADMAP.md:200`:
@@ -24,7 +33,7 @@ out to demonstrate **receiver compatibility** (each handoff rendered *for* its
 own receiver, Pi→Pi / Codex→Codex / OpenCode→OpenCode), not the directed paths,
 and ran against the rc.1 commit `12dda05` rather than the candidate. Nothing in
 `eval-2026-09-08/` was rewritten apart from the header note. Protocol:
-[docs/internal/EVALUATION-PROTOCOL.md](../../docs/internal/EVALUATION-PROTOCOL.md).
+[docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md).
 
 Executed 2026-09-09 by an agent (opencode-go/omen-alpha). Every claim below is
 backed by a file in this directory; disposable originals (clones, receiver
@@ -183,7 +192,7 @@ excluding failed runs is not permitted. This pass did not verify: the
 OpenCode→Pi baseline (all attempts provider-blocked), OpenCode→Pi requested
 extra trials, and the entire Codex→Pi leg. Verdict B stays PARTIAL/INCONCLUSIVE
 until every required condition verifies — see
-[`eval-2026-09-10/`](../eval-2026-09-10/README.md) for the funded rerun pass.
+[`eval-2026-09-09b/`](../eval-2026-09-09b/README.md) for the funded rerun pass.
 
 **Codex legs, stated precisely (2026-09-10 re-audit wording):** the Codex→
 OpenCode leg executed successfully — that demonstrates transport/receiver

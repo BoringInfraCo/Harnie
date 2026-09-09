@@ -1,4 +1,18 @@
-# Funded rerun pass — 2026-09-10 (Order 5, post-rc.3 re-audit P1)
+# Funded rerun pass — 2026-09-09 (Order 5, post-rc.3 re-audit P1)
+
+> **Chronology correction (2026-09-09 re-audit, future-dating finding).** This
+> directory was originally committed as `eval-2026-09-10/` with hand-authored
+> run-ids/recordedAt claiming execution on 2026-09-10T01:50Z–02:05Z. The actual
+> chronology (file mtimes + the harness-emitted run manifests) places the pass
+> on **2026-09-09T01:41Z–01:46Z** — before the `v0.1.0-rc.4` tag/publish at
+> 2026-09-09T02:09:58Z. Corrected in place: dir renamed to `eval-2026-09-09b/`,
+> run-ids re-dated (`eval-20260910T0150-legD` → `eval-20260909T0142-legD`,
+> `eval-20260910T0150-pi-blocked` → `eval-20260909T0145-pi-blocked`), the
+> hand-authored `recordedAt`/`createdAt` values replaced with mtime-derived
+> ones, and this README/summary re-dated. The leg D receiver `recordedAt`
+> values were always harness-emitted and needed no correction. Timestamps
+> inside the synthetic driver fixtures (e.g. the codex rollout's
+> `2026-09-10T05:20Z` stamps) are **fixture data**, not execution times.
 
 Rerun of the legs the 2026-09-09 pass
 ([`eval-2026-09-09/`](../eval-2026-09-09/README.md) — verdict B PARTIAL) could
@@ -6,11 +20,12 @@ not fund, plus an unrelated-task handoff+baseline pair bound to the **actual
 candidate** tag `v0.1.0-rc.3` → `cbe5399346a27d43a13dc8856dfe54ff039936fe`.
 The 2026-09-09 directory is untouched except the two-verdict verdict edits and
 record curation (schema v2 stamp, portable paths, per-run summaries). Protocol:
-[docs/internal/EVALUATION-PROTOCOL.md](../../docs/internal/EVALUATION-PROTOCOL.md)
+[docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md)
 (§4 two-verdict rules).
 
-Executed 2026-09-10 by an agent (opencode-go/omen-alpha). Every claim below is
-backed by a file in this directory (or the referenced 2026-09-09 artifact).
+Executed 2026-09-09T01:41Z–01:46Z by an agent (opencode-go/omen-alpha). Every
+claim below is backed by a file in this directory (or the referenced
+2026-09-09 artifact).
 
 ## Environment
 
@@ -40,12 +55,12 @@ legs are recorded not-run below, exactly as the protocol requires.
 
 | Leg | Condition | Verdict | Evidence / reason not-run |
 | --- | --- | --- | --- |
-| OpenCode→Pi (version-flag) baseline | baseline | **NOT RUN — provider unfunded** | `runs/eval-20260910T0150-pi-blocked/version-flag/baseline/` (record `status: "not-run"`, notRunReason = the probe evidence above) |
-| OpenCode→Pi extra trials (requested +2) | handoff | **NOT RUN — provider unfunded** | `runs/eval-20260910T0150-pi-blocked/version-flag/handoff/`; the ready artifact from 2026-09-09 is referenced with its verified sha256 |
-| Codex→Pi (shebang-guard) handoff | handoff | **NOT RUN — provider unfunded** | `runs/eval-20260910T0150-pi-blocked/shebang-guard/handoff/`; `handoff-codex_pi-sprint024.md` ready, sha256 verified |
-| Codex→Pi (shebang-guard) baseline | baseline | **NOT RUN — provider unfunded** | `runs/eval-20260910T0150-pi-blocked/shebang-guard/baseline/` |
-| Codex→OpenCode, unrelated task (first-run-recovery), bound to **rc.3** | handoff | **PASS** | `runs/eval-20260910T0150-legD/first-run-recovery/handoff/` — exit 0, 35.1s, single in-scope edit (`docs/internal/FIRST-RUN.md`, +21), verification pass (receiver + evaluator re-run: `## Recovery` at line 495, backup 0600 / restore validates-then-overwrites / no-undo all present), no false completion, no repeated finished edits |
-| Codex→OpenCode, unrelated task (first-run-recovery), bound to **rc.3** | baseline | **PASS** | `runs/eval-20260910T0150-legD/first-run-recovery/baseline/` — exit 0, 33.3s, single in-scope edit (+19), same verification, statement-only (no handoff), no false completion |
+| OpenCode→Pi (version-flag) baseline | baseline | **NOT RUN — provider unfunded** | `runs/eval-20260909T0145-pi-blocked/version-flag/baseline/` (record `status: "not-run"`, notRunReason = the probe evidence above) |
+| OpenCode→Pi extra trials (requested +2) | handoff | **NOT RUN — provider unfunded** | `runs/eval-20260909T0145-pi-blocked/version-flag/handoff/`; the ready artifact from 2026-09-09 is referenced with its verified sha256 |
+| Codex→Pi (shebang-guard) handoff | handoff | **NOT RUN — provider unfunded** | `runs/eval-20260909T0145-pi-blocked/shebang-guard/handoff/`; `handoff-codex_pi-sprint024.md` ready, sha256 verified |
+| Codex→Pi (shebang-guard) baseline | baseline | **NOT RUN — provider unfunded** | `runs/eval-20260909T0145-pi-blocked/shebang-guard/baseline/` |
+| Codex→OpenCode, unrelated task (first-run-recovery), bound to **rc.3** | handoff | **PASS** | `runs/eval-20260909T0142-legD/first-run-recovery/handoff/` — exit 0, 35.1s, single in-scope edit (`docs/internal/FIRST-RUN.md`, +21), verification pass (receiver + evaluator re-run: `## Recovery` at line 495, backup 0600 / restore validates-then-overwrites / no-undo all present), no false completion, no repeated finished edits |
+| Codex→OpenCode, unrelated task (first-run-recovery), bound to **rc.3** | baseline | **PASS** | `runs/eval-20260909T0142-legD/first-run-recovery/baseline/` — exit 0, 33.3s, single in-scope edit (+19), same verification, statement-only (no handoff), no false completion |
 
 Pair note (n=1, anecdote): handoff 35.1s vs baseline 33.3s; identical outcome
 shape (single-file Recovery section covering the same three facts). The
@@ -60,7 +75,10 @@ explicit benchmark task this time (see driver note below).
   `first-run-recovery` and leaving the edit to the next session; an equivalent
   opencode snapshot (`driver/driver-opencode_first-run-recovery.json`) was
   also generated/imported and is kept for reproducibility, but the leg used
-  the codex driver.
+  the codex driver. All session timestamps inside these fixture files are
+  **synthetic fixture data** (the codex rollout carries fixture stamps like
+  `2026-09-10T05:20Z`); they are NOT execution times — the execution
+  chronology of this pass is the one stated in the header note above.
 - Handoff artifact rendered by Harnie rc.3 (`dist/cli.js` reporting
   `0.1.0-rc.3`) in the temp Harnie home:
   `driver/handoff-codex_opencode-first-run-recovery.md`, 1907 chars,
@@ -100,11 +118,11 @@ the multi-step continuation-semantics evidence remains the 2026-09-09
 ## Raw evidence map
 
 - `summary.md` — curated outcomes + verdicts (this dir).
-- `runs/eval-20260910T0150-legD/` — the funded rc.3 pair: `run.json`
+- `runs/eval-20260909T0142-legD/` — the funded rc.3 pair: `run.json`
   (`refName: "v0.1.0-rc.3"`, `tagSha cbe5399…`), per-condition `result.json`
   (schema `harnie-eval-result/v2`), `prompt.md`, `agent-stdout.log`,
   `agent-stderr.log`, `edits.diff`, harness `summary.{md,json}`.
-- `runs/eval-20260910T0150-pi-blocked/` — explicit `status: "not-run"`
+- `runs/eval-20260909T0145-pi-blocked/` — explicit `status: "not-run"`
   records for every pi-targeted leg, each with the probe-based notRunReason
   and (where applicable) the ready handoff artifact reference + verified sha.
 - `probes/` — the four availability probes (stdout+stderr preserved).
@@ -112,7 +130,7 @@ the multi-step continuation-semantics evidence remains the 2026-09-09
   handoff artifact with size/sha256-12 recorded above.
 
 Integrity: `node scripts/eval-continuation.mjs verify-evidence --dir
-docs/research/eval-2026-09-10` → OK (2 run dirs, 6 result records).
+docs/research/eval-2026-09-09b` → OK (2 run dirs, 6 result records).
 
 ## Limitations
 

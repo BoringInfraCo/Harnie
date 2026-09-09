@@ -3,8 +3,11 @@
 # Assumptions:
 # - The tag is cut from a tree where `npm run check` is green; this workflow re-runs
 #   `npm run check` as a final gate before packing.
+# - The pushed tag must equal `v` + the version in package.json; this is asserted
+#   (and the job fails) before anything is released.
 # - `prepack` (npm run build) runs automatically during `npm pack`, producing dist/.
-# - Releases are published with auto-generated notes; the tarball is attached.
+# - The release is created in a single `gh release create` call that attaches the
+#   tarball and its `<tarball>.sha256` sidecar — no release-without-asset window.
 # - Pre-release tags (v*-rc*, v*-alpha*, v*-beta*) are marked as prereleases;
 #   the tag is verified against the pushed SHA (--verify-tag).
 # - One-off backfill: the existing v0.1.0-rc.2 release (published before this
@@ -29,17 +32,24 @@ jobs:
         with:
           node-version: 22.23.0
           cache: npm
+      - name: Assert tag matches package version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package version v$VERSION"
+            exit 1
+          fi
       - run: npm ci && npm run check
       - run: npm pack
-      - name: Create release and upload tarball
+      - name: Create release and attach tarball with SHA-256 sidecar
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}
         run: |
           TARBALL="$(ls harnie-*.tgz)"
+          sha256sum "$TARBALL" > "$TARBALL.sha256"
           FLAG=""
           if [ "$PRERELEASE" = "true" ]; then
             FLAG="--prerelease"
           fi
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes $FLAG
-          gh release upload "$GITHUB_REF_NAME" "$TARBALL" --clobber
+          gh release create "$GITHUB_REF_NAME" "$TARBALL" "$TARBALL.sha256" --verify-tag --generate-notes $FLAG

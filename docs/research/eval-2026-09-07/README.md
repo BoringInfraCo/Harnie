@@ -1,7 +1,7 @@
 # Continuation evaluation results — 2026-09-07 (Order 5)
 
 Raw outcome evidence for the Order 5 re-run of the continuation evaluation on
-the release candidate. Protocol: [docs/internal/EVALUATION-PROTOCOL.md](../../docs/internal/EVALUATION-PROTOCOL.md).
+the release candidate. Protocol: [docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md).
 Executed 2026-09-07 by an agent (opencode-go/omen-alpha) following §6 of the
 protocol. Every claim below is backed by a file in this directory; raw machine
 evidence (clones, receiver session DBs) additionally lives in the disposable

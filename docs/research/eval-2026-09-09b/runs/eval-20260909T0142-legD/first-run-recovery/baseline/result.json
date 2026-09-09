@@ -1,6 +1,6 @@
 {
   "schema": "harnie-eval-result/v2",
-  "runId": "eval-20260910T0150-legD",
+  "runId": "eval-20260909T0142-legD",
   "taskId": "first-run-recovery",
   "condition": "baseline",
   "sourceHarness": null,
@@ -79,5 +79,5 @@
     "falseCompletion": false,
     "packageSizeChars": null
   },
-  "notes": "funded rerun (2026-09-10): statement-only baseline paired with the handoff condition, ref v0.1.0-rc.3"
+  "notes": "funded rerun (2026-09-09): statement-only baseline paired with the handoff condition, ref v0.1.0-rc.3"
 }

@@ -364,18 +364,37 @@ describe("eval harness — manual-run mode", () => {
     const instructions = readFileSync(join(dir, "manual-instructions.md"), "utf8");
     expect(instructions).toContain("Manual receiver run");
     expect(instructions).toContain("record --dir");
+    expect(instructions).toContain("sourceHarness");
     const template = JSON.parse(readFileSync(join(dir, "result-template.json"), "utf8"));
     expect(template.status).toBe("not-run");
     expect(template.metrics.taskCompleted).toBeNull();
 
     const result = JSON.parse(readFileSync(join(dir, "result.json"), "utf8"));
     expect(result.status).toBe("manual");
-    expect(mod.validateResult(result).ok).toBe(true);
+    // A handoff-condition skeleton with NO declared driver/artifact provenance
+    // is rejected by design (strict v2 condition invariants).
+    const v = mod.validateResult(result);
+    expect(v.ok).toBe(false);
+    expect(v.errors.join("\n")).toContain('condition "handoff" requires a non-empty sourceHarness');
   });
 
   it("record validates: rejects bad results, accepts filled ones", () => {
     const runId = uniqueRun();
-    runHarness(["run", "--task", "first-run-recovery", "--condition", "handoff", "--run", runId]);
+    const handoffFile = join(scratch, "fake-handoff-manual-rec.md");
+    writeFileSync(handoffFile, "# manual record test handoff\n");
+    runHarness([
+      "run",
+      "--task",
+      "first-run-recovery",
+      "--condition",
+      "handoff",
+      "--run",
+      runId,
+      "--handoff",
+      handoffFile,
+      "--source-harness",
+      "pi",
+    ]);
     const dir = join(EVAL_BASE, runId, "first-run-recovery", "handoff");
 
     const badPath = join(scratch, "bad-result.json");
@@ -392,6 +411,15 @@ describe("eval harness — manual-run mode", () => {
     good.recordedAt = new Date().toISOString();
     good.notRunReason = null;
     good.environment.agent = "human";
+    good.execution = {
+      invocation: ["manual-run", "opencode", "run", "--auto", "$(cat prompt.md)"],
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+      wallMs: 1000,
+      stdoutLog: "agent-stdout.log",
+      stderrLog: "agent-stderr.log",
+    };
     good.metrics.taskCompleted = true;
     good.metrics.falseCompletion = false;
     good.metrics.repeatedFinishedEdits = "none";
@@ -471,6 +499,8 @@ describe("eval harness — handoff/baseline isolation", () => {
       runId,
       "--handoff",
       handoffFile,
+      "--source-harness",
+      "pi",
     ]);
     expect(res.code).toBe(0);
 
@@ -479,6 +509,10 @@ describe("eval harness — handoff/baseline isolation", () => {
     const baselineResult = JSON.parse(readFileSync(join(base, "baseline", "result.json"), "utf8"));
     expect(handoffResult.handoff.path).not.toMatch(/^\//);
     expect(resolve(join(base, "handoff"), handoffResult.handoff.path)).toBe(handoffFile);
+    // the ready artifact is measured into the skeleton at prep time
+    expect(handoffResult.handoff.chars).toBeGreaterThan(0);
+    expect(handoffResult.handoff.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(handoffResult.handoffArtifactSha).toBe(handoffResult.handoff.sha256);
     expect(baselineResult.handoff).toEqual({ path: null, chars: null, sha256: null });
     expect(mod.validateResult(baselineResult).ok).toBe(true);
     expect(mod.validateResult(handoffResult).ok).toBe(true);
@@ -542,32 +576,175 @@ describe("eval harness — schema versioning (v1 archived / v2 current)", () => 
     // v2 requirements correctly reject it (provenance fields absent).
     expect(mod.validateResultV2(archived).ok).toBe(false);
   });
+});
 
-  it("v2 records require the provenance fields; unknown schemas are rejected", () => {
-    const v2 = {
-      schema: "harnie-eval-result/v2",
-      runId: "r", taskId: "version-flag", recordedAt: "now", condition: "baseline",
-      status: "ran", notRunReason: null,
-      sourceHarness: null, targetHarness: "opencode",
-      tagSha: "a".repeat(40), refName: "v0.1.0-rc.3", handoffArtifactSha: null,
-      environment: { agent: "opencode" }, handoff: { path: null, chars: null, sha256: null },
-      execution: {}, commandsRun: [], edits: { files: [] },
-      verification: {},
-      metrics: {
-        developerReExplanation: "unknown", repeatedInvestigation: "unknown",
-        repeatedFinishedEdits: "unknown", nextActionCorrect: "unknown",
-        missingOrFalseContext: "unknown", taskCompleted: null, falseCompletion: null,
-        packageSizeChars: null,
-      },
-      notes: null,
-    };
-    expect(mod.validateResult(v2).ok).toBe(true);
-    const noTagSha = { ...v2, tagSha: undefined };
-    expect(mod.validateResultV2(noTagSha).ok).toBe(false);
-    // v1 stays tolerant of extra fields (archived records must keep passing);
-    // unknown schemas are rejected by dispatch.
-    expect(mod.validateResult({ ...v2, schema: "harnie-eval-result/v1" }).ok).toBe(true);
-    expect(mod.validateResult({ ...v2, schema: "harnie-eval-result/v3" }).ok).toBe(false);
+describe("eval harness — v2 invariants (condition, provenance, nested fields)", () => {
+  // A fully valid v2 record (mirrors what the harness emits and what the
+  // curated eval-2026-09-09 / eval-2026-09-09b records carry).
+  const makeV2 = (overrides: Record<string, unknown> = {}) => ({
+    schema: "harnie-eval-result/v2",
+    runId: "eval-x",
+    taskId: "version-flag",
+    condition: "baseline",
+    status: "ran",
+    notRunReason: null,
+    sourceHarness: null,
+    targetHarness: "opencode",
+    tagSha: "a".repeat(40),
+    refName: "v0.1.0-rc.3",
+    handoffArtifactSha: null,
+    patch: null,
+    recordedAt: "2026-09-09T01:43:41.787Z",
+    environment: {
+      agent: "opencode",
+      agentVersion: "1.18.29",
+      model: "opencode-go/kimi-k2.7-code",
+      node: "v22.23.0",
+      platform: "darwin",
+      ref: "a".repeat(40),
+      clonePath: "disposable:version-flag/baseline/clone",
+    },
+    handoff: { path: null, chars: null, sha256: null },
+    execution: {
+      invocation: ["opencode", "run", "--auto", "prompt"],
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+      wallMs: 33271,
+      stdoutLog: "agent-stdout.log",
+      stderrLog: "agent-stderr.log",
+    },
+    commandsRun: [{ cmd: "npm run build", purpose: "receiver verification" }],
+    edits: { files: ["src/cli.ts"], outOfScopeFiles: [], diffChars: 100, diffPath: "edits.diff" },
+    verification: { ran: true, commands: ["npm run build"], passed: true, details: "ok" },
+    metrics: {
+      developerReExplanation: "unknown",
+      repeatedInvestigation: "unknown",
+      repeatedFinishedEdits: "unknown",
+      nextActionCorrect: "unknown",
+      missingOrFalseContext: "unknown",
+      taskCompleted: null,
+      falseCompletion: null,
+      packageSizeChars: null,
+    },
+    notes: null,
+    ...overrides,
+  });
+
+  it("accepts a fully valid baseline and handoff record", () => {
+    expect(mod.validateResult(makeV2()).ok).toBe(true);
+    expect(
+      mod.validateResult(
+        makeV2({
+          condition: "handoff",
+          sourceHarness: "codex",
+          handoffArtifactSha: "b".repeat(64),
+          handoff: { path: "../../driver/h.md", chars: 1907, sha256: "b".repeat(64) },
+          metrics: {
+            developerReExplanation: "unknown",
+            repeatedInvestigation: "unknown",
+            repeatedFinishedEdits: "unknown",
+            nextActionCorrect: "unknown",
+            missingOrFalseContext: "unknown",
+            taskCompleted: null,
+            falseCompletion: null,
+            packageSizeChars: 1907,
+          },
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("rejects the OLD malformed baseline shape (non-null sourceHarness on baseline)", () => {
+    // Historical probe: the pre-fix eval-2026-09-10 pi-blocked baseline records
+    // carried sourceHarness "opencode"/"codex" on condition "baseline".
+    const old = makeV2({ condition: "baseline", sourceHarness: "opencode", targetHarness: "pi" });
+    expect(mod.validateResultV2(old).ok).toBe(false);
+    expect(mod.validateResultV2(old).errors.join("\n")).toContain('condition "baseline" requires sourceHarness null');
+    expect(mod.validateResult(old).ok).toBe(false);
+  });
+
+  it("rejects baseline records with any handoff-related value set", () => {
+    expect(mod.validateResultV2(makeV2({ handoffArtifactSha: "b".repeat(64) })).ok).toBe(false);
+    expect(
+      mod.validateResultV2(makeV2({ handoff: { path: "h.md", chars: null, sha256: null } })).ok,
+    ).toBe(false);
+    expect(
+      mod.validateResultV2(makeV2({ handoff: { path: null, chars: 10, sha256: null } })).ok,
+    ).toBe(false);
+    expect(
+      mod.validateResultV2(makeV2({ handoff: { path: null, chars: null, sha256: "b".repeat(64) } })).ok,
+    ).toBe(false);
+  });
+
+  it("rejects handoff records with missing or contradictory provenance", () => {
+    const handoff = (o: Record<string, unknown>) => makeV2({ condition: "handoff", ...o });
+    expect(mod.validateResultV2(handoff({ sourceHarness: null, handoffArtifactSha: "b".repeat(64), handoff: { path: "h.md", chars: 10, sha256: "b".repeat(64) } })).ok).toBe(false);
+    expect(mod.validateResultV2(handoff({ sourceHarness: "codex", handoffArtifactSha: null, handoff: { path: "h.md", chars: 10, sha256: null } })).ok).toBe(false);
+    expect(mod.validateResultV2(handoff({ sourceHarness: "codex", handoffArtifactSha: "nothex", handoff: { path: "h.md", chars: 10, sha256: "nothex" } })).ok).toBe(false);
+    expect(mod.validateResultV2(handoff({ sourceHarness: "codex", handoffArtifactSha: "b".repeat(64), handoff: { path: null, chars: 10, sha256: "b".repeat(64) } })).ok).toBe(false);
+    expect(mod.validateResultV2(handoff({ sourceHarness: "codex", handoffArtifactSha: "b".repeat(64), handoff: { path: "h.md", chars: null, sha256: "b".repeat(64) } })).ok).toBe(false);
+    // recorded hash must match the referenced artifact's recorded sha
+    const mismatch = handoff({
+      sourceHarness: "codex",
+      handoffArtifactSha: "b".repeat(64),
+      handoff: { path: "h.md", chars: 10, sha256: "c".repeat(64) },
+    });
+    expect(mod.validateResultV2(mismatch).ok).toBe(false);
+    expect(mod.validateResultV2(mismatch).errors.join("\n")).toContain("must equal handoffArtifactSha");
+  });
+
+  it('rejects status "not-run" without a non-empty notRunReason', () => {
+    expect(mod.validateResultV2(makeV2({ status: "not-run", notRunReason: null })).ok).toBe(false);
+    expect(mod.validateResultV2(makeV2({ status: "not-run", notRunReason: "" })).ok).toBe(false);
+    expect(mod.validateResultV2(makeV2({ status: "not-run", notRunReason: "provider unfunded (402)" })).ok).toBe(true);
+  });
+
+  it('rejects status "ran" with empty or missing execution fields', () => {
+    const noInvocation = makeV2({ execution: { invocation: [], exitCode: 0, signal: null, timedOut: false, wallMs: 1, stdoutLog: "o.log", stderrLog: "e.log" } });
+    expect(mod.validateResultV2(noInvocation).ok).toBe(false);
+    expect(mod.validateResultV2(noInvocation).errors.join("\n")).toContain('status "ran" requires execution.invocation');
+    const noLogs = makeV2({ execution: { invocation: ["x"], exitCode: 0, signal: null, timedOut: false, wallMs: 1, stdoutLog: null, stderrLog: null } });
+    expect(mod.validateResultV2(noLogs).ok).toBe(false);
+    const noExit = makeV2({ execution: { invocation: ["x"], exitCode: null, signal: null, timedOut: false, wallMs: 1, stdoutLog: "o.log", stderrLog: "e.log" } });
+    expect(mod.validateResultV2(noExit).ok).toBe(false);
+    // a killed run exits via signal/timedOut instead of an exit code
+    expect(
+      mod.validateResultV2(makeV2({ execution: { invocation: ["x"], exitCode: null, signal: "SIGTERM", timedOut: true, wallMs: 1, stdoutLog: "o.log", stderrLog: "e.log" } })).ok,
+    ).toBe(true);
+  });
+
+  it("rejects v2 records missing any documented nested field (unknowns must be explicit nulls)", () => {
+    const missingEnv = makeV2();
+    delete (missingEnv.environment as Record<string, unknown>).node;
+    expect(mod.validateResultV2(missingEnv).ok).toBe(false);
+    expect(mod.validateResultV2(missingEnv).errors.join("\n")).toContain("environment.node must be present");
+
+    const missingVerif = makeV2();
+    delete (missingVerif.verification as Record<string, unknown>).passed;
+    expect(mod.validateResultV2(missingVerif).ok).toBe(false);
+
+    const missingEdits = makeV2();
+    delete (missingEdits.edits as Record<string, unknown>).outOfScopeFiles;
+    expect(mod.validateResultV2(missingEdits).ok).toBe(false);
+
+    const wrongType = makeV2({ handoff: { path: null, chars: "1907", sha256: null } });
+    expect(mod.validateResultV2(wrongType).ok).toBe(false);
+    expect(mod.validateResultV2(wrongType).errors.join("\n")).toContain("handoff.chars must be a number or null");
+
+    // explicit nulls for unknown evidence stay valid
+    expect(mod.validateResultV2(makeV2({ verification: { ran: null, commands: [], passed: null, details: null } })).ok).toBe(true);
+  });
+
+  it("v1 stays tolerant of archived shapes; unknown schemas are rejected", () => {
+    const v1: Record<string, unknown> = { ...makeV2(), schema: "harnie-eval-result/v1" };
+    delete v1.sourceHarness;
+    delete v1.tagSha;
+    v1.environment = { agent: "opencode" };
+    v1.edits = { files: [] };
+    // v1 does not enforce the nested spec or provenance.
+    expect(mod.validateResultV1(v1).ok).toBe(true);
+    expect(mod.validateResult({ ...makeV2(), schema: "harnie-eval-result/v3" }).ok).toBe(false);
   });
 });
 
@@ -588,6 +765,8 @@ describe("eval harness — verify-evidence integrity check", () => {
       agentCommand("VE"),
       "--handoff",
       handoffFile,
+      "--source-harness",
+      "pi",
     ]);
     expect(res.code).toBe(0);
     const srcRun = join(EVAL_BASE, runId);
@@ -688,6 +867,67 @@ describe("eval harness — verify-evidence integrity check", () => {
     res = runHarness(["verify-evidence", "--dir", fixture]);
     expect(res.code).not.toBe(0);
     expect(res.stderr).toContain("schema must be");
+  }, 30000);
+
+  it("rejects the OLD malformed baseline shape through verify-evidence", () => {
+    const fixture = makeFixture(handoffSource);
+    const rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    const rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.sourceHarness = "opencode"; // baseline must have null
+    writeFileSync(rp, JSON.stringify(rec));
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain('condition "baseline" requires sourceHarness null');
+  }, 30000);
+
+  it("rejects future-dated recordedAt (hand-authored dates)", () => {
+    const fixture = makeFixture(handoffSource);
+    const rp = join(soleRunDir(fixture), "version-flag", "baseline", "result.json");
+    const rec = JSON.parse(readFileSync(rp, "utf8"));
+    rec.recordedAt = new Date(Date.now() + 3 * 3600 * 1000).toISOString();
+    writeFileSync(rp, JSON.stringify(rec));
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("future-dated");
+  }, 30000);
+
+  it("rejects recordedAt more than 1h off the run manifest (either direction)", () => {
+    // future relative to the run manifest createdAt
+    let fixture = makeFixture(handoffSource);
+    let runDir = soleRunDir(fixture);
+    let rp = join(runDir, "version-flag", "baseline", "result.json");
+    let rec = JSON.parse(readFileSync(rp, "utf8"));
+    const runJson = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+    rec.recordedAt = new Date(Date.parse(runJson.createdAt) + 3 * 3600 * 1000).toISOString();
+    writeFileSync(rp, JSON.stringify(rec));
+    let res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("future-dated relative to the manifest");
+
+    // predating the run manifest createdAt
+    fixture = makeFixture(handoffSource);
+    runDir = soleRunDir(fixture);
+    rp = join(runDir, "version-flag", "baseline", "result.json");
+    rec = JSON.parse(readFileSync(rp, "utf8"));
+    const runJson2 = JSON.parse(readFileSync(join(runDir, "run.json"), "utf8"));
+    rec.recordedAt = new Date(Date.parse(runJson2.createdAt) - 3 * 3600 * 1000).toISOString();
+    writeFileSync(rp, JSON.stringify(rec));
+    res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("predates the run manifest");
+  }, 30000);
+
+  it("rejects a run manifest whose createdAt is more than 1h after the newest file mtime", () => {
+    const fixture = makeFixture(handoffSource);
+    const runDir = soleRunDir(fixture);
+    const rjp = join(runDir, "run.json");
+    const runJson = JSON.parse(readFileSync(rjp, "utf8"));
+    runJson.createdAt = new Date(Date.now() + 3 * 3600 * 1000).toISOString();
+    writeFileSync(rjp, JSON.stringify(runJson));
+    const res = runHarness(["verify-evidence", "--dir", fixture]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toContain("run.json: createdAt");
+    expect(res.stderr).toContain("hand-authored date");
   }, 30000);
 });
 

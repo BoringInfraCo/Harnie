@@ -1,11 +1,16 @@
 #!/usr/bin/env node
-// Generator for the synthetic Codex driver used by the 2026-09-10 funded
+// Generator for the synthetic Codex driver used by the 2026-09-09b funded
 // rerun pass. The driver performs the INVESTIGATION phase of the
 // `first-run-recovery` benchmark task (reads docs/internal/FIRST-RUN.md and
 // the backup/restore CLI help, formulates the Recovery-section plan) and
 // explicitly leaves the edit to the next session. Synthetic, sanitized, and
 // declared as such in the run README — same approach as the 2026-09-09
 // synthetic drivers.
+//
+// Fixture-data rule: every timestamp below (2026-09-10T05:20:xxZ) is a
+// fictional session stamp baked into the fixture bytes that were imported and
+// sha-pinned. They are NOT execution times; the pass executed
+// 2026-09-09T01:41Z–01:46Z (see this dir's README chronology note).
 //
 //   node generate-drivers.mjs <output-dir>
 import { writeFileSync } from "node:fs";

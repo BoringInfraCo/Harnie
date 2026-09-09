@@ -1,4 +1,4 @@
-# Continuation evaluation summary — run eval-20260910T0150-legD
+# Continuation evaluation summary — run eval-20260909T0142-legD
 
 Ref: `v0.1.0-rc.3` → `cbe5399346a27d43a13dc8856dfe54ff039936fe` · tagSha `cbe5399346a27d43a13dc8856dfe54ff039936fe` · Node: v22.23.0 · Platform: darwin · Repo: Harnie
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
@@ -22,6 +22,20 @@ try {
   const installedPackage = join(installation, "node_modules", name);
   assert.ok(existsSync(join(installedPackage, "dist", "cli.js")));
   assert.equal(existsSync(join(installedPackage, "src")), false, "The installed CLI must not rely on TypeScript sources");
+  const docs = join(installedPackage, "docs");
+  assert.ok(existsSync(docs), "The installed package must ship its docs");
+  const lifecyclePhrases = [/pending tag/i, /prepared, pending/i, /what remains to publish/i];
+  for (const entry of readdirSync(docs, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const contents = readFileSync(join(entry.parentPath, entry.name), "utf8");
+    for (const phrase of lifecyclePhrases) {
+      assert.doesNotMatch(
+        contents,
+        phrase,
+        `Packaged doc ${relative(installedPackage, join(entry.parentPath, entry.name))} must not assert a publish-time state`,
+      );
+    }
+  }
   const executable = join(installation, "node_modules", ".bin", process.platform === "win32" ? "harnie.cmd" : "harnie");
   const cli = (...args) => run(executable, args, installation);
   const attempt = (args) => {

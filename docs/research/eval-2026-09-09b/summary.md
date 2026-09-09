@@ -1,4 +1,4 @@
-# Funded rerun summary — 2026-09-10 (Order 5, post-rc.3)
+# Funded rerun summary — 2026-09-09 (Order 5, post-rc.3)
 
 Companion to [README.md](README.md). Ref: tag `v0.1.0-rc.3` → tagSha
 `cbe5399346a27d43a13dc8856dfe54ff039936fe` · Node v22.23.0 · darwin · temp
@@ -10,12 +10,12 @@ timeout, never hit).
 
 | Leg | Condition | Verdict | Evidence / reason not-run |
 | --- | --- | --- | --- |
-| OpenCode→Pi baseline | baseline | **NOT RUN** — pi provider unfunded (402 credits / 429 free tier) | `runs/eval-20260910T0150-pi-blocked/version-flag/baseline/` |
-| OpenCode→Pi extra trials (×2) | handoff | **NOT RUN** — same provider blocker | `runs/eval-20260910T0150-pi-blocked/version-flag/handoff/` |
-| Codex→Pi | handoff | **NOT RUN** — same provider blocker; artifact `handoff-codex_pi-sprint024.md` ready, sha-pinned | `runs/eval-20260910T0150-pi-blocked/shebang-guard/handoff/` |
-| Codex→Pi | baseline | **NOT RUN** — same provider blocker | `runs/eval-20260910T0150-pi-blocked/shebang-guard/baseline/` |
-| Codex→OpenCode (first-run-recovery, rc.3) | handoff | **PASS** — 35.1s, in-scope single-file edit, receiver + evaluator verified, no false completion | `runs/eval-20260910T0150-legD/first-run-recovery/handoff/` |
-| Codex→OpenCode (first-run-recovery, rc.3) | baseline | **PASS** — 33.3s, same shape, statement-only | `runs/eval-20260910T0150-legD/first-run-recovery/baseline/` |
+| OpenCode→Pi baseline | baseline | **NOT RUN** — pi provider unfunded (402 credits / 429 free tier) | `runs/eval-20260909T0145-pi-blocked/version-flag/baseline/` |
+| OpenCode→Pi extra trials (×2) | handoff | **NOT RUN** — same provider blocker | `runs/eval-20260909T0145-pi-blocked/version-flag/handoff/` |
+| Codex→Pi | handoff | **NOT RUN** — same provider blocker; artifact `handoff-codex_pi-sprint024.md` ready, sha-pinned | `runs/eval-20260909T0145-pi-blocked/shebang-guard/handoff/` |
+| Codex→Pi | baseline | **NOT RUN** — same provider blocker | `runs/eval-20260909T0145-pi-blocked/shebang-guard/baseline/` |
+| Codex→OpenCode (first-run-recovery, rc.3) | handoff | **PASS** — 35.1s, in-scope single-file edit, receiver + evaluator verified, no false completion | `runs/eval-20260909T0142-legD/first-run-recovery/handoff/` |
+| Codex→OpenCode (first-run-recovery, rc.3) | baseline | **PASS** — 33.3s, same shape, statement-only | `runs/eval-20260909T0142-legD/first-run-recovery/baseline/` |
 
 ## Verdicts — two-verdict framing
 
@@ -32,7 +32,7 @@ timeout, never hit).
   from it; continuation semantics evidence remains the 2026-09-09
   `greeting-command` OpenCode→Codex leg.
 
-## Probes (2026-09-10T01:3x–01:4xZ, `probes/`)
+## Probes (2026-09-09T01:3x–01:4xZ, `probes/`)
 
 | Provider/model | Result |
 | --- | --- |

@@ -4,9 +4,10 @@ Date: 2026-09-08. Maps the audit's Orders 1–6
 (`docs/internal/LAUNCH-READINESS-AUDIT-2026-09-05.md`, "Recommended launch
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
-on the `0.1.0-rc.4` tree on 2026-09-10 (typecheck clean, 63 test files /
-396 tests passed, package smoke passed on v22.23.0 including strict-flag
-(help-mode parse-before-help) and `--version` repros); the suite-green
+on the `0.1.0-rc.5` tree on 2026-09-09 (typecheck clean, 63 test files /
+396 tests passed, package smoke passed on v22.23.0 including the
+packaged-docs lifecycle check, strict-flag (help-mode parse-before-help)
+and `--version` repros); the suite-green
 caveats below describe the state at the time each order was closed,
 superseded by that run.
 
@@ -97,17 +98,17 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   framing per `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A
   is not a PASS on Verdict B):
 
-  - [ ] Verdict A (safety among completed runs): PASS — 09-09 (7 runs, rc.2) + 09-10 (2 runs, rc.3)
+  - [x] Verdict A (safety among completed runs): PASS — 09-09 (7 runs, rc.2) + 09-10 (2 runs, rc.3)
   - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — do NOT claim the matrix met
-    - [ ] Pi → Harnie → OpenCode: met (09-09, rc.2; handoff+baseline verified)
+    - [x] Pi → Harnie → OpenCode: met (09-09, rc.2; handoff+baseline verified)
     - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials NOT RUN (provider)
     - [ ] Codex → Harnie → Pi: NOT RUN — pi receiver provider-blocked (402 credits / 429 free tier; probes recorded 09-10)
-    - [ ] Codex → Harnie → OpenCode: met for transport/receiver compatibility ONLY
+    - [x] Codex → Harnie → OpenCode: met for transport/receiver compatibility ONLY
       - 09-09 leg: handoff context unrelated to the benchmark task → no semantic-continuation claim
       - 09-10 leg D (rc.3, first-run-recovery, task-matching driver context): handoff + baseline PASS
-    - [ ] Continuation semantics: met via OpenCode→Codex greeting-command leg (09-09; steps 1-2 → step 3 only)
-  - [ ] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts are ready + sha-pinned in docs/research/eval-2026-09-{09,10}/driver/, records show not-run + reasons
-  - [ ] Integrity: verify-evidence OK on docs/research/eval-2026-09-09 and eval-2026-09-10 (run after any new evidence)
+    - [x] Continuation semantics: met via OpenCode→Codex greeting-command leg (09-09; steps 1-2 → step 3 only)
+  - [x] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts are ready + sha-pinned in docs/research/eval-2026-09-{09,10}/driver/, records show not-run + reasons
+  - [x] Integrity: verify-evidence OK on docs/research/eval-2026-09-09 and eval-2026-09-09b (run after any new evidence)
 - [x] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
   instructions, known limitations, recovery instructions.
@@ -134,6 +135,20 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   fixture import + handoff). This checklist fact lives on `main` for the
   next RC (rc.4's immutable tarball still says "pending"; corrected here
   per the established pattern).
-  How to verify: `npm run check` (numbers above),
-  `npm run test:package`, install-instructions walkthrough on a clean machine,
-  release tag + published GitHub Release.
+   How to verify: `npm run check` (numbers above),
+   `npm run test:package`, install-instructions walkthrough on a clean machine,
+   release tag + published GitHub Release.
+- [ ] **Order 6 — `v0.1.0-rc.5` pending.** RC5 = RC4 + post-rc.4
+  packaging-integrity round: lifecycle-neutral release notes
+  (`docs/internal/RELEASE-0.1.0-rc.5.md` — packaged file asserts no
+  publication state and carries no publish-time facts, so no post-publish
+  rewrite is needed), packaged-docs smoke assertion
+  (`scripts/smoke-package.mjs` fails the package smoke if any packaged doc
+  asserts a publish-time state), release-workflow hardening (tag/version
+  assertion before release creation, `<tarball>.sha256` sidecar attached,
+  tarball attached in the single `gh release create` call),
+  SUPPORT-MATRIX/checklist chronology corrections, version bump to
+  `0.1.0-rc.5` (rc.4 release-note entry replaced in the packaged `files`).
+  To record here after publishing (on `main`, not in the packaged file):
+  tag → commit, CI/release run IDs, asset + sidecar SHA-256,
+  `isPrerelease`, independent verification results.

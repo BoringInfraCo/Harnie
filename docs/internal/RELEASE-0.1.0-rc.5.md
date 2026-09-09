@@ -1,15 +1,13 @@
-# Release notes — harnie 0.1.0-rc.4 (developer preview)
+# Release notes — harnie 0.1.0-rc.5 (developer preview)
 
-Date: 2026-09-10. Status: **published** (`v0.1.0-rc.4`). RC4 =
-RC3 (`docs/internal/RELEASE-0.1.0-rc.3.md`, published — tag `v0.1.0-rc.3` →
-`cbe5399346a27d43a13dc8856dfe54ff039936fe`, release
-https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.3 with asset
-`harnie-0.1.0-rc.3.tgz` (SHA-256
-`bebf9201d497a9b3b92c1e2e8a6246404ea2d8586e14b63ef80bc6c09d0407f9`),
-`isPrerelease` true, independently verified 2026-09-09) plus this
-post-rc.3 re-audit remediation round. The remaining release step is
-documented at the bottom and in `docs/internal/LAUNCH-CHECKLIST.md`
-(Order 6).
+Date: 2026-09-09. RC5 = RC4 (`docs/internal/RELEASE-0.1.0-rc.4.md`, tag
+`v0.1.0-rc.4` → `37c4c22`) plus this post-rc.4 packaging-integrity round.
+This file is written to be accurate at pack time and after publishing alike:
+it records no publication state and no publish-time facts (CI/release run
+IDs, asset SHA-256) — those live on `main` in
+`docs/internal/LAUNCH-CHECKLIST.md` (Order 6) once they exist. The
+"Release verification" section below tells you how to check any given
+release yourself.
 
 ## What this preview does
 
@@ -24,46 +22,51 @@ every session format, and makes no productivity-saving claims.
 ## Supported
 
 Detail and per-claim evidence live in `docs/internal/SUPPORT-MATRIX.md`
-(source of truth). Essentials (carried over from RC3): fixture/live imports
+(source of truth). Essentials (carried over from RC4): fixture/live imports
 for pi/opencode (codex experimental), `sessions` discovery, `import --work`
 attach, inspection (`list`/`show`/`executions`/`history`/`diff`) with the
 opt-in `--json` machine contract (`docs/internal/MACHINE-CONTRACT.md`),
 checkpoint/fork/handoff (bounded Markdown packages, `0600` artifacts),
 ingestion + output redaction (best-effort), `backup`/`restore`.
 
-## New in RC4 (post-rc.3 re-audit remediation)
+## New in RC5 (post-rc.4 re-audit remediation: packaging integrity)
 
-- **Parse-before-help strictness on all four help short-circuits.**
-  `--help`/`-h` no longer bypass flag validation: help prints and exits 0
-  only when the rest of the argv parses cleanly — an unknown or duplicate
-  flag next to `--help` (e.g. `harnie backup --help --bogus`) is rejected
-  with exit 1 exactly as in normal execution
-  (`tests/cli-help-strict.test.ts`; spec: `docs/internal/MACHINE-CONTRACT.md`,
-  "Flag hardening").
-- **Evaluation record schema v2 with the v1 validator retained.** Eval
-  result records stamp `harnie-eval-result/v2`; the retained v1 validator
-  keeps older evidence readable. Evidence: `tests/eval-harness.test.ts`.
-- **Two-verdict evaluation reporting** (per
-  `docs/internal/EVALUATION-PROTOCOL.md` §4). Verdict A (safety behavior
-  among completed runs) and Verdict B (full Order 5 matrix gate) are
-  separate claims — a PASS on A is not a PASS on B. Current status:
-  **Verdict A PASS / Verdict B PARTIAL**, with the not-run legs and their
-  provider-funding reasons recorded explicitly
-  (`docs/research/eval-2026-09-09/`, `docs/research/eval-2026-09-09b/`).
-  See the evaluation section below.
-- **Portable evaluation evidence.** Per-run `run.json` and `summaries`,
-  and relative paths throughout `docs/research/eval-*/`, so the evidence
-  tree does not depend on absolute machine paths; a `verify-evidence`
-  subcommand re-checks record/sha integrity of an evidence directory.
-  Integrity is green on both `docs/research/eval-2026-09-09/` and
-  `docs/research/eval-2026-09-09b/`.
-- **Release-doc status corrections.** RC3 docs reconciled with reality:
-  rc.3 is fully published (tag, CI/release runs, release URL, asset +
-  SHA-256, prerelease mark, independent verification), and the Codex rows
-  use the precise wording (Codex→OpenCode executed successfully —
-  transport/receiver compatibility; Codex→Pi remains provider-blocked; the
-  09-09 Codex→OpenCode handoff context was unrelated to its benchmark task,
-  so it does not demonstrate semantic continuation).
+RC4's tarball shipped a release note asserting a publication state it did
+not yet have, and needed a post-publish rewrite on `main` to carry the
+published facts. RC5 fixes the class of problem, not just the instance:
+
+- **Lifecycle-neutral release notes.** This file asserts no publication
+  state and contains no publish-time facts, so it is true when packed and
+  stays true after the release is cut — no post-publish rewrite needed.
+  Publish-time facts are recorded on `main`
+  (`docs/internal/LAUNCH-CHECKLIST.md`, Order 6), which is not packaged
+  (confirmed via `npm pack --dry-run`).
+- **Strict packaging validator invariant.** `scripts/smoke-package.mjs`
+  (part of `npm run check`) now fails if any file shipped in the tarball's
+  `docs/` carries the lifecycle-status phrasing that made RC4's packaged
+  note wrong — so a tarball cannot again ship describing its own release as
+  mid-flight or unfinished.
+- **Release workflow hardening** (`.github/workflows/release.yml`): the
+  workflow asserts that the pushed tag equals `v` + the package version
+  before creating a release (the job fails otherwise); it writes a
+  `<tarball>.sha256` sidecar and attaches it alongside the tarball; and the
+  tarball (plus sidecar) is attached in the same `gh release create` call —
+  there is no window in which a release exists without its asset.
+  `--verify-tag` and conditional `--prerelease` are retained.
+- **Chronology corrections.** `docs/internal/SUPPORT-MATRIX.md` now records
+  RC4's published facts (tag → commit, CI/release runs, asset SHA-256,
+  prerelease mark, independent verification date) as its reference release,
+  and `docs/internal/LAUNCH-CHECKLIST.md` checkbox states match the recorded
+  verdicts (met items checked; only the not-run matrix legs unchecked).
+
+## Release waiver
+
+Release waiver: v0.1.0-rc.5 ships as a developer preview under an explicit
+waiver of the full continuation-matrix gate (Verdict B). The safety sub-gate
+(Verdict A) PASS is required and holds. The matrix legs OpenCode→Pi
+baseline/trials and Codex→Pi remain not-run pending a funded Pi provider;
+this release makes no claim that the full cross-harness matrix or the
+productivity thesis is proven.
 
 ## Known limitations
 
@@ -92,7 +95,7 @@ ingestion + output redaction (best-effort), `backup`/`restore`.
   exhausted / contested 429 free-tier daily quota; probes recorded
   2026-09-10). This is not a code or harness problem: handoff artifacts
   are ready and sha-pinned, and the legs can execute unchanged once a
-  funded pi model exists.
+  funded pi model exists. See the release waiver above.
 
 ## Evaluation result (Order 5, two-verdict)
 
@@ -141,7 +144,7 @@ Verify (never point the walkthrough at your real `~/.harnie`):
 
 ```sh
 export HARNIE_HOME="$(mktemp -d)"
-harnie --version            # 0.1.0-rc.4
+harnie --version            # 0.1.0-rc.5
 harnie --help
 harnie init
 harnie init --bogus         # rejected: unknown flag
@@ -154,15 +157,35 @@ Automated equivalent: `npm run check` (typecheck + tests + offline package
 smoke test), enforced by `.github/workflows/ci.yml` and re-run by
 `.github/workflows/release.yml` on tag pushes.
 
-## Published artifact
+## Release verification
 
-Tag `v0.1.0-rc.4` → commit `37c4c22` (main `37c4c22…`). CI green on main
-and the tag (runs 34302120421, 34302121764); Release workflow green
-(run 34302121639). GitHub Release
-https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.4 with
-asset `harnie-0.1.0-rc.4.tgz` (95.3 kB, 68 files), SHA-256
-`d5a487b486007b7b5a29ca8e9fee254f513947218eef9454538142f323953851`,
-`isPrerelease` true (automatic for `-rc` tags). Independently verified
-2026-09-09 by downloading the published asset and a clean-prefix install
-under a temp `HARNIE_HOME`: `--version` → `harnie 0.1.0-rc.4`;
-`init --bogus` / `backup x.db --bogus` exit 1; fixture import + handoff.
+This file makes no claim about whether, when, or how any particular release
+was published. To verify a release of this version yourself:
+
+1. **Tag.** The tag `v0.1.0-rc.5` should exist on
+   https://github.com/BoringInfraCo/Harnie and point at the commit the
+   release was cut from. The Release workflow asserts that the pushed tag
+   equals `v` + the package version (`0.1.0-rc.5`) before creating a
+   release, re-runs `npm run check` as a final gate, and passes
+   `--verify-tag` to `gh release create` so the release cannot be created
+   against a mismatched tag.
+2. **CI.** The automated checks for the tagged commit should be green: the
+   tag-triggered CI run (typecheck + tests + package smoke) and the Release
+   workflow run. Check the Actions tab for the runs associated with the tag.
+3. **Asset.** The GitHub Release for the tag should carry the tarball
+   `harnie-0.1.0-rc.5.tgz` and a `harnie-0.1.0-rc.5.tgz.sha256` sidecar
+   produced by the Release workflow. Download both, run
+   `shasum -a 256 harnie-0.1.0-rc.5.tgz` (or `sha256sum`), and compare with
+   the sidecar. A `-rc` tag's release should be marked as a prerelease
+   (the workflow sets this automatically).
+4. **Install.** In an empty directory, install the downloaded asset (or a
+   locally packed tarball) with
+   `npm install --global ./harnie-0.1.0-rc.5.tgz`, then repeat the verify
+   steps above with `HARNIE_HOME` pointed at a scratch directory:
+   `harnie --version` prints `harnie 0.1.0-rc.5`; `harnie init --bogus` and
+   `harnie backup x.db --bogus` exit 1; fixture import + handoff work.
+
+For a given release, the publish-time facts observed during verification
+(tag → commit, CI/release run IDs, asset SHA-256) are recorded on `main` in
+`docs/internal/LAUNCH-CHECKLIST.md` (Order 6) — deliberately not in this
+packaged file, so nothing here goes stale at publish time.
