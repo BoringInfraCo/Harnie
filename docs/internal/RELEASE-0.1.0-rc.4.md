@@ -1,6 +1,6 @@
 # Release notes — harnie 0.1.0-rc.4 (developer preview)
 
-Date: 2026-09-10. Status: **prepared, pending tag** (`v0.1.0-rc.4`). RC4 =
+Date: 2026-09-10. Status: **published** (`v0.1.0-rc.4`). RC4 =
 RC3 (`docs/internal/RELEASE-0.1.0-rc.3.md`, published — tag `v0.1.0-rc.3` →
 `cbe5399346a27d43a13dc8856dfe54ff039936fe`, release
 https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.3 with asset
@@ -154,15 +154,15 @@ Automated equivalent: `npm run check` (typecheck + tests + offline package
 smoke test), enforced by `.github/workflows/ci.yml` and re-run by
 `.github/workflows/release.yml` on tag pushes.
 
-## What remains to publish
+## Published artifact
 
-Release-engineering steps (orchestrator, user-executed — nothing is
-committed, tagged, pushed, or run against the GitHub API by the release
-prep): commit the working tree (parse-before-help strictness, eval schema
-v2 + v1 retention, two-verdict reporting, portable evidence +
-`verify-evidence`, docs status corrections + version bump), tag
-`v0.1.0-rc.4`, push with tags — CI gates the tag and
-`.github/workflows/release.yml` creates the GitHub Release with the
-tarball attached, prerelease-marked and tag-verified. Confirm both
-workflows green and the asset present
-(`docs/internal/LAUNCH-CHECKLIST.md`, Order 6).
+Tag `v0.1.0-rc.4` → commit `37c4c22` (main `37c4c22…`). CI green on main
+and the tag (runs 34302120421, 34302121764); Release workflow green
+(run 34302121639). GitHub Release
+https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.4 with
+asset `harnie-0.1.0-rc.4.tgz` (95.3 kB, 68 files), SHA-256
+`d5a487b486007b7b5a29ca8e9fee254f513947218eef9454538142f323953851`,
+`isPrerelease` true (automatic for `-rc` tags). Independently verified
+2026-09-09 by downloading the published asset and a clean-prefix install
+under a temp `HARNIE_HOME`: `--version` → `harnie 0.1.0-rc.4`;
+`init --bogus` / `backup x.db --bogus` exit 1; fixture import + handoff.

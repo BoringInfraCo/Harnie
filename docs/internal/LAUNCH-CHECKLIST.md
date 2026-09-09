@@ -122,20 +122,18 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   `isPrerelease` true; independently verified 2026-09-09 (clean install,
   `--version`, `init --bogus` exit 1, `backup x.db --bogus` exit 1,
   fixture import + handoff). RC2 published 2026-09-08 as above.
-- [ ] **Order 6 — `v0.1.0-rc.4` (this round, pending tag/publish).** The
-  same gate as above, re-applied: commit the working tree
-  (parse-before-help strictness on all four help short-circuits, eval
-  schema v2 + retained v1 validator, two-verdict evaluation reporting,
-  portable evidence paths + `verify-evidence`, docs status corrections +
-  version bump to `0.1.0-rc.4`), tag `v0.1.0-rc.4`, push with tags — CI
-  gates the tag and `.github/workflows/release.yml` creates the GitHub
-  Release with the tarball attached, prerelease-marked and tag-verified.
-  Confirm both workflows green and the asset present, then verify the
-  published asset by clean install under a temp `HARNIE_HOME`
-  (`--version`, `init --bogus` exit 1, `backup x.db --bogus` exit 1,
-  fixture import + handoff) — see `docs/internal/RELEASE-0.1.0-rc.4.md`.
-  These are orchestrator steps (nothing is committed, tagged, pushed, or
-  run against the GitHub API by the release prep).
+- [x] **Order 6 — `v0.1.0-rc.4` published 2026-09-09.** Tag `v0.1.0-rc.4` →
+  commit `37c4c22`; CI green on main and the tag (runs 34302120421,
+  34302121764); Release workflow green (run 34302121639); GitHub Release
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.4 with
+  asset `harnie-0.1.0-rc.4.tgz` (95.3 kB, SHA-256
+  `d5a487b486007b7b5a29ca8e9fee254f513947218eef9454538142f323953851`),
+  `isPrerelease` true; independently verified 2026-09-09 (published asset
+  downloaded, clean install under temp `HARNIE_HOME`: `--version` →
+  `0.1.0-rc.4`, `init --bogus` exit 1, `backup x.db --bogus` exit 1,
+  fixture import + handoff). This checklist fact lives on `main` for the
+  next RC (rc.4's immutable tarball still says "pending"; corrected here
+  per the established pattern).
   How to verify: `npm run check` (numbers above),
   `npm run test:package`, install-instructions walkthrough on a clean machine,
   release tag + published GitHub Release.
