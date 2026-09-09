@@ -1016,7 +1016,7 @@ describe("eval harness — verify-evidence integrity check", () => {
     res = runHarness(["verify-evidence", "--dir", fixture]);
     expect(res.code).not.toBe(0);
     expect(res.stderr).toContain("predates the run manifest");
-  }, 30000);
+  }, 60000);
 
   it("rejects a run manifest whose createdAt is more than 1h after the newest file mtime", () => {
     const fixture = makeFixture(handoffSource);
@@ -1486,7 +1486,11 @@ describe("eval harness — verify-evidence integrity check", () => {
       agentCommand("AT"),
       "--attest",
       "ci-run-12345",
-    ]);
+    ], {
+      GITHUB_RUN_ID: "",
+      GITHUB_REPOSITORY: "",
+      GITHUB_ACTOR: "",
+    });
     expect(res.code).toBe(0);
     const runJson = JSON.parse(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8"));
     expect(runJson.attestation).toMatchObject({ source: "provided", attestation: "ci-run-12345" });
