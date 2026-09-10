@@ -22,7 +22,13 @@ A local-first work-preservation layer for AI development. Records agent session 
 
 Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie uses Node's built-in SQLite support; Node may print an experimental SQLite warning). The narrative version of this walkthrough lives in [docs/internal/FIRST-RUN.md](docs/internal/FIRST-RUN.md).
 
-**1. Install.** From this checkout:
+**1. Install.** Download the pinned release tarball from Cloudflare, verify its published SHA-256 checksum, and install it globally with npm:
+
+```sh
+curl -fsSL https://boringinfra.company/harnie/install.sh | sh
+```
+
+Or install from this checkout:
 
 ```sh
 npm ci
@@ -32,7 +38,7 @@ harnie --version   # e.g. 0.1.0-rc.7
 harnie --help
 ```
 
-The package stays `private: true` and is **not published to npm**; distribution is via `npm pack` tarballs and the GitHub Release assets. (`npm run harnie -- <args>` builds the JavaScript CLI from this checkout and runs it — handy for development.)
+The package stays `private: true` and is **not published to npm**; distribution is via the verified install script, `npm pack` tarballs, and GitHub Release assets. (`npm run harnie -- <args>` builds the JavaScript CLI from this checkout and runs it — handy for development.)
 
 **2. Point at a scratch store** so the walkthrough never touches your real home:
 

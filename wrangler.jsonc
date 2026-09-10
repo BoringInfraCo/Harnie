@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "harnie-installer",
+  "account_id": "1c1597c473c77c9ea49a53b4d62fdb2d",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./worker/public"
+  },
+  "routes": [
+    {
+      "pattern": "https://boringinfra.company/harnie/install.sh",
+      "zone_name": "boringinfra.company"
+    },
+    {
+      "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.7/harnie-0.1.0-rc.7.tgz",
+      "zone_name": "boringinfra.company"
+    },
+    {
+      "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.7/harnie-0.1.0-rc.7.tgz.sha256",
+      "zone_name": "boringinfra.company"
+    }
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

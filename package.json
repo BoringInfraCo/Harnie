@@ -12,6 +12,9 @@
     "test": "vitest run",
     "test:package": "node scripts/smoke-package.mjs",
     "check": "npm run typecheck && npm test && npm run test:package",
+    "prepare:installer": "sh scripts/prepare-installer-assets.sh",
+    "check:installer": "sh -n scripts/prepare-installer-assets.sh worker/public/harnie/install.sh && wrangler deploy --dry-run",
+    "deploy:installer": "npm run prepare:installer && npm run check:installer && wrangler deploy",
     "prepack": "npm run build",
     "preharnie": "npm run build",
     "harnie": "node dist/cli.js",
@@ -20,7 +23,8 @@
   "devDependencies": {
     "@types/node": "^25.0.3",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.16",
+    "wrangler": "^4.131.0"
   },
   "files": [
     "dist",

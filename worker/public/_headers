@@ -1,0 +1,9 @@
+/harnie/install.sh
+  Cache-Control: public, max-age=300
+  Content-Disposition: inline; filename="install.sh"
+  Content-Type: text/x-shellscript; charset=utf-8
+  X-Content-Type-Options: nosniff
+
+/harnie/releases/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
