@@ -7,7 +7,7 @@ checked only with cited evidence. Final gate `npm run check` was re-run green
 on the `0.1.0-rc.7` tree on 2026-09-09 (typecheck clean, 64 test files /
 428 tests passed — the rc.7 publish figure — package smoke passed on v22.23.0 including the expanded
 packaged-docs lifecycle check, strict-flag (help-mode parse-before-help)
-and `--version` repros). The rc.8 candidate (2026-09-11, post-rc.7 installer
+and `--version` repros). The rc.8 release tree (2026-09-11, post-rc.7 installer
 work): 65 test files / 441 tests including the expanded `tests/installer.test.ts`,
 with `npm run check:installer` now run in CI. The suite-green
 caveats below describe the state at the time each order was closed,
@@ -106,9 +106,8 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   plus funded rerun pass bound to v0.1.0-rc.3/cbe5399, plus a candidate-bound
   pass bound to v0.1.0-rc.5/6ac02e3) — order status:
   **Verdict A PASS / Verdict B PARTIAL/INCONCLUSIVE**. The released
-  candidate is v0.1.0-rc.7 (tagSha 34372be31a8feb83bf1ab84dd17e9a40316b2e33),
-  with rc.8 prepared as its installer/re-audit successor; no receiver runs
-  are bound to rc.6, rc.7, or rc.8. Those rounds did not change handoff
+  candidate is v0.1.0-rc.8 (tagSha e819be671ab3e1bf1d137a570939337cb7813104);
+  no receiver runs are bound to rc.6, rc.7, or rc.8. Those rounds did not change handoff
   semantics or receiver behavior. Two-verdict framing per
   `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A is not a PASS
   on Verdict B):
@@ -200,3 +199,26 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   `f673607141b973ec2c35463d4e4dd24168d6683d4b8aeae5fee91d3bdfea6f04`
   (downloaded independently; sidecar match verified 2026-09-09),
   `isPrerelease` true. Suite at publish: 64 test files / 428 tests.
+- [x] **Order 6 — `v0.1.0-rc.8` published 2026-09-11.** RC8 = RC7 + the
+  macOS/Linux curl-installer path and its mocked/live smoke tooling,
+  fail-closed installer-version synchronization, CI installer check, Pi
+  capacity re-probe evidence, stale benchmark-version correction, and
+  sanitized OpenRouter probe identifier. The first main push (`f74816a`)
+  exposed a substring-collision test bug on Linux (run 34614753722); the
+  column-specific assertion fix is the released commit `e819be6`.
+  Tag `v0.1.0-rc.8` → commit
+  `e819be671ab3e1bf1d137a570939337cb7813104`; CI green on main (run
+  34614982090) and the tag (run 34615157787); Release workflow green (run
+  34615157833); GitHub Release
+  https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.8 with
+  assets `harnie-0.1.0-rc.8.tgz` (91,674 bytes) and its `.sha256` sidecar,
+  SHA-256
+  `f7a2c3a6826432cdd5b1767d47f6455098e830096377c3cf9443365b13fb6bd1`
+  (downloaded independently; sidecar match verified 2026-09-11),
+  `isPrerelease` true. Suite at publish: 65 test files / 441 tests.
+  Cloudflare deployment is not yet closed: the local Wrangler OAuth token
+  expired, both browser-callback and device authorization timed out, and the
+  public installer still returned rc.7 during the post-release smoke. Re-run
+  `npx wrangler login --device`, `npm run deploy:installer`, then
+  `sh scripts/smoke-live-installer.sh`; do not claim the public curl path is
+  on rc.8 until that smoke passes.
