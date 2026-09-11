@@ -1,0 +1,23 @@
+{
+  "schema": "harnie-eval-run/v2",
+  "runId": "eval-20260911T041514-pi-reprobe",
+  "repo": "Harnie",
+  "ref": "34372be31a8feb83bf1ab84dd17e9a40316b2e33",
+  "refName": "v0.1.0-rc.7",
+  "tagSha": "34372be31a8feb83bf1ab84dd17e9a40316b2e33",
+  "createdAt": "2026-09-11T04:15:14.330Z",
+  "node": "v22.23.0",
+  "platform": "darwin",
+  "tasks": [
+    "version-flag",
+    "shebang-guard",
+    "first-run-recovery",
+    "help-regression-test",
+    "greeting-command"
+  ],
+  "attestation": {
+    "source": "provided",
+    "attestation": "pi-unblock-2026-09-11 (free-tier quota re-probe)",
+    "capturedAt": "2026-09-11T04:15:14.331Z"
+  }
+}

@@ -9,18 +9,18 @@ Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Cod
 
 **Preview promise:** Import supported local coding sessions, inspect evidence-backed work history, and prepare Markdown continuation packages.
 
-- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the import-side live gate is a single manual datapoint. The receiver side is partially validated: Codex→OpenCode executed successfully (transport/receiver compatibility — `docs/research/eval-2026-09-09/`, `docs/research/eval-2026-09-09b/`); Codex→Pi remains provider-blocked.
+- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the import-side live gate is a single manual datapoint. The receiver side is partially validated: Codex→OpenCode executed successfully (transport/receiver compatibility — `docs/research/eval-2026-09-09/`, `docs/research/eval-2026-09-09b/`); Codex→Pi remains blocked by OpenRouter capacity/funding (the free model tier answers but shares an account-wide 50/day cap, so the remaining Pi legs could not run — `docs/research/eval-2026-09-11/`).
 - Harnie does not resume sessions natively in any harness, does not accept every session format, and makes no productivity-saving claims. Derived state (goal, decisions, findings, next steps) consists of rule-derived claims over observed events with per-claim provenance — traceable, but not necessarily true, current, or settled.
 
 **For engineers:**
 Harnie captures the agent-work handoff graph (sessions → observed work → continuation targets) into a local SQLite DB at `$HARNIE_HOME/harnie.db`. Run `harnie init` + `harnie import pi <session.jsonl>` to build a normalized work archive. All data stays on your machine; core functionality requires no internet. Think of it as "git log" for agent work states—preserving what was accomplished so it can be restored or handed off later.
 
 **For technical product folks:**
-A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is validated in limited scenarios, not established as complete: the safety sub-gate (Verdict A) passes, the full cross-harness matrix (Verdict B) is PARTIAL — Pi-receiver legs remain not-run pending a funded provider — and reduced developer re-explanation is NOT established (waiver and verdicts: `docs/internal/RELEASE-0.1.0-rc.7.md`; evidence: `docs/research/eval-2026-09-09c/`). The import/handoff tooling above is what this preview delivers.
+A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is validated in limited scenarios, not established as complete: the safety sub-gate (Verdict A) passes, the full cross-harness matrix (Verdict B) is PARTIAL — the Pi-receiver legs remain not-run because OpenRouter's shared account-wide 50/day free-model cap is exhausted and paid credits are zero — and reduced developer re-explanation is NOT established (waiver and verdicts: `docs/internal/RELEASE-0.1.0-rc.8.md`; evidence: `docs/research/eval-2026-09-09c/`, `docs/research/eval-2026-09-11/`). The import/handoff tooling above is what this preview delivers.
 
 ## First run
 
-Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie uses Node's built-in SQLite support; Node may print an experimental SQLite warning). The narrative version of this walkthrough lives in [docs/internal/FIRST-RUN.md](docs/internal/FIRST-RUN.md).
+Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie uses Node's built-in SQLite support; Node may print an experimental SQLite warning). Preview support is **macOS and Linux**; Windows is unverified (not exercised by CI). The narrative version of this walkthrough lives in [docs/internal/FIRST-RUN.md](docs/internal/FIRST-RUN.md).
 
 **1. Install.** Download the pinned release tarball from Cloudflare, verify its published SHA-256 checksum, and install it globally with npm:
 
@@ -34,7 +34,7 @@ Or install from this checkout:
 npm ci
 npm pack
 npm install --global ./harnie-*.tgz
-harnie --version   # e.g. 0.1.0-rc.7
+harnie --version   # e.g. 0.1.0-rc.8
 harnie --help
 ```
 

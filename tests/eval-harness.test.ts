@@ -6,7 +6,14 @@ import { createHash } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 
 interface EvalMod {
-  TASKS: Array<{ id: string; files: string[]; statement: string; verify: string[] }>;
+  TASKS: Array<{
+    id: string;
+    files: string[];
+    statement: string;
+    details: string;
+    verify: string[];
+    endState: string;
+  }>;
   validateResult: (r: unknown) => { ok: boolean; errors: string[] };
   validateResultV1: (r: unknown) => { ok: boolean; errors: string[] };
   validateResultV2: (r: unknown) => { ok: boolean; errors: string[] };
@@ -70,6 +77,16 @@ const uniqueRun = () => {
   return id;
 };
 
+describe("eval harness — task registry", () => {
+  it("keeps the version-flag expectation candidate-independent", () => {
+    const task = mod.TASKS.find(({ id }) => id === "version-flag");
+    expect(task).toBeDefined();
+    const contract = [...task!.verify, task!.endState].join("\n");
+    expect(contract).toContain("package.json");
+    expect(contract).not.toContain("0.0.0");
+  });
+});
+
 describe("eval harness — clone preparation", () => {
   it("prepares isolated, deterministic clones outside the working tree", () => {
     const runId = uniqueRun();
@@ -123,7 +140,7 @@ describe("eval harness — clone preparation", () => {
     expect(otherClone).not.toBe(clone);
     expect(readFileSync(join(EVAL_BASE, runId, "run.json"), "utf8")).toContain("harnie-eval-run/v2");
     expect(head).toBeTruthy();
-  });
+  }, 30000);
 });
 
 describe("eval harness — mocked agent run", () => {

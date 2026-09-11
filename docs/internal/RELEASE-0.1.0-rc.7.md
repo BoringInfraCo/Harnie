@@ -80,9 +80,14 @@ could silently go stale and hardens the evaluation verifier:
 Release waiver: v0.1.0-rc.7 ships as a developer preview under an explicit
 waiver of the full continuation-matrix gate (Verdict B). The safety sub-gate
 (Verdict A) PASS is required and holds. The matrix legs OpenCode→Pi
-baseline/trials and Codex→Pi remain not-run pending a funded Pi provider;
-this release makes no claim that the full cross-harness matrix or the
-productivity thesis is proven.
+baseline/trials and Codex→Pi remain not-run on OpenRouter capacity/funding
+grounds: the free model tier answers again (the earlier "provider does not
+respond" symptom is stale) but every `:free` model shares one account-wide
+50/day cap, and paid models have no credits. A 2026-09-11 re-probe pass
+(`docs/research/eval-2026-09-11/`) recorded a correctly edited receiver run
+killed mid-way by that cap (429 `openrouter_free_tier_daily`) and a still-zero
+paid balance (402 `openrouter_credits`). This release makes no claim that the
+full cross-harness matrix or the productivity thesis is proven.
 
 ## Known limitations
 
@@ -109,13 +114,15 @@ productivity thesis is proven.
   `docs/research/eval-2026-09-09c/`.
 - **Unverified matrix legs (Verdict B PARTIAL).** The OpenCode→Pi
   baseline and requested extra trials, and the entire Codex→Pi leg, are
-  NOT RUN — the pi receiver is provider-unfunded (paid openrouter credits
-  exhausted / contested 429 free-tier daily quota; probes recorded
-  2026-09-09T13:54Z and re-verified 2026-09-09T15:35Z,
-  `docs/research/eval-2026-09-09c/`). This is not a code or harness
-  problem: handoff artifacts are ready and sha-pinned, and the legs can
-  execute unchanged once a funded pi model exists. See the release waiver
-  above.
+  NOT RUN — the pi receiver is blocked by OpenRouter capacity/funding, not
+  by code: every `:free` model shares one account-wide 50/day cap
+  (exhausted at the 2026-09-11 re-probe; reset 2026-09-12T00:00Z) and paid
+  models remain unfunded (402 `openrouter_credits`, zero credits). The
+  2026-09-11 pass captured a receiver run that made the correct edit before
+  the cap killed it (`docs/research/eval-2026-09-11/`); earlier probes are
+  in `docs/research/eval-2026-09-09c/`. The legs execute unchanged once the
+  cap is available early in a window or the key is funded. See the release
+  waiver above.
 
 ## Evaluation result (Order 5, two-verdict)
 
@@ -135,12 +142,14 @@ first-run-recovery pair with task-matching driver context,
 continuation-semantics OpenCode→Codex greeting-command leg (09-09;
 driver steps 1–2 → receiver step 3 only). Not met / not run: the
 OpenCode→Pi baseline + extra trials and the whole Codex→Pi leg —
-provider-blocked (402 credits / 429 free tier; probes recorded
-2026-09-09T13:54Z, re-verified 2026-09-09T15:35Z,
-`docs/research/eval-2026-09-09c/`).
+OpenRouter capacity/funding blocked (account-wide free-tier 50/day cap
+exhausted; paid credits zero; probes recorded 2026-09-09T13:54Z,
+re-verified 2026-09-09T15:35Z and again 2026-09-11T04:37Z,
+`docs/research/eval-2026-09-09c/`, `docs/research/eval-2026-09-11/`).
 Do not claim the matrix is met. Full verdicts, ledgers, and per-run
 provenance: `docs/research/eval-2026-09-09/`,
-`docs/research/eval-2026-09-09b/`, and `docs/research/eval-2026-09-09c/`
+`docs/research/eval-2026-09-09b/`, `docs/research/eval-2026-09-09c/`, and
+`docs/research/eval-2026-09-11/`
 (prior: `eval-2026-09-08/` receiver compatibility, `eval-2026-09-07/`
 initial gate).
 

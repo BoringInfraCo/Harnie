@@ -1,0 +1,28 @@
+diff --git a/scripts/prepare-bin.mjs b/scripts/prepare-bin.mjs
+index 699ce1c..f45c857 100644
+--- a/scripts/prepare-bin.mjs
++++ b/scripts/prepare-bin.mjs
+@@ -1,3 +1,21 @@
+-import { chmodSync } from "node:fs";
++import { chmodSync, readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
+ 
+-chmodSync(new URL("../dist/cli.js", import.meta.url), 0o755);
++const filePath = new URL("../dist/cli.js", import.meta.url);
++const filePathString = fileURLToPath(filePath);
++
++try {
++  const content = readFileSync(filePathString, "utf8");
++  if (!content.startsWith("#!")) {
++    console.error(`Error: ${filePathString} lacks a shebang (must start with #!)`);
++    process.exit(1);
++  }
++} catch (err) {
++  if (err.code === "ENOENT") {
++    console.error(`Error: ${filePathString} does not exist`);
++    process.exit(1);
++  }
++  throw err;
++}
++
++chmodSync(filePath, 0o755);

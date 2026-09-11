@@ -1,6 +1,6 @@
 {
   "name": "harnie",
-  "version": "0.1.0-rc.7",
+  "version": "0.1.0-rc.8",
   "private": true,
   "type": "module",
   "bin": {
@@ -13,8 +13,9 @@
     "test:package": "node scripts/smoke-package.mjs",
     "check": "npm run typecheck && npm test && npm run test:package",
     "prepare:installer": "sh scripts/prepare-installer-assets.sh",
-    "check:installer": "sh -n scripts/prepare-installer-assets.sh worker/public/harnie/install.sh && wrangler deploy --dry-run",
-    "deploy:installer": "npm run prepare:installer && npm run check:installer && wrangler deploy",
+    "installer:sync": "node scripts/sync-installer-version.mjs",
+    "check:installer": "node scripts/sync-installer-version.mjs --check && sh -n scripts/prepare-installer-assets.sh worker/public/harnie/install.sh && wrangler deploy --dry-run",
+    "deploy:installer": "npm run installer:sync && npm run prepare:installer && npm run check:installer && wrangler deploy",
     "prepack": "npm run build",
     "preharnie": "npm run build",
     "harnie": "node dist/cli.js",
@@ -32,7 +33,7 @@
     "docs/internal/BACKUP-RECOVERY.md",
     "docs/internal/MACHINE-CONTRACT.md",
     "docs/internal/SUPPORT-MATRIX.md",
-    "docs/internal/RELEASE-0.1.0-rc.7.md",
+    "docs/internal/RELEASE-0.1.0-rc.8.md",
     "tests/fixtures/pi/coding.jsonl"
   ],
   "engines": {

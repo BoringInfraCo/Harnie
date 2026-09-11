@@ -63,11 +63,11 @@ export const TASKS = [
       "When the CLI is invoked with --version (or -v) as its first argument, print the version declared in package.json (read it, do not hardcode) to stdout and exit with code 0, before any other argument handling. All other flags and commands must behave exactly as before.",
     verify: [
       "npm run build",
-      "node dist/cli.js --version   # prints 0.0.0, exit 0",
+      "node dist/cli.js --version   # prints the version declared in package.json, exit 0",
       "npx vitest run tests/cli-init.test.ts   # still green",
     ],
     endState:
-      "`node dist/cli.js --version` prints 0.0.0 and exits 0; existing CLI behavior and the cli-init tests are unchanged.",
+      "`node dist/cli.js --version` prints the version declared in package.json and exits 0; existing CLI behavior and the cli-init tests are unchanged.",
   },
   {
     id: "shebang-guard",

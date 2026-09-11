@@ -5,12 +5,13 @@ Date: 2026-09-08. Maps the audit's Orders 1–6
 sequence and acceptance gates") to current status. Strict rule: a box is
 checked only with cited evidence. Final gate `npm run check` was re-run green
 on the `0.1.0-rc.7` tree on 2026-09-09 (typecheck clean, 64 test files /
-415 tests passed, package smoke passed on v22.23.0 including the expanded
+428 tests passed — the rc.7 publish figure — package smoke passed on v22.23.0 including the expanded
 packaged-docs lifecycle check, strict-flag (help-mode parse-before-help)
-and `--version` repros); for the current counts see the latest CI run —
-the suite-green
+and `--version` repros). The rc.8 candidate (2026-09-11, post-rc.7 installer
+work): 65 test files / 441 tests including the expanded `tests/installer.test.ts`,
+with `npm run check:installer` now run in CI. The suite-green
 caveats below describe the state at the time each order was closed,
-superseded by that run.
+superseded by the current `npm run check`.
 
 Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
 
@@ -60,9 +61,9 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   re-verified via `npm pack --dry-run`): the tarball carries the user docs
   (`FIRST-RUN`, `BACKUP-RECOVERY`, `MACHINE-CONTRACT`, `SUPPORT-MATRIX`),
   the single lifecycle-neutral release note for the version being packed
-  (`RELEASE-0.1.0-rc.7.md`), and the example fixture
+  (`RELEASE-0.1.0-rc.8.md`), and the example fixture
   `tests/fixtures/pi/coding.jsonl`; internal strategy material and the
-  historical rc.1–rc.6 release notes are excluded. (At this order's
+  historical rc.1–rc.7 release notes are excluded. (At this order's
   original closure on the rc.2 tree, the packaged release note was
   `RELEASE-0.1.0-rc.2`.)
   How to verify: follow `docs/internal/FIRST-RUN.md` on a clean checkout with
@@ -102,28 +103,29 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   How to verify: `node scripts/eval-continuation.mjs tasks --json`;
   inspect `docs/research/eval-2026-09-08/`.
 - Order 5 — Directed cross-harness matrix (2026-09-09, ref v0.1.0-rc.2/0231dd7,
-  plus funded rerun pass bound to v0.1.0-rc.3/cbe5399, plus newest
-  candidate-bound pass bound to v0.1.0-rc.5/6ac02e3) — order status:
+  plus funded rerun pass bound to v0.1.0-rc.3/cbe5399, plus a candidate-bound
+  pass bound to v0.1.0-rc.5/6ac02e3) — order status:
   **Verdict A PASS / Verdict B PARTIAL/INCONCLUSIVE**. The released
-  candidate is now v0.1.0-rc.6 (tagSha a81f5840ef17ab42e08119f34591c2a7cf6b1e64);
-  no receiver runs are bound to rc.6 — the rc.6 round was docs-integrity
-  only and changed no evaluation behavior. Two-verdict framing per
+  candidate is v0.1.0-rc.7 (tagSha 34372be31a8feb83bf1ab84dd17e9a40316b2e33),
+  with rc.8 prepared as its installer/re-audit successor; no receiver runs
+  are bound to rc.6, rc.7, or rc.8. Those rounds did not change handoff
+  semantics or receiver behavior. Two-verdict framing per
   `docs/internal/EVALUATION-PROTOCOL.md` §4 (a PASS on Verdict A is not a PASS
   on Verdict B):
 
-  - [x] Verdict A (safety among completed runs): PASS — 9 successful receiver runs total (rc.2: eval-2026-09-09, 7; rc.3: eval-2026-09-09b, 2); zero false completion / repeated finished edits / out-of-scope edits. The rc.5 candidate itself has no receiver runs (probe-gated).
-  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — newest candidate-bound confirmation v0.1.0-rc.5 (tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc); released candidate v0.1.0-rc.6 (tagSha a81f5840ef17ab42e08119f34591c2a7cf6b1e64) and the rc.7 preview carry the same waiver (docs/internal/RELEASE-0.1.0-rc.5.md → RELEASE-0.1.0-rc.6.md → RELEASE-0.1.0-rc.7.md); no rc.6- or rc.7-bound evaluation legs exist
+  - [x] Verdict A (safety among completed runs): PASS — 9 successful receiver runs total (rc.2: eval-2026-09-09, 7; rc.3: eval-2026-09-09b, 2); zero false completion / repeated finished edits / out-of-scope edits. The rc.5–rc.8 candidates themselves have no successful receiver runs (probe/quota-gated).
+  - [ ] Verdict B (full Order 5 matrix gate): PARTIAL/INCONCLUSIVE — newest candidate-bound confirmation v0.1.0-rc.5 (tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc); v0.1.0-rc.7 (tagSha 34372be31a8feb83bf1ab84dd17e9a40316b2e33) and the rc.8 candidate carry the same waiver (docs/internal/RELEASE-0.1.0-rc.5.md → RELEASE-0.1.0-rc.6.md → RELEASE-0.1.0-rc.7.md → RELEASE-0.1.0-rc.8.md); no rc.6–rc.8-bound evaluation legs exist
     - [x] Pi → Harnie → OpenCode: met (09-09, rc.2; handoff+baseline verified)
-    - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials 2-3 NOT RUN — pi provider unfunded (402 openrouter_credits / 429 free-tier daily; re-probed 2026-09-09T13:54Z), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/
-    - [ ] Codex → Harnie → Pi: NOT RUN — same provider blocker (handoff + baseline recorded not-run, ready artifact sha-pinned), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/
+    - [ ] OpenCode → Harnie → Pi: PARTIAL — handoff PASS n=1 (rc.2); baseline + trials 2-3 NOT RUN — OpenRouter capacity/funding (the free model tier answers but shares one account-wide 50/day cap, exhausted; paid credits zero; re-probed 2026-09-11T04:37Z), evidence docs/research/eval-2026-09-09c/runs/eval-20260909T1354-pi-blocked/ and docs/research/eval-2026-09-11/
+    - [ ] Codex → Harnie → Pi: NOT RUN — same OpenRouter capacity/funding blocker (handoff + baseline not run; a 2026-09-11 free-model `shebang-guard` baseline made the correct edit before the cap killed it), evidence docs/research/eval-2026-09-11/
     - [x] Codex → Harnie → OpenCode: met for transport/receiver compatibility ONLY
       - 09-09 leg: handoff context unrelated to the benchmark task → no semantic-continuation claim
       - leg D (rc.3, first-run-recovery, task-matching driver context): handoff + baseline PASS
     - [x] Continuation semantics: met via OpenCode→Codex greeting-command leg (09-09; steps 1-2 → step 3 only)
-  - [x] Re-run gate: only pi funding (a funded openrouter key) blocks the remaining legs; artifacts ready + sha-pinned in docs/research/eval-2026-09-{09,09b}/driver/, all four missing legs recorded not-run with reasons in docs/research/eval-2026-09-09c/ (those records are bound to v0.1.0-rc.5/6ac02e3, tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc; the ready handoff artifacts were generated by v0.1.0-rc.2 — handoffGeneratedBy=rc.2/0231dd77; no rc.6- or rc.7-bound records exist)
+  - [x] Re-run gate: only OpenRouter capacity/funding (a funded paid key, or a fresh account-wide free-tier window) blocks the remaining legs; artifacts ready + sha-pinned in docs/research/eval-2026-09-{09,09b}/driver/, all four missing legs recorded not-run with reasons in docs/research/eval-2026-09-09c/ and re-probed 2026-09-11 in docs/research/eval-2026-09-11/ (the rc.5-bound not-run records are bound to v0.1.0-rc.5/6ac02e3, tagSha 6ac02e359b3b973c7fc4b4c603a6d2db38b665dc; the ready handoff artifacts were generated by v0.1.0-rc.2 — handoffGeneratedBy=rc.2/0231dd77; no rc.6–rc.8-bound qualifying records exist)
   - [x] Developer re-explanation threshold ("substantially less re-explanation"): NOT ESTABLISHED — 4 n=1 pairs, mean Δ ≈ −0.6s mixed sign, newest 35.1s vs 33.3s (docs/research/eval-2026-09-09c/{README,summary}.md); no productivity claim made
-  - [x] Release waiver: carried by the current release note (docs/internal/RELEASE-0.1.0-rc.6.md, carried forward by RELEASE-0.1.0-rc.7.md for the rc.7 preview); the rc.5 note (docs/internal/RELEASE-0.1.0-rc.5.md) was accurate at re-verification 2026-09-09T13:54Z; pi probes re-verified unfunded 2026-09-09T15:35Z (docs/research/eval-2026-09-09c/probes/)
-  - [x] Integrity: verify-evidence OK on eval-2026-09-09, eval-2026-09-09b, eval-2026-09-09c (run after any new evidence)
+  - [x] Release waiver: carried by the rc.8 packaged release note (docs/internal/RELEASE-0.1.0-rc.8.md, carried forward from RELEASE-0.1.0-rc.7.md); the rc.5 note (docs/internal/RELEASE-0.1.0-rc.5.md) was accurate at re-verification 2026-09-09T13:54Z; pi probes re-verified capacity-blocked 2026-09-11T04:37Z after the free-model tier resumed answering (docs/research/eval-2026-09-11/probes/)
+  - [x] Integrity: verify-evidence OK on eval-2026-09-09, eval-2026-09-09b, eval-2026-09-09c, and eval-2026-09-11 (run after any new evidence)
 - [x] **Order 6 — Tag and release a developer preview.**
   Gate: named release candidate, green automated checks, tested install
   instructions, known limitations, recovery instructions.
