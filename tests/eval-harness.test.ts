@@ -511,8 +511,8 @@ describe("eval harness — handoff/baseline isolation", () => {
     const baselineLine = summaryMd
       .split("\n")
       .find((l) => l.startsWith(`| version-flag | baseline |`));
-    expect(baselineLine).toContain("N/A");
-    expect(baselineLine).not.toContain(String(handoffResult.handoff.chars));
+    const baselineHandoffChars = baselineLine?.split("|").at(-2)?.trim();
+    expect(baselineHandoffChars).toBe("N/A");
   });
   it("manual-run mode also isolates baseline from the handoff artifact", () => {
     const runId = uniqueRun();
