@@ -216,9 +216,10 @@ Current capability detail lives in `docs/internal/SUPPORT-MATRIX.md`.
   `f7a2c3a6826432cdd5b1767d47f6455098e830096377c3cf9443365b13fb6bd1`
   (downloaded independently; sidecar match verified 2026-09-11),
   `isPrerelease` true. Suite at publish: 65 test files / 441 tests.
-  Cloudflare deployment is not yet closed: the local Wrangler OAuth token
-  expired, both browser-callback and device authorization timed out, and the
-  public installer still returned rc.7 during the post-release smoke. Re-run
-  `npx wrangler login --device`, `npm run deploy:installer`, then
-  `sh scripts/smoke-live-installer.sh`; do not claim the public curl path is
-  on rc.8 until that smoke passes.
+  Cloudflare deployment closed 2026-09-11T23:44Z after Wrangler OAuth was
+  renewed with credentials encrypted via macOS Keychain. `npm run
+  deploy:installer` deployed Worker version
+  `b38b6e86-95df-4278-9889-90651583ffbd`; the public installer, tarball, and
+  checksum routes now serve rc.8. `sh scripts/smoke-live-installer.sh` then
+  downloaded the public assets, verified the SHA-256 sidecar, installed into
+  an isolated prefix, and returned `harnie 0.1.0-rc.8`.
