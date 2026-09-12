@@ -7,7 +7,7 @@ tagged commit at pass time; Node v22.23.0, darwin). The re-audit P1 left
 verdict B PARTIAL with four not-run legs; this pass probed the pi provider
 first and, on probe failure, recorded the legs not-run without spending any
 receiver invocation. Protocol:
-[docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md)
+[docs/EVALUATION-PROTOCOL.md](../../EVALUATION-PROTOCOL.md)
 (§4 two-verdict rules). Prior passes:
 [`eval-2026-09-09/`](../eval-2026-09-09/README.md) (rc.2),
 [`eval-2026-09-09b/`](../eval-2026-09-09b/README.md) (rc.3).

@@ -89,17 +89,17 @@ export const TASKS = [
   {
     id: "first-run-recovery",
     area: "docs",
-    files: ["docs/internal/FIRST-RUN.md"],
+    files: ["docs/FIRST-RUN.md"],
     statement:
       "Document backup/restore recovery in the first-run walkthrough.",
     details:
-      "Add a short '## Recovery' section to docs/internal/FIRST-RUN.md covering: `harnie backup <path>` writes a consistent SQLite snapshot (0600), `harnie restore <path> --force` validates the backup and then overwrites the live store, and restore has no undo. Edit only that file; no code changes.",
+      "Add a short '## Recovery' section to docs/FIRST-RUN.md covering: `harnie backup <path>` writes a consistent SQLite snapshot (0600), `harnie restore <path> --force` validates the backup and then overwrites the live store, and restore has no undo. Edit only that file; no code changes.",
     verify: [
-      "grep -n '^## Recovery' docs/internal/FIRST-RUN.md   # section exists",
-      "git diff --stat   # only docs/internal/FIRST-RUN.md modified",
+      "grep -n '^## Recovery' docs/FIRST-RUN.md   # section exists",
+      "git diff --stat   # only docs/FIRST-RUN.md modified",
     ],
     endState:
-      "docs/internal/FIRST-RUN.md has a Recovery section with backup/restore usage and the no-undo caveat; no other file is modified.",
+      "docs/FIRST-RUN.md has a Recovery section with backup/restore usage and the no-undo caveat; no other file is modified.",
   },
   {
     id: "help-regression-test",

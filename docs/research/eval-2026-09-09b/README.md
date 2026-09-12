@@ -22,7 +22,7 @@ not fund, plus an unrelated-task handoff+baseline pair bound to the **actual
 candidate** tag `v0.1.0-rc.3` → `cbe5399346a27d43a13dc8856dfe54ff039936fe`.
 The 2026-09-09 directory is untouched except the two-verdict verdict edits and
 record curation (schema v2 stamp, portable paths, per-run summaries). Protocol:
-[docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md)
+[docs/EVALUATION-PROTOCOL.md](../../EVALUATION-PROTOCOL.md)
 (§4 two-verdict rules).
 
 Executed 2026-09-09T01:41Z–01:46Z by an agent (opencode-go/omen-alpha). Every

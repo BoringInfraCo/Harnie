@@ -44,7 +44,7 @@ out to demonstrate **receiver compatibility** (each handoff rendered *for* its
 own receiver, Pi→Pi / Codex→Codex / OpenCode→OpenCode), not the directed paths,
 and ran against the rc.1 commit `12dda05` rather than the candidate. Nothing in
 `eval-2026-09-08/` was rewritten apart from the header note. Protocol:
-[docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md).
+[docs/EVALUATION-PROTOCOL.md](../../EVALUATION-PROTOCOL.md).
 
 Executed 2026-09-09 by an agent (opencode-go/omen-alpha). Every claim below is
 backed by a file in this directory; disposable originals (clones, receiver

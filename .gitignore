@@ -3,6 +3,7 @@ dist/
 coverage/
 .history/
 .wrangler/
+docs/internal/
 
 *.tgz
 worker/public/harnie/releases/

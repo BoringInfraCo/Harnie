@@ -16,11 +16,11 @@ Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Cod
 Harnie captures the agent-work handoff graph (sessions → observed work → continuation targets) into a local SQLite DB at `$HARNIE_HOME/harnie.db`. Run `harnie init` + `harnie import pi <session.jsonl>` to build a normalized work archive. All data stays on your machine; core functionality requires no internet. Think of it as "git log" for agent work states—preserving what was accomplished so it can be restored or handed off later.
 
 **For technical product folks:**
-A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is validated in limited scenarios, not established as complete: the safety sub-gate (Verdict A) passes, the full cross-harness matrix (Verdict B) is PARTIAL — the Pi-receiver legs remain not-run because OpenRouter's shared account-wide 50/day free-model cap is exhausted and paid credits are zero — and reduced developer re-explanation is NOT established (waiver and verdicts: `docs/internal/RELEASE-0.1.0-rc.8.md`; evidence: `docs/research/eval-2026-09-09c/`, `docs/research/eval-2026-09-11/`). The import/handoff tooling above is what this preview delivers.
+A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is validated in limited scenarios, not established as complete: the safety sub-gate (Verdict A) passes, the full cross-harness matrix (Verdict B) is PARTIAL — the Pi-receiver legs remain not-run because OpenRouter's shared account-wide 50/day free-model cap is exhausted and paid credits are zero — and reduced developer re-explanation is NOT established (waiver and verdicts: [v0.1.0-rc.8 release](https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.8); evidence: `docs/research/eval-2026-09-09c/`, `docs/research/eval-2026-09-11/`). The import/handoff tooling above is what this preview delivers.
 
 ## First run
 
-Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie uses Node's built-in SQLite support; Node may print an experimental SQLite warning). Preview support is **macOS and Linux**; Windows is unverified (not exercised by CI). The narrative version of this walkthrough lives in [docs/internal/FIRST-RUN.md](docs/internal/FIRST-RUN.md).
+Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie uses Node's built-in SQLite support; Node may print an experimental SQLite warning). Preview support is **macOS and Linux**; Windows is unverified (not exercised by CI). The narrative version of this walkthrough lives in [docs/FIRST-RUN.md](docs/FIRST-RUN.md).
 
 **1. Install.** Download the pinned release tarball from Cloudflare, verify its published SHA-256 checksum, and install it globally with npm:
 
@@ -175,7 +175,7 @@ $HARNIE_HOME/handoffs/work_pi_cfef1a72-fb89-43a3-bac0-6c7246eda6d8.md
 
 ## Commands
 
-One example per command; see [docs/internal/FIRST-RUN.md](docs/internal/FIRST-RUN.md) for the narrative. Work ids below are real outputs from the committed fixtures; checkpoint/fork ids are generated per run and will differ on your machine.
+One example per command; see [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for the narrative. Work ids below are real outputs from the committed fixtures; checkpoint/fork ids are generated per run and will differ on your machine.
 
 ```sh
 harnie sessions [--harness pi|opencode|codex]
@@ -227,7 +227,7 @@ harnie restore /path/to/harnie-backup.db [--force]
 # Restored / <home>/harnie.db / From / <src>  (validates before touching the live store)
 ```
 
-Import errors are actionable: a missing file reports `Session file not found: <path>` plus a pointer to `harnie sessions`, an unknown `--work` id reports `Work not found: <id>`, and a missing `--work` value prints the import usage. See [docs/internal/BACKUP-RECOVERY.md](docs/internal/BACKUP-RECOVERY.md) for backup/restore details.
+Import errors are actionable: a missing file reports `Session file not found: <path>` plus a pointer to `harnie sessions`, an unknown `--work` id reports `Work not found: <id>`, and a missing `--work` value prints the import usage. See [docs/BACKUP-RECOVERY.md](docs/BACKUP-RECOVERY.md) for backup/restore details.
 
 ### Machine-readable output
 
@@ -245,7 +245,7 @@ harnie handoff <work> --to opencode --json   # sections list + budget + file pat
 harnie sessions --json                       # structured per-harness scans
 ```
 
-Failures use the same envelope with `"ok":false` and a stable `error.code` (`unknown_flag`, `duplicate_flag`, `missing_argument`, `not_found`, `invalid_input`, `unsupported`, `usage`, `store_error`, `unknown_command`), still on stdout with a non-zero exit code. Output is deterministic (no timestamps beyond persisted data), and truncation is explicit: the handoff budget reports its limits and omitted/truncated counts as data. Without `--json`, every command prints exactly the human-readable text it always has. The full contract — envelope key order, error-code table, and per-command data shapes — is specified in [docs/internal/MACHINE-CONTRACT.md](docs/internal/MACHINE-CONTRACT.md).
+Failures use the same envelope with `"ok":false` and a stable `error.code` (`unknown_flag`, `duplicate_flag`, `missing_argument`, `not_found`, `invalid_input`, `unsupported`, `usage`, `store_error`, `unknown_command`), still on stdout with a non-zero exit code. Output is deterministic (no timestamps beyond persisted data), and truncation is explicit: the handoff budget reports its limits and omitted/truncated counts as data. Without `--json`, every command prints exactly the human-readable text it always has. The full contract — envelope key order, error-code table, and per-command data shapes — is specified in [docs/MACHINE-CONTRACT.md](docs/MACHINE-CONTRACT.md).
 
 ## Where things live
 

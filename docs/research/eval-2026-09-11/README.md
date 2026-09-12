@@ -18,7 +18,7 @@ of its 4096 requested max tokens).
 
 Executed 2026-09-11T04:14Z–04:38Z by an agent. Raw evidence in `probes/` and
 `runs/`; protocol
-[`docs/internal/EVALUATION-PROTOCOL.md`](../../internal/EVALUATION-PROTOCOL.md).
+[`docs/EVALUATION-PROTOCOL.md`](../../EVALUATION-PROTOCOL.md).
 Prior passes: [`eval-2026-09-09/`](../eval-2026-09-09/README.md) (rc.2),
 [`eval-2026-09-09b/`](../eval-2026-09-09b/README.md) (rc.3),
 [`eval-2026-09-09c/`](../eval-2026-09-09c/README.md) (rc.5, probe-blocked).

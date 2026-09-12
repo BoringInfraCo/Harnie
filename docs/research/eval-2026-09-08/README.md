@@ -16,7 +16,7 @@ Raw outcome evidence for the extended Order 5 continuation evaluation, closing
 the coverage gaps flagged by the 2026-09-08 re-audit of the rc.1 evaluation
 (`docs/research/eval-2026-09-07/`, which remains the rc.1 record and is NOT
 superseded or modified). Protocol:
-[docs/internal/EVALUATION-PROTOCOL.md](../../internal/EVALUATION-PROTOCOL.md).
+[docs/EVALUATION-PROTOCOL.md](../../EVALUATION-PROTOCOL.md).
 
 Executed 2026-09-08 by an agent (opencode-go/omen-alpha). Every claim below is
 backed by a file in this directory; disposable originals (clones, receiver

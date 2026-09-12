@@ -23,7 +23,7 @@ const NARROWED_CHRONOLOGY_CLAIM =
 // (a) Scope: documentation files only. Raw evidence (logs, probes, driver
 // fixtures) is never rewritten and may quote machine paths that happen to
 // contain the old name — those are not docs.
-const DOC_ROOTS = ["docs/internal", "docs/research"];
+const DOC_ROOTS = ["docs"];
 
 const listMdFiles = (dir: string): string[] => {
   const out: string[] = [];
@@ -44,7 +44,7 @@ const evalDirs = () =>
 
 describe("eval docs consistency", () => {
   it("the protocol's chronology guarantee stays narrowed (no broader claim)", () => {
-    const protocol = readFileSync(join(ROOT, "docs/internal/EVALUATION-PROTOCOL.md"), "utf8");
+    const protocol = readFileSync(join(ROOT, "docs/EVALUATION-PROTOCOL.md"), "utf8");
     // Whitespace-normalized: the doc may wrap the sentence, the claim itself
     // must be verbatim.
     const normalized = protocol.replace(/\s+/g, " ");

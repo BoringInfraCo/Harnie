@@ -29,11 +29,10 @@
   },
   "files": [
     "dist",
-    "docs/internal/FIRST-RUN.md",
-    "docs/internal/BACKUP-RECOVERY.md",
-    "docs/internal/MACHINE-CONTRACT.md",
-    "docs/internal/SUPPORT-MATRIX.md",
-    "docs/internal/RELEASE-0.1.0-rc.8.md",
+    "docs/FIRST-RUN.md",
+    "docs/BACKUP-RECOVERY.md",
+    "docs/MACHINE-CONTRACT.md",
+    "docs/SUPPORT-MATRIX.md",
     "tests/fixtures/pi/coding.jsonl"
   ],
   "engines": {

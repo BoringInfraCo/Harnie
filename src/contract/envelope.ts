@@ -3,7 +3,7 @@ import type { CliErrorCode } from "./errors.js";
 /**
  * Versioned envelope for `--json` CLI output. Bumping the schema value is a
  * breaking change: it must only happen when data shapes change incompatibly,
- * and it must be announced in docs/internal/MACHINE-CONTRACT.md.
+ * and it must be announced in docs/MACHINE-CONTRACT.md.
  */
 export const CLI_JSON_SCHEMA = "harnie.cli.v1";
 
