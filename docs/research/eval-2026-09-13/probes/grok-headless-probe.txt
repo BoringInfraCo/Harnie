@@ -1,0 +1,8 @@
+# Standalone Grok headless probe
+# Captured: 2026-09-13T16:31:05Z UTC
+# Version: grok 1.0.30 (04b7ffed98c6) [stable]
+# Command: grok -p "Reply with exactly the text: probe-ok. Do not use any tools." --always-approve
+# --- stdout ---
+probe-ok
+# exit=0
+# --- stderr ---

@@ -143,6 +143,12 @@ scenario", not unqualified overall Grok support.
   the harness `harnie-home` sandbox were removed after re-verification.
 - `driver/` — the copied precondition patch, the two synthetic opencode driver
   fixtures, and the rendered Grok handoff artifact with size/sha256 above.
+- `probes/grok-headless-probe.txt` — standalone headless probe
+  (`grok -p "Reply with exactly the text: probe-ok. Do not use any tools."
+  --always-approve`), captured 2026-09-13T16:31:05Z UTC after the leg:
+  `grok 1.0.30 (04b7ffed98c6) [stable]`, stdout `probe-ok`, empty stderr,
+  exit 0 — independently reproducible evidence that auth and non-interactive
+  single-turn execution worked, separate from the two receiver runs.
 
 Integrity: `node scripts/eval-continuation.mjs verify-evidence --dir
 docs/research/eval-2026-09-13 --repo .` → see the run report; the committed
