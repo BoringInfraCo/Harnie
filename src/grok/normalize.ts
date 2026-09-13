@@ -112,7 +112,9 @@ const normalizeEntry = (sessionId: string, entry: GrokChatEntry): readonly Obser
  * is present the known context/reminder wrappers are stripped and any
  * remaining text is treated as speech. Entries that are pure context
  * (`<user_info>`/`<git_status>`/`<system-reminder>`/`<rules>` and their nested
- * rule blocks) yield an empty string.
+ * rule blocks) yield an empty string, and a whitespace-only `<user_query>` is
+ * not speech either — its wrapper is stripped so the literal markup can never
+ * become a false goal.
  */
 const userSpeechText = (content: JsonValue | undefined): string => {
   const text = blockText(content);
@@ -126,7 +128,10 @@ const userSpeechText = (content: JsonValue | undefined): string => {
   }
   if (queries.length > 0) return queries.join("\n");
 
-  return stripContextWrappers(text).trim();
+  // No non-empty query wrapper matched. Strip any (empty) `<user_query>` markup
+  // before the untagged fallback so its literal tags are never treated as speech.
+  const withoutQueryWrappers = text.replace(USER_QUERY_PATTERN, "");
+  return stripContextWrappers(withoutQueryWrappers).trim();
 };
 
 const blockText = (content: JsonValue | undefined): string => {

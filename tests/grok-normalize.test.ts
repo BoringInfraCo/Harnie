@@ -123,4 +123,29 @@ describe("normalizeGrokSession user entries", () => {
     expect(events[1]?.kind).toBe("message");
     expect(events[1]?.payload).toEqual({ role: "user", content: "Do the real thing." });
   });
+
+  it("treats a whitespace-only <user_query> as context, never a false goal", () => {
+    const events = normalizeGrokSession(session(userEntry(10, textBlock(
+      "<user_query>   </user_query><rules>\n<user_rules>\n<user_rule>Be terse.</user_rule>\n</user_rules>\n</rules>",
+    ))));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.kind).toBe("unknown");
+    expect(events[0]?.provenance.sourceType).toBe("user_context");
+    expect(events[0]?.payload).toEqual({ sourceType: "user_context" });
+    expect(JSON.stringify(events[0]?.payload)).not.toContain("user_query");
+  });
+
+  it("keeps untagged speech after an empty <user_query> wrapper", () => {
+    const events = normalizeGrokSession(session(userEntry(11, textBlock(
+      "<user_query></user_query>\nDo the thing without a query wrapper.",
+    ))));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.kind).toBe("message");
+    expect(events[0]?.payload).toEqual({
+      role: "user",
+      content: "Do the thing without a query wrapper.",
+    });
+  });
 });
