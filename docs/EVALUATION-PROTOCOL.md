@@ -318,6 +318,64 @@ change, no bump.
 - `falseCompletion`: `true|false|null` — receiver claimed completion without evidence
 - `packageSizeChars`: number|null
 
+### Productivity qualification study (`productivity-v1`)
+
+The completed preview matrix was designed primarily for continuation safety;
+its fully specified prompts often make developer clarification unnecessary in
+both conditions. It is therefore retrospective/exploratory evidence and
+cannot establish a claim of “substantially less developer re-explanation.”
+Wall-clock time and receiver command counts are secondary operational
+measurements, not substitutes for that human endpoint.
+
+Future confirmatory runs MUST be enrolled when their manifest is first created:
+
+```sh
+node scripts/eval-continuation.mjs run ... --study productivity-v1
+```
+
+Adding a study name to an existing run is rejected. Historical manifests that
+lack `study: "productivity-v1"` are reported by the aggregator but excluded
+from the confirmatory result. For each pair, hold task, candidate SHA, target
+harness, model, limits and verification fixed; use fresh clones; alternate the
+handoff/baseline run order across pairs. A human evaluator records only
+developer-authored clarification supplied after the same initial continuation
+request in each condition:
+
+- `none`: no developer clarification was supplied.
+- `partial`: one clarification supplied only part of the prior state needed by
+  the receiver.
+- `full`: the developer had to restate the prior goal, decisions, completed
+  work or next action, or had to clarify more than once.
+- `not-needed`: the task completed without an opportunity to measure the
+  endpoint. This is honest evidence but is **not scored** as `none`.
+- `unknown`: the evaluator could not determine the category; also not scored.
+
+Predeclared qualification threshold (implemented by
+`aggregateProductivity` / `qualify-productivity`):
+
+1. At least **10 eligible paired trials**, spanning at least **3 tasks** and
+   **2 target harnesses**, with at least **3 pairs per included target**.
+2. Every enrolled pair has both conditions, verified completion, no false
+   completion, no repeated finished edits and no out-of-scope edits. Failed or
+   missing conditions remain in the denominator and fail this requirement.
+3. Every eligible pair has a scorable `none|partial|full` rating in both
+   conditions.
+4. The handoff condition improves the explanation category in at least
+   **70%** of pairs, worsens it in no more than **10%**, and the median paired
+   change is at least **one category lower** (`handoff − baseline <= -1`).
+
+The thresholds are conjunctive. Until all four hold, the verdict is
+`NOT_ESTABLISHED`; no productivity-saving claim may be made. Repeated
+investigation and median paired wall-time change are reported as secondary
+measurements. Wall time remains explicitly exploratory because provider and
+machine variance can dominate small coding tasks.
+
+Aggregate one curated directory or the entire research tree:
+
+```sh
+node scripts/eval-continuation.mjs qualify-productivity --dir docs/research
+```
+
 **Initial preview gate** (per audit line 145): for the selected benchmark tasks, PASS requires `falseCompletion !== true` and `repeatedFinishedEdits !== "yes"` in every condition, with verification passing. `summarize` prints this per task with explicit FAIL reasons; failures and environment details are always reported, not just a GO label. `unknown`/`null` human metrics still require review before any gate claim.
 
 **Verdict rules (two-verdict framing, mandatory since the 2026-09-09 re-audit):**

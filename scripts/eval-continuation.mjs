@@ -188,6 +188,7 @@ function parseArgs(argv) {
     "target-harness",
     "patch",
     "attest",
+    "study",
   ]);
   const parsed = { _: [], flags: {}, multi: {} };
   for (let i = 0; i < argv.length; i++) {
@@ -746,11 +747,15 @@ function applyDriverPatch(cloneDir, patchPath) {
   return { path: patchPath, sha256: sha256File(patchPath), committed: true };
 }
 
-function ensureRun({ repo, refInput, runId, attest }) {
+function ensureRun({ repo, refInput, runId, attest, study }) {
   const runDir = join(EVAL_ROOT, runId);
   const runJsonPath = join(runDir, "run.json");
   if (existsSync(runJsonPath)) {
-    return { runDir, run: JSON.parse(readFileSync(runJsonPath, "utf8")) };
+    const run = JSON.parse(readFileSync(runJsonPath, "utf8"));
+    if (study && run.study !== String(study)) {
+      throw new Error(`run ${runId} is not enrolled in study ${study}; create a fresh run id`);
+    }
+    return { runDir, run };
   }
   mkdirSync(runDir, { recursive: true });
   let ref = refInput || "HEAD";
@@ -782,6 +787,10 @@ function ensureRun({ repo, refInput, runId, attest }) {
     platform: process.platform,
     tasks: TASKS.map((t) => t.id),
   };
+  // A named study binds future evidence to a protocol declared before the
+  // runs were collected. Historical evidence remains useful for exploration,
+  // but cannot silently become confirmatory after thresholds are chosen.
+  if (study) run.study = String(study);
   // Execution-time attestation (--attest, 2026-09-10 re-audit P2): when the
   // operator passes --attest <string>, capture it — plus the GitHub Actions
   // environment when present — into the manifest, ONCE at manifest-creation
@@ -921,7 +930,13 @@ function cmdRun(parsed) {
     return 1;
   }
   const runId = parsed.flags.run || `eval-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-p${process.pid}`;
-  const { runDir, run } = ensureRun({ repo: REPO_ROOT, refInput: parsed.flags.ref, runId, attest: parsed.flags.attest });
+  const { runDir, run } = ensureRun({
+    repo: REPO_ROOT,
+    refInput: parsed.flags.ref,
+    runId,
+    attest: parsed.flags.attest,
+    study: parsed.flags.study,
+  });
   const conditions = parsed.flags.condition
     ? String(parsed.flags.condition).split(",")
     : CONDITIONS;
@@ -1174,7 +1189,13 @@ function cmdPrepare(parsed) {
     return 1;
   }
   const runId = parsed.flags.run || `eval-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-p${process.pid}`;
-  const { runDir, run } = ensureRun({ repo: REPO_ROOT, refInput: parsed.flags.ref, runId, attest: parsed.flags.attest });
+  const { runDir, run } = ensureRun({
+    repo: REPO_ROOT,
+    refInput: parsed.flags.ref,
+    runId,
+    attest: parsed.flags.attest,
+    study: parsed.flags.study,
+  });
   const conditions = parsed.flags.condition ? String(parsed.flags.condition).split(",") : CONDITIONS;
   for (const condition of conditions) {
     const dir = join(runDir, task.id, condition);
@@ -1382,6 +1403,190 @@ function cmdSummarize(parsed) {
   writeFileSync(join(runDir, "summary.json"), JSON.stringify(data, null, 2) + "\n");
   writeFileSync(join(runDir, "summary.md"), md);
   console.log(md);
+  return 0;
+}
+
+// Confirmatory productivity study v1. These thresholds are intentionally
+// declared in code/protocol before new trials are collected. Wall time is
+// reported as an exploratory operational measure; it is too provider- and
+// machine-sensitive to stand in for developer re-explanation.
+export const PRODUCTIVITY_STUDY = Object.freeze({
+  id: "productivity-v1",
+  minimumPairs: 10,
+  minimumTasks: 3,
+  minimumTargets: 2,
+  minimumPairsPerTarget: 3,
+  primaryMinimumImprovedShare: 0.7,
+  primaryMaximumWorsenedShare: 0.1,
+  primaryMinimumMedianCategoryReduction: 1,
+});
+
+const explanationScore = { none: 0, partial: 1, full: 2 };
+const investigationScore = { none: 0, partial: 1, full: 2 };
+
+function median(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+const pairKey = (result) => [
+  result.runId,
+  result.taskId,
+  result.targetHarness ?? result.environment?.agent ?? "unknown",
+  result.environment?.model ?? "default",
+  result.tagSha ?? "unknown",
+].join("\u0000");
+
+export function aggregateProductivity(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const result = entry.result ?? entry;
+    const key = pairKey(result);
+    const group = groups.get(key) ?? { run: entry.run ?? null, results: {} };
+    group.results[result.condition] = result;
+    if (!group.run && entry.run) group.run = entry.run;
+    groups.set(key, group);
+  }
+
+  const pairs = [];
+  for (const group of groups.values()) {
+    const handoff = group.results.handoff;
+    const baseline = group.results.baseline;
+    const sample = handoff ?? baseline;
+    const reasons = [];
+    if (!handoff) reasons.push("missing handoff condition");
+    if (!baseline) reasons.push("missing baseline condition");
+    for (const [name, result] of [["handoff", handoff], ["baseline", baseline]]) {
+      if (!result) continue;
+      if (result.status !== "ran") reasons.push(`${name} status=${result.status}`);
+      if (result.verification?.passed !== true) reasons.push(`${name} verification did not pass`);
+      if (result.metrics?.taskCompleted !== true) reasons.push(`${name} task completion not established`);
+      if (result.metrics?.falseCompletion === true) reasons.push(`${name} false completion`);
+      if (result.metrics?.repeatedFinishedEdits === "yes") reasons.push(`${name} repeated finished edits`);
+      if ((result.edits?.outOfScopeFiles?.length ?? 0) > 0) reasons.push(`${name} out-of-scope edits`);
+    }
+    const confirmatory = group.run?.study === PRODUCTIVITY_STUDY.id;
+    const explanationDelta = handoff && baseline &&
+      explanationScore[handoff.metrics?.developerReExplanation] !== undefined &&
+      explanationScore[baseline.metrics?.developerReExplanation] !== undefined
+      ? explanationScore[handoff.metrics.developerReExplanation] - explanationScore[baseline.metrics.developerReExplanation]
+      : null;
+    const investigationDelta = handoff && baseline &&
+      investigationScore[handoff.metrics?.repeatedInvestigation] !== undefined &&
+      investigationScore[baseline.metrics?.repeatedInvestigation] !== undefined
+      ? investigationScore[handoff.metrics.repeatedInvestigation] - investigationScore[baseline.metrics.repeatedInvestigation]
+      : null;
+    const baselineWall = baseline?.execution?.wallMs;
+    const handoffWall = handoff?.execution?.wallMs;
+    const wallRelativeDelta = Number.isFinite(baselineWall) && baselineWall > 0 && Number.isFinite(handoffWall)
+      ? (handoffWall - baselineWall) / baselineWall
+      : null;
+    pairs.push({
+      runId: sample?.runId ?? group.run?.runId ?? null,
+      taskId: sample?.taskId ?? null,
+      targetHarness: sample?.targetHarness ?? sample?.environment?.agent ?? null,
+      model: sample?.environment?.model ?? null,
+      tagSha: sample?.tagSha ?? null,
+      confirmatory,
+      eligible: confirmatory && reasons.length === 0,
+      exclusionReasons: confirmatory ? reasons : ["run manifest is not enrolled in study productivity-v1"],
+      explanationDelta,
+      investigationDelta,
+      wallRelativeDelta,
+    });
+  }
+
+  const confirmatoryPairs = pairs.filter((pair) => pair.confirmatory);
+  const eligiblePairs = confirmatoryPairs.filter((pair) => pair.eligible);
+  const scored = eligiblePairs.filter((pair) => pair.explanationDelta !== null);
+  const targets = new Map();
+  for (const pair of eligiblePairs) targets.set(pair.targetHarness, (targets.get(pair.targetHarness) ?? 0) + 1);
+  const explanationDeltas = scored.map((pair) => pair.explanationDelta);
+  const improved = explanationDeltas.filter((delta) => delta < 0).length;
+  const worsened = explanationDeltas.filter((delta) => delta > 0).length;
+  const improvedShare = scored.length ? improved / scored.length : null;
+  const worsenedShare = scored.length ? worsened / scored.length : null;
+  const medianExplanationDelta = median(explanationDeltas);
+  const coverage = {
+    pairs: eligiblePairs.length >= PRODUCTIVITY_STUDY.minimumPairs,
+    tasks: new Set(eligiblePairs.map((pair) => pair.taskId)).size >= PRODUCTIVITY_STUDY.minimumTasks,
+    targets: targets.size >= PRODUCTIVITY_STUDY.minimumTargets,
+    pairsPerTarget: targets.size >= PRODUCTIVITY_STUDY.minimumTargets &&
+      [...targets.values()].every((count) => count >= PRODUCTIVITY_STUDY.minimumPairsPerTarget),
+    allConfirmatoryPairsEligible: confirmatoryPairs.length > 0 && eligiblePairs.length === confirmatoryPairs.length,
+    allEligiblePairsScored: eligiblePairs.length > 0 && scored.length === eligiblePairs.length,
+  };
+  const primary = {
+    improvedShare,
+    worsenedShare,
+    medianCategoryDelta: medianExplanationDelta,
+    passes: improvedShare !== null &&
+      improvedShare >= PRODUCTIVITY_STUDY.primaryMinimumImprovedShare &&
+      worsenedShare <= PRODUCTIVITY_STUDY.primaryMaximumWorsenedShare &&
+      medianExplanationDelta <= -PRODUCTIVITY_STUDY.primaryMinimumMedianCategoryReduction,
+  };
+  const passes = Object.values(coverage).every(Boolean) && primary.passes;
+  return {
+    schema: "harnie-productivity-assessment/v1",
+    study: PRODUCTIVITY_STUDY,
+    verdict: passes ? "ESTABLISHED" : "NOT_ESTABLISHED",
+    counts: {
+      discoveredPairs: pairs.length,
+      confirmatoryPairs: confirmatoryPairs.length,
+      eligiblePairs: eligiblePairs.length,
+      primaryScoredPairs: scored.length,
+      tasks: new Set(eligiblePairs.map((pair) => pair.taskId)).size,
+      targets: Object.fromEntries(targets),
+    },
+    coverage,
+    primary,
+    secondary: {
+      medianInvestigationCategoryDelta: median(eligiblePairs.map((pair) => pair.investigationDelta).filter((v) => v !== null)),
+      medianWallRelativeDelta: median(eligiblePairs.map((pair) => pair.wallRelativeDelta).filter((v) => v !== null)),
+      wallTimeIsExploratory: true,
+    },
+    pairs,
+  };
+}
+
+function findProductivityEntries(root) {
+  const entries = [];
+  const visit = (dir) => {
+    for (const item of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, item.name);
+      if (item.isDirectory()) visit(path);
+      else if (item.name === "result.json") {
+        const result = JSON.parse(readFileSync(path, "utf8"));
+        let cursor = dirname(path);
+        let run = null;
+        while (cursor.startsWith(resolve(root))) {
+          const manifest = join(cursor, "run.json");
+          if (existsSync(manifest)) {
+            run = JSON.parse(readFileSync(manifest, "utf8"));
+            break;
+          }
+          const parent = dirname(cursor);
+          if (parent === cursor) break;
+          cursor = parent;
+        }
+        entries.push({ result, run, path });
+      }
+    }
+  };
+  visit(resolve(root));
+  return entries;
+}
+
+function cmdQualifyProductivity(parsed) {
+  const dir = parsed.flags.dir;
+  if (!dir || !existsSync(resolve(dir))) {
+    console.error("qualify-productivity requires --dir <eval evidence root>");
+    return 1;
+  }
+  const assessment = aggregateProductivity(findProductivityEntries(dir));
+  process.stdout.write(JSON.stringify(assessment, null, 2) + "\n");
   return 0;
 }
 
@@ -1891,7 +2096,7 @@ Commands:
       [--handoff <path>] [--model <provider/model>] [--agent-arg <arg>]...
       [--ref HEAD|worktree|<sha>] [--run <id>] [--timeout <ms>]
       [--source-harness pi|opencode|codex] [--target-harness <name>]
-      [--patch <diff>] [--agent-command "<argv...>"]
+      [--patch <diff>] [--agent-command "<argv...>"] [--study productivity-v1]
       Prepare the clone(s), invoke the agent non-interactively (or fall back to
       manual-run mode), and record result.json with collected evidence.
       --source-harness records which harness produced the driver session
@@ -1908,6 +2113,12 @@ Commands:
       Validate a filled result JSON and register it.
   summarize --run <run-id>
       Side-by-side handoff vs baseline summary (summary.md/json).
+  qualify-productivity --dir <eval evidence root>
+      Aggregate paired trials enrolled at run creation with
+      --study productivity-v1. Reports the predeclared sample-coverage and
+      developer-re-explanation thresholds as ESTABLISHED or NOT_ESTABLISHED;
+      wall-time differences are exploratory and never substitute for the
+      primary human-judged endpoint.
    verify-evidence --dir <curated eval dir> [--repo <git dir>] [--fix] [--archival]
        Integrity check over a curated eval directory (e.g.
        docs/research/eval-2026-09-09): every referenced file exists relative to
@@ -1970,6 +2181,8 @@ function main(argv) {
       return cmdRecord(parsed);
     case "summarize":
       return cmdSummarize(parsed);
+    case "qualify-productivity":
+      return cmdQualifyProductivity(parsed);
     case "verify-evidence":
       return cmdVerifyEvidence(parsed);
     default:

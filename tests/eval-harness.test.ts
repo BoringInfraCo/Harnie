@@ -19,6 +19,11 @@ interface EvalMod {
   validateResultV2: (r: unknown) => { ok: boolean; errors: string[] };
   validateRunV2: (run: unknown, opts?: { now?: number }) => { ok: boolean; errors: string[] };
   generateSummary: (runDir: string, run: unknown) => { data: unknown; md: string };
+  PRODUCTIVITY_STUDY: {
+    id: string;
+    minimumPairs: number;
+  };
+  aggregateProductivity: (entries: Array<{ result: Record<string, any>; run: Record<string, any> }>) => Record<string, any>;
   buildPrompt: (
     task: { id: string; statement: string; details: string; verify: string[]; endState: string },
     condition: string,
@@ -576,6 +581,99 @@ describe("eval harness — summarize", () => {
     expect(vf.map((r: { condition: string }) => r.condition)).toEqual(
       expect.arrayContaining(["handoff", "baseline"]),
     );
+  });
+});
+
+describe("eval harness — productivity qualification", () => {
+  const result = ({ runId, taskId, targetHarness, condition, explanation }: {
+    runId: string;
+    taskId: string;
+    targetHarness: string;
+    condition: "handoff" | "baseline";
+    explanation: "none" | "partial" | "full" | "not-needed";
+  }) => ({
+    runId,
+    taskId,
+    targetHarness,
+    condition,
+    tagSha: "a".repeat(40),
+    status: "ran",
+    environment: { agent: targetHarness, model: "test-model" },
+    execution: { wallMs: condition === "handoff" ? 80 : 100 },
+    verification: { passed: true },
+    edits: { outOfScopeFiles: [] },
+    metrics: {
+      developerReExplanation: explanation,
+      repeatedInvestigation: condition === "handoff" ? "none" : "partial",
+      repeatedFinishedEdits: "none",
+      taskCompleted: true,
+      falseCompletion: false,
+    },
+  });
+
+  it("does not promote historical post-hoc evidence into a confirmatory claim", () => {
+    const entries = ["handoff", "baseline"].map((condition) => ({
+      run: { runId: "old-run" },
+      result: result({
+        runId: "old-run",
+        taskId: "version-flag",
+        targetHarness: "codex",
+        condition: condition as "handoff" | "baseline",
+        explanation: condition === "handoff" ? "none" : "full",
+      }),
+    }));
+    const assessment = mod.aggregateProductivity(entries);
+    expect(assessment.verdict).toBe("NOT_ESTABLISHED");
+    expect(assessment.counts.confirmatoryPairs).toBe(0);
+    expect(assessment.pairs[0].exclusionReasons).toContain(
+      "run manifest is not enrolled in study productivity-v1",
+    );
+  });
+
+  it("applies the predeclared coverage and primary-endpoint thresholds", () => {
+    const entries: Array<{ result: Record<string, any>; run: Record<string, any> }> = [];
+    for (let i = 0; i < 10; i++) {
+      const runId = `confirmatory-${i}`;
+      const taskId = ["version-flag", "shebang-guard", "first-run-recovery"][i % 3]!;
+      const targetHarness = i < 5 ? "codex" : "opencode";
+      const run = { runId, study: mod.PRODUCTIVITY_STUDY.id };
+      entries.push({ run, result: result({ runId, taskId, targetHarness, condition: "handoff", explanation: "none" }) });
+      entries.push({ run, result: result({ runId, taskId, targetHarness, condition: "baseline", explanation: "full" }) });
+    }
+    const assessment = mod.aggregateProductivity(entries);
+    expect(mod.PRODUCTIVITY_STUDY.minimumPairs).toBe(10);
+    expect(assessment.counts).toMatchObject({
+      confirmatoryPairs: 10,
+      eligiblePairs: 10,
+      primaryScoredPairs: 10,
+      tasks: 3,
+      targets: { codex: 5, opencode: 5 },
+    });
+    expect(assessment.primary).toMatchObject({
+      improvedShare: 1,
+      worsenedShare: 0,
+      medianCategoryDelta: -2,
+      passes: true,
+    });
+    expect(assessment.secondary.wallTimeIsExploratory).toBe(true);
+    expect(assessment.verdict).toBe("ESTABLISHED");
+  });
+
+  it("requires observable explanation ratings rather than treating not-needed as improvement", () => {
+    const entries = ["handoff", "baseline"].map((condition) => ({
+      run: { runId: "no-rating", study: mod.PRODUCTIVITY_STUDY.id },
+      result: result({
+        runId: "no-rating",
+        taskId: "version-flag",
+        targetHarness: "codex",
+        condition: condition as "handoff" | "baseline",
+        explanation: "not-needed",
+      }),
+    }));
+    const assessment = mod.aggregateProductivity(entries);
+    expect(assessment.counts.primaryScoredPairs).toBe(0);
+    expect(assessment.coverage.allEligiblePairsScored).toBe(false);
+    expect(assessment.verdict).toBe("NOT_ESTABLISHED");
   });
 });
 
