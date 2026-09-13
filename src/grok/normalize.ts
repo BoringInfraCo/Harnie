@@ -9,6 +9,10 @@ import {
 
 const OUTPUT_LIMIT = 200;
 const USER_QUERY_PATTERN = /<user_query>([\s\S]*?)<\/user_query>/gu;
+const USER_INFO_PATTERN = /<user_info>[\s\S]*?<\/user_info>/gu;
+const GIT_STATUS_PATTERN = /<git_status>[\s\S]*?<\/git_status>/gu;
+const SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*?<\/system-reminder>/gu;
+const UNCLOSED_SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*$/u;
 
 /** Argument keys that name the file or directory a Grok tool operates on. */
 const PATH_KEYS = ["target_file", "file_path", "target_directory", "path", "filePath"] as const;
@@ -26,13 +30,13 @@ export const normalizeGrokSession = (session: GrokSession): readonly ObservedEve
 const normalizeEntry = (sessionId: string, entry: GrokChatEntry): readonly ObservedEvent[] => {
   const record = entry.record;
   if (entry.type === "user") {
-    const query = userQueryText(record.content);
-    if (query.trim() !== "") {
-      return [observedEvent(sessionId, entry, "message", "user", { role: "user", content: query })];
+    const speech = userSpeechText(record.content);
+    if (speech !== "") {
+      return [observedEvent(sessionId, entry, "message", "user", { role: "user", content: speech })];
     }
     // Environment injections (<user_info>/<git_status>) and system reminders
     // are context, not user speech: kept as unknown evidence so goal
-    // derivation (first user message) lands on the first real <user_query>.
+    // derivation (first user message) lands on the first real prompt.
     return [observedEvent(sessionId, entry, "unknown", "user_context", { sourceType: "user_context" })];
   }
 
@@ -78,20 +82,34 @@ const normalizeEntry = (sessionId: string, entry: GrokChatEntry): readonly Obser
 };
 
 /**
- * Real user speech in a Grok transcript is wrapped in
- * `<user_query>...</user_query>`; entries without it are environment or
- * reminder injections.
+ * Real user speech in a Grok transcript is usually wrapped in
+ * `<user_query>...</user_query>`. Subagent/non-interactive runs sometimes put
+ * the genuine first prompt in a plain untagged block, so when no query wrapper
+ * is present the known context/reminder wrappers are stripped and any
+ * remaining text is treated as speech. Entries that are pure context
+ * (`<user_info>`/`<git_status>`/`<system-reminder>`) yield an empty string.
  */
-const userQueryText = (content: JsonValue | undefined): string => {
+const userSpeechText = (content: JsonValue | undefined): string => {
   const text = blockText(content);
   if (text === "") return "";
+
   const queries: string[] = [];
   USER_QUERY_PATTERN.lastIndex = 0;
   for (const match of text.matchAll(USER_QUERY_PATTERN)) {
     const inner = match[1]?.trim() ?? "";
     if (inner !== "") queries.push(inner);
   }
-  return queries.join("\n");
+  if (queries.length > 0) return queries.join("\n");
+
+  USER_INFO_PATTERN.lastIndex = 0;
+  GIT_STATUS_PATTERN.lastIndex = 0;
+  SYSTEM_REMINDER_PATTERN.lastIndex = 0;
+  let remainder = text.replace(USER_INFO_PATTERN, "");
+  remainder = remainder.replace(GIT_STATUS_PATTERN, "");
+  remainder = remainder.replace(SYSTEM_REMINDER_PATTERN, "");
+  // Some sessions end a reminder without its closing tag.
+  remainder = remainder.replace(UNCLOSED_SYSTEM_REMINDER_PATTERN, "");
+  return remainder.trim();
 };
 
 const blockText = (content: JsonValue | undefined): string => {

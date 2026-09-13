@@ -1,0 +1,12 @@
+{
+  "info": {
+    "id": "01grokuntagged0000000000000001",
+    "cwd": "/workspace/grok-untagged"
+  },
+  "created_at": "2026-09-12T11:00:00.000Z",
+  "updated_at": "2026-09-12T11:03:00.000Z",
+  "num_messages": 6,
+  "num_chat_messages": 5,
+  "current_model_id": "grok-4.6",
+  "generated_title": "Widget renderer"
+}

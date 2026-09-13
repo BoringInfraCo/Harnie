@@ -7,6 +7,9 @@ import type { WorkEvent } from "../src/work/types.js";
 
 const FIXTURE_DIR = "tests/fixtures/grok/unfinished-demo";
 const SESSION_ID = "01grokdemo000000000000000001";
+const UNTAGGED_FIXTURE_DIR = "tests/fixtures/grok/untagged-prompt";
+const UNTAGGED_SESSION_ID = "01grokuntagged0000000000000001";
+const UNTAGGED_PROMPT = "Implement the widget renderer and run its tests.";
 
 describe("observeGrokSession", () => {
   it("observes the unfinished Grok fixture into Work", async () => {
@@ -96,6 +99,25 @@ describe("observeGrokSession", () => {
     expect(JSON.stringify(derived.decisions ?? [])).not.toContain("secretly rewrite");
     const statuses = (derived.operations ?? []).map((operation) => operation.status).sort();
     expect(statuses).toEqual(["failed", "pending", "succeeded"]);
+  });
+
+  it("derives the goal from an untagged first prompt", async () => {
+    const session = await readGrokSessionPath(UNTAGGED_FIXTURE_DIR);
+    const work = observeGrokSession(session);
+
+    expect(session.sessionId).toBe(UNTAGGED_SESSION_ID);
+    expect(work.workspace).toEqual({ path: "/workspace/grok-untagged" });
+
+    const userMessages = work.events.filter(
+      (event) => event.kind === "message" && event.payload.role === "user",
+    );
+    expect(userMessages).toHaveLength(1);
+    expect(asString(userMessages[0]?.payload.content)).toBe(UNTAGGED_PROMPT);
+    expect(JSON.stringify(work.events.filter((event) => event.kind === "message"))).not.toContain("user_info");
+    expect(work.events.filter((event) => event.provenance.sourceType === "user_context")).toHaveLength(2);
+
+    const derived = deriveObservedWork(work);
+    expect(derived.goal?.statement).toBe(UNTAGGED_PROMPT);
   });
 });
 
