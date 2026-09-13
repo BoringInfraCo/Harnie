@@ -11,7 +11,17 @@ const installation = join(temporary, "installation");
 const home = join(temporary, "home");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const env = { ...process.env, HARNIE_HOME: home, npm_config_cache: join(temporary, "npm-cache") };
-const run = (command, args, cwd) => execFileSync(command, args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const run = (command, args, cwd) =>
+  execFileSync(command, args, {
+    cwd,
+    env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    // Node refuses to spawn `.cmd`/`.bat` shims (npm.cmd) without a shell
+    // (EINVAL), so Windows needs shell:true. The temp paths used here are
+    // space-free (8.3 short names), so unquoted args are safe.
+    shell: process.platform === "win32",
+  });
 
 try {
   mkdirSync(installation);
