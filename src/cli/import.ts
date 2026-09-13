@@ -1,6 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import {
   importCodexSessionFile,
+  importGrokSessionPath,
   importOpenCodeSessionFile,
   importPiSessionFile,
 } from "../engine/import.js";
@@ -15,14 +16,15 @@ export interface RunImportOptions {
 }
 
 const usage =
-  "Usage: harnie import pi <path> [--work <work>]\n       harnie import opencode <path> [--work <work>]\n       harnie import codex <path> [--work <work>]\nRun \"harnie sessions\" to list local sessions, or \"harnie import --help\" for per-harness paths.\n";
+  "Usage: harnie import pi <path> [--work <work>]\n       harnie import opencode <path> [--work <work>]\n       harnie import codex <path> [--work <work>]\n       harnie import grok <path> [--work <work>]\nRun \"harnie sessions\" to list local sessions, or \"harnie import --help\" for per-harness paths.\n";
 
 const importHelp = `Usage: harnie import pi <path> [--work <work>]
        harnie import opencode <path-or-session-id> [--work <work>]
        harnie import codex <path> [--work <work>]
+       harnie import grok <path> [--work <work>]
 
 Find sessions on this machine:
-  harnie sessions [--harness pi|opencode|codex]
+  harnie sessions [--harness pi|opencode|codex|grok]
 
 What counts as a valid import path:
   pi        A Pi session JSONL file: one JSON object per line whose first
@@ -44,6 +46,12 @@ What counts as a valid import path:
             already is JSONL rollout files, so they import directly.)
             Codex stores rollouts at ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
             Example: harnie import codex ~/.codex/sessions/2026/09/07/rollout-2026-09-07T00-00-00-abc123.jsonl
+  grok      A Grok session directory (holding chat_history.jsonl plus a
+            summary.json sidecar), or a chat_history.jsonl file directly.
+            (Grok's native storage already is per-session directories, so
+            they import directly.)
+            Grok stores sessions at ~/.grok/sessions/<project>/<session-id>/
+            Example: harnie import grok ~/.grok/sessions/%2Fworkspace%2Fproj/01a098b1-4776-7cc3-832a-0cf4618a5950
 `;
 
 const OPENCODE_SESSION_ID_PATTERN = /^ses_[A-Za-z0-9]+$/;
@@ -54,6 +62,8 @@ const expectedFormatHint: Record<string, string> = {
     'Expected an OpenCode snapshot JSON file ({"harness":"opencode","format":"opencode-session-v1",...}) or a live session id (ses_...) from ~/.local/share/opencode/opencode.db. Run "harnie sessions --harness opencode" to list local sessions.',
   codex:
     'Expected a Codex rollout JSONL file (first record {"type":"session_meta",...}), e.g. ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl. Run "harnie sessions --harness codex" to list local sessions.',
+  grok:
+    'Expected a Grok session directory (chat_history.jsonl plus summary.json), e.g. ~/.grok/sessions/<project>/<session-id>/. Run "harnie sessions --harness grok" to list local sessions.',
 };
 
 export const runImport = async (argv: string[], options: RunImportOptions): Promise<number> => {
@@ -93,9 +103,9 @@ export const runImport = async (argv: string[], options: RunImportOptions): Prom
     return 1;
   }
 
-  if (harness !== "pi" && harness !== "opencode" && harness !== "codex") {
+  if (harness !== "pi" && harness !== "opencode" && harness !== "codex" && harness !== "grok") {
     options.stderr.write(
-      `Harness "${harness}" is not implemented. Supported harnesses: pi, opencode, codex.\n`,
+      `Harness "${harness}" is not implemented. Supported harnesses: pi, opencode, codex, grok.\n`,
     );
     return 1;
   }
@@ -120,9 +130,11 @@ export const runImport = async (argv: string[], options: RunImportOptions): Prom
       const result =
         harness === "codex"
           ? await importCodexSessionFile(store, path, attach)
-          : harness === "opencode"
-            ? await importOpenCodeSessionFile(store, path, attach)
-            : await importPiSessionFile(store, path, attach);
+          : harness === "grok"
+            ? await importGrokSessionPath(store, path, attach)
+            : harness === "opencode"
+              ? await importOpenCodeSessionFile(store, path, attach)
+              : await importPiSessionFile(store, path, attach);
       options.stdout.write(
         `Imported ${harness} session.\n\nWork\n${result.workId}\nEvents inserted\n${result.eventsInserted}\n`,
       );

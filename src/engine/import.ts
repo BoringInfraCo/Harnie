@@ -1,5 +1,7 @@
 import { observeCodexSession } from "../codex/observe.js";
 import { readCodexJsonlFile } from "../codex/reader.js";
+import { observeGrokSession } from "../grok/observe.js";
+import { readGrokSessionPath } from "../grok/reader.js";
 import { observeOpenCodeSession } from "../opencode/observe.js";
 import { readOpenCodeSnapshotFile } from "../opencode/reader.js";
 import { observePiSession } from "../pi/observe.js";
@@ -40,6 +42,15 @@ export const importCodexSessionFile = async (
 ): Promise<PersistObservedWorkResult> => {
   const rollout = await readCodexJsonlFile(path);
   return persistWithOptionalAttach(store, observeCodexSession(rollout), options?.workId);
+};
+
+export const importGrokSessionPath = async (
+  store: HarnieStore,
+  path: string,
+  options?: ImportSessionOptions,
+): Promise<PersistObservedWorkResult> => {
+  const session = await readGrokSessionPath(path);
+  return persistWithOptionalAttach(store, observeGrokSession(session), options?.workId);
 };
 
 const persistWithOptionalAttach = (

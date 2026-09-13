@@ -235,7 +235,7 @@ describe("machine contract: stable error codes", () => {
     const envelope = parseEnvelope(stdout.toString());
     if (envelope.ok !== false) throw new Error("expected failure envelope");
     expect(envelope.error.code).toBe("invalid_input");
-    expect(envelope.error.message).toMatch(/Supported harnesses: pi, opencode, codex/);
+    expect(envelope.error.message).toMatch(/Supported harnesses: pi, opencode, codex, grok/);
   });
 
   it("reports unknown commands as text (the router cannot know the requested schema)", async () => {

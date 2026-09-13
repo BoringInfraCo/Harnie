@@ -9,6 +9,7 @@ import { runSessions } from "../src/cli/sessions.js";
 
 const PI_FIXTURE = "tests/fixtures/pi/trace-b-unfinished.jsonl";
 const CODEX_FIXTURE = "tests/fixtures/codex/unfinished-read.jsonl";
+const GROK_CHAT_FIXTURE = "tests/fixtures/grok/unfinished-demo/chat_history.jsonl";
 
 const capture = () => {
   let output = "";
@@ -66,6 +67,26 @@ describe("harnie sessions discovery", () => {
     const path = join(dir, fileName);
     await copyFile(CODEX_FIXTURE, path);
     return path;
+  };
+
+  const seedGrokSession = async (
+    fakeHome: string,
+    bucket: string,
+    sessionId: string,
+  ): Promise<string> => {
+    const dir = join(fakeHome, ".grok", "sessions", bucket, sessionId);
+    await mkdir(dir, { recursive: true });
+    await copyFile(GROK_CHAT_FIXTURE, join(dir, "chat_history.jsonl"));
+    await writeFile(
+      join(dir, "summary.json"),
+      JSON.stringify({
+        info: { id: sessionId, cwd: "/workspace/grok-discovery" },
+        created_at: "2026-09-12T10:00:00.000Z",
+        updated_at: "2026-09-12T10:05:00.000Z",
+        current_model_id: "grok-4.6",
+      }),
+    );
+    return dir;
   };
 
   const seedOpenCodeDb = async (fakeHome: string, sessionId: string): Promise<string> => {
@@ -192,6 +213,50 @@ describe("harnie sessions discovery", () => {
     expect(output).toContain("harnie import opencode ses_fixture123");
   });
 
+  it("lists grok sessions with exact import commands", async () => {
+    const fakeHome = await makeTemp("harnie-sessions-grok-");
+    setDiscoveryHome(fakeHome);
+    const sessionDir = await seedGrokSession(
+      fakeHome,
+      "%2Fworkspace%2Fgrok-proj",
+      "01grokdiscovery00000000000001",
+    );
+
+    const stdout = capture();
+    const code = await runSessions(["--harness", "grok"], {
+      stdout,
+      stderr: capture(),
+      env: process.env,
+    });
+
+    expect(code).toBe(0);
+    const output = stdout.toString();
+    expect(output).toContain("01grokdiscovery00000000000001");
+    expect(output).toContain("/workspace/grok-discovery");
+    expect(output).toContain(`harnie import grok "${sessionDir}"`);
+  });
+
+  it("imports the sessions-listed grok path end to end", async () => {
+    const fakeHome = await makeTemp("harnie-sessions-grok-e2e-");
+    setDiscoveryHome(fakeHome);
+    await seedGrokSession(fakeHome, "%2Fworkspace%2Fgrok-proj", "01grokdiscovery00000000000002");
+    const home = await makeTemp("harnie-sessions-grok-e2e-store-");
+
+    const listed = capture();
+    expect(await runSessions(["--harness", "grok"], {
+      stdout: listed,
+      stderr: capture(),
+      env: process.env,
+    })).toBe(0);
+    const grokLine = importLineFor(listed.toString(), "grok");
+    const grokPath = grokLine.split('harnie import grok "')[1]?.replace(/"$/, "");
+    expect(grokPath).toBeDefined();
+
+    const grokOut = capture();
+    expect(await runImport(["grok", grokPath ?? ""], { home, stdout: grokOut, stderr: capture() })).toBe(0);
+    expect(grokOut.toString()).toContain("work:grok:");
+  });
+
   it("imports an opencode session id from the discovered database", async () => {
     const fakeHome = await makeTemp("harnie-sessions-ocimport-");
     setDiscoveryHome(fakeHome);
@@ -269,9 +334,11 @@ describe("harnie sessions discovery", () => {
     const output = stdout.toString();
     expect(output).toMatch(/No pi sessions found/);
     expect(output).toMatch(/No codex sessions found/);
+    expect(output).toMatch(/No grok sessions found/);
     expect(output).toMatch(/No opencode sessions found/);
     // Hints point at the overridden scan roots, proving no dependence on real machine state.
     expect(output).toContain(join(fakeHome, ".pi", "agent", "sessions"));
+    expect(output).toContain(join(fakeHome, ".grok", "sessions"));
     expect(output).not.toContain(homedir() + "/.pi");
   });
 
@@ -282,7 +349,7 @@ describe("harnie sessions discovery", () => {
     expect(stdout.toString()).toContain("--harness");
   });
 
-  it("rejects an unknown harness and lists the three", async () => {
+  it("rejects an unknown harness and lists the four", async () => {
     const stderr = capture();
     const code = await runSessions(["--harness", "claude"], {
       stdout: capture(),
@@ -293,6 +360,7 @@ describe("harnie sessions discovery", () => {
     expect(stderr.toString()).toContain("pi");
     expect(stderr.toString()).toContain("opencode");
     expect(stderr.toString()).toContain("codex");
+    expect(stderr.toString()).toContain("grok");
   });
 
   it("rejects positional args with usage and exit 1", async () => {
@@ -325,7 +393,7 @@ describe("harnie import actionable errors", () => {
   });
 
   it("suggests sessions when the file does not exist", async () => {
-    for (const harness of ["pi", "opencode", "codex"] as const) {
+    for (const harness of ["pi", "opencode", "codex", "grok"] as const) {
       const home = await makeHome();
       const stderr = capture();
       const code = await runImport([harness, join("nope", "missing.jsonl")], {
@@ -376,7 +444,7 @@ describe("harnie import actionable errors", () => {
     expect(stderr.toString()).toContain("harnie sessions");
   });
 
-  it("lists the three harnesses for an unknown harness", async () => {
+  it("lists the four harnesses for an unknown harness", async () => {
     const stderr = capture();
     const code = await runImport(["claude", "whatever.jsonl"], {
       stdout: capture(),
@@ -387,6 +455,7 @@ describe("harnie import actionable errors", () => {
     expect(stderr.toString()).toContain("pi");
     expect(stderr.toString()).toContain("opencode");
     expect(stderr.toString()).toContain("codex");
+    expect(stderr.toString()).toContain("grok");
   });
 
   it("prints import help with exit 0 describing per-harness paths", async () => {
@@ -398,6 +467,7 @@ describe("harnie import actionable errors", () => {
     expect(output).toMatch(/Usage: harnie import/);
     expect(output).toContain("~/.pi/agent/sessions");
     expect(output).toContain("~/.codex/sessions");
+    expect(output).toContain("~/.grok/sessions");
     expect(output).toContain("opencode.db");
     expect(output).toContain("harnie sessions");
   });

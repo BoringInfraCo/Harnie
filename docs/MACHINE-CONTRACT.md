@@ -189,7 +189,7 @@ does, and prints the structure instead of the Markdown on stdout:
 
 ```jsonc
 {
-  "workId", "target": "opencode" | "pi" | "codex", "checkpointId?", "file": "/abs/path.md",
+  "workId", "target": "opencode" | "pi" | "codex" | "grok", "checkpointId?", "file": "/abs/path.md",
   "sections": { "goal?", "currentState?", "decisions", "findings", "nextSteps",
                 "operations", "filesTouched", "revision?", "relevantFiles?",
                 "changedFiles?", "failedApproaches?", "testState?", "verification?",
@@ -203,7 +203,7 @@ does, and prints the structure instead of the Markdown on stdout:
 ### `sessions [--harness …] --json`
 
 ```jsonc
-{ "scans": [ { "harness": "pi" | "opencode" | "codex",
+{ "scans": [ { "harness": "pi" | "opencode" | "codex" | "grok",
                "locations": ["…"],       // roots/db paths that were scanned
                "omitted": 0,             // older sessions hidden by the per-harness cap
                "sessions": [ { "harness", "sessionId", "project", "updatedAt",

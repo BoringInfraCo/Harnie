@@ -1,0 +1,12 @@
+{
+  "info": {
+    "id": "01grokdemo000000000000000001",
+    "cwd": "/workspace/grok-project"
+  },
+  "created_at": "2026-09-12T10:00:00.000Z",
+  "updated_at": "2026-09-12T10:05:00.000Z",
+  "num_messages": 10,
+  "num_chat_messages": 8,
+  "current_model_id": "grok-4.6",
+  "generated_title": "Demo video catalog"
+}

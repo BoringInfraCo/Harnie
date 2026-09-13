@@ -300,7 +300,7 @@ describe("machine contract: --json envelopes", () => {
     const data = envelope.data as {
       scans: Array<{ harness: string; locations: string[]; omitted: number; sessions: unknown[] }>;
     };
-    expect(data.scans.map((scan) => scan.harness)).toEqual(["pi", "opencode", "codex"]);
+    expect(data.scans.map((scan) => scan.harness)).toEqual(["pi", "opencode", "codex", "grok"]);
     for (const scan of data.scans) {
       expect(scan.omitted).toBeGreaterThanOrEqual(0);
       expect(Array.isArray(scan.sessions)).toBe(true);

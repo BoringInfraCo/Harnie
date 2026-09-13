@@ -1,5 +1,6 @@
 import {
   codexSessionsRoots,
+  grokSessionsRoot,
   isSessionHarness,
   openCodeDbCandidates,
   piSessionsRoot,
@@ -20,7 +21,7 @@ export interface RunSessionsOptions {
   readonly env?: DiscoveryEnv | undefined;
 }
 
-const usage = `Usage: harnie sessions [--harness pi|opencode|codex] [--json]
+const usage = `Usage: harnie sessions [--harness pi|opencode|codex|grok] [--json]
 
 List local coding sessions available for import. Prints one line per
 session: harness, session id, project, last update, and the exact
@@ -30,6 +31,7 @@ Scans known locations:
   pi        $PI_CODING_AGENT_SESSION_DIR, or ~/.pi/agent/sessions/
   codex     $CODEX_HOME/sessions/ and $CODEX_HOME/archived_sessions/
             (default ~/.codex)
+  grok      $GROK_HOME/sessions/ (default ~/.grok/sessions/)
   opencode  $XDG_DATA_HOME/opencode/opencode.db, then
             ~/.local/share/opencode/opencode.db
             (macOS fallback ~/Library/Application Support/opencode/opencode.db)
@@ -53,7 +55,7 @@ export const runSessions = async (argv: string[], options: RunSessionsOptions): 
     }
     const harness = parsed.values["--harness"];
     if (harness !== undefined && !isSessionHarness(harness)) {
-      const message = `Unknown harness "${harness}". Supported harnesses: pi, opencode, codex.`;
+      const message = `Unknown harness "${harness}". Supported harnesses: pi, opencode, codex, grok.`;
       if (json) return emitJsonFailure(options.stdout, "sessions", "invalid_input", message);
       options.stderr.write(`${message}\n${usage}`);
       return 1;
@@ -160,6 +162,14 @@ const emptyHint = (scan: HarnessScan, env: DiscoveryEnv): string => {
       `No codex sessions found in ${roots}.\n` +
       `Codex stores rollouts at ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl; ` +
       `import one with: harnie import codex <path>\n`
+    );
+  }
+  if (scan.harness === "grok") {
+    const root = grokSessionsRoot(env);
+    return (
+      `No grok sessions found in ${root}.\n` +
+      `Grok stores sessions at ~/.grok/sessions/<project>/<session-id>/; ` +
+      `import one with: harnie import grok <path>\n`
     );
   }
   const candidates = openCodeDbCandidates(env);

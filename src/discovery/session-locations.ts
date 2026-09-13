@@ -1,14 +1,14 @@
-import { existsSync, openSync, closeSync, readSync, readdirSync, statSync } from "node:fs";
+import { existsSync, openSync, closeSync, readFileSync, readSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-export type SessionHarness = "pi" | "opencode" | "codex";
+export type SessionHarness = "pi" | "opencode" | "codex" | "grok";
 
-export const SESSION_HARNESSES: readonly SessionHarness[] = ["pi", "opencode", "codex"];
+export const SESSION_HARNESSES: readonly SessionHarness[] = ["pi", "opencode", "codex", "grok"];
 
 export const isSessionHarness = (value: string): value is SessionHarness =>
-  value === "pi" || value === "opencode" || value === "codex";
+  value === "pi" || value === "opencode" || value === "codex" || value === "grok";
 
 /** String map compatible with process.env; kept abstract so tests can inject a fake env. */
 export type DiscoveryEnv = Record<string, string | undefined>;
@@ -69,6 +69,17 @@ export const codexSessionsRoots = (env: DiscoveryEnv = process.env): readonly st
   const home = codexHome(env);
   return [join(home, "sessions"), join(home, "archived_sessions")];
 };
+
+/** Grok state home; GROK_HOME relocates everything Grok persists. */
+export const grokHome = (env: DiscoveryEnv = process.env): string => {
+  const override = env.GROK_HOME;
+  if (override !== undefined && override !== "") return override;
+  return join(resolveDiscoveryHome(env), ".grok");
+};
+
+/** Grok session root: per-project buckets of per-session directories. */
+export const grokSessionsRoot = (env: DiscoveryEnv = process.env): string =>
+  join(grokHome(env), "sessions");
 
 /**
  * Candidate OpenCode databases, most specific first. The XDG data-home layout
@@ -206,12 +217,102 @@ export const scanOpenCodeSessions = (dbPath: string | undefined): HarnessScan =>
   }
 };
 
+/**
+ * Grok sessions are directories, not files: `<root>/<url-encoded-cwd>/<session-id>/`
+ * holding `chat_history.jsonl` plus a `summary.json` sidecar. Buckets whose
+ * names fail to decode still list (raw name as project); sessions without a
+ * transcript are skipped. Never throws.
+ */
+export const scanGrokSessions = (root: string): HarnessScan => {
+  const sessions: DiscoveredSession[] = [];
+  let buckets: Array<{ name: string; isDirectory(): boolean }>;
+  try {
+    if (!statSync(root).isDirectory()) return { harness: "grok", sessions: [], locations: [root], omitted: 0 };
+    buckets = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return { harness: "grok", sessions: [], locations: [root], omitted: 0 };
+  }
+  for (const bucket of buckets) {
+    if (!bucket.isDirectory()) continue;
+    let children: Array<{ name: string; isDirectory(): boolean }>;
+    try {
+      children = readdirSync(join(root, bucket.name), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const child of children) {
+      if (!child.isDirectory()) continue;
+      const sessionDir = join(root, bucket.name, child.name);
+      const transcript = join(sessionDir, "chat_history.jsonl");
+      try {
+        if (!statSync(transcript).isFile()) continue;
+      } catch {
+        continue;
+      }
+      const meta = readGrokSessionMeta(join(sessionDir, "summary.json"));
+      sessions.push({
+        harness: "grok",
+        sessionId: meta.sessionId ?? child.name,
+        project: meta.cwd ?? decodeBucket(bucket.name),
+        updatedAt: meta.updatedAt ?? isoFromMtime(transcript),
+        importCommand: `harnie import grok ${quotePath(sessionDir)}`,
+      });
+    }
+  }
+  return finalize("grok", [root], sessions);
+};
+
+/**
+ * Best-effort metadata peek at a Grok summary.json sidecar: session id,
+ * working directory, and update timestamp. Never throws.
+ */
+const readGrokSessionMeta = (path: string): { sessionId?: string; cwd?: string; updatedAt?: string } => {
+  try {
+    const text = readFileSync(path, "utf8");
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const record = parsed as { info?: unknown; updated_at?: unknown };
+    const out: { sessionId?: string; cwd?: string; updatedAt?: string } = {};
+    if (typeof record.info === "object" && record.info !== null) {
+      const info = record.info as { id?: unknown; cwd?: unknown };
+      if (typeof info.id === "string" && info.id !== "") out.sessionId = info.id;
+      if (typeof info.cwd === "string" && info.cwd !== "") out.cwd = info.cwd;
+    }
+    if (typeof record.updated_at === "string" && record.updated_at !== "") {
+      const iso = isoFromString(record.updated_at);
+      if (iso) out.updatedAt = iso;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+};
+
+const decodeBucket = (bucket: string): string => {
+  try {
+    const decoded = decodeURIComponent(bucket);
+    return decoded !== "" ? decoded : bucket;
+  } catch {
+    return bucket;
+  }
+};
+
+const isoFromString = (value: string): string | undefined => {
+  const millis = Date.parse(value);
+  if (!Number.isFinite(millis)) return undefined;
+  try {
+    return new Date(millis).toISOString();
+  } catch {
+    return undefined;
+  }
+};
 export const scanHarness = (
   harness: SessionHarness,
   env: DiscoveryEnv = process.env,
 ): HarnessScan => {
   if (harness === "pi") return scanPiSessions(piSessionsRoot(env));
   if (harness === "codex") return scanCodexSessions(codexSessionsRoots(env));
+  if (harness === "grok") return scanGrokSessions(grokSessionsRoot(env));
   return scanOpenCodeSessions(findOpenCodeDatabase(env));
 };
 

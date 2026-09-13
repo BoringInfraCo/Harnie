@@ -42,11 +42,13 @@ Commands:
                     (snapshot JSON file, or a live ses_* id from the
                     local OpenCode database; see import --help)
   import codex <path>
-                    Import a Codex rollout as observed Work
-                    (--work <id> attaches as a new execution)
+                     Import a Codex rollout as observed Work
+                     (--work <id> attaches as a new execution)
+  import grok <path> Import a Grok session directory (or chat_history.jsonl)
+                     as observed Work
   import --help     Explain valid per-harness import paths
-  sessions [--harness pi|opencode|codex]
-                    List local sessions available for import
+  sessions [--harness pi|opencode|codex|grok]
+                     List local sessions available for import
   list              List persisted observed Work
   show <work>       Show observed Work
   executions <work> List executions of observed Work
@@ -58,7 +60,7 @@ Commands:
   diff <work> <execution-a> <execution-b>
                     Diff two executions of observed Work
   handoff <work> [--checkpoint <id>] --to <target>
-                     Write a continuation handoff for opencode, pi, or codex
+                      Write a continuation handoff for opencode, pi, codex, or grok
   backup <path>      Write a consistent snapshot of the SQLite store
   restore <path> [--force]
                      Restore the store from a backup file

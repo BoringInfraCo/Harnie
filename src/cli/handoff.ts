@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderCodexHandoff } from "../handoff/codex.js";
+import { renderGrokHandoff } from "../handoff/grok.js";
 import { renderOpenCodeHandoff } from "../handoff/opencode.js";
 import { renderPiHandoff } from "../handoff/pi.js";
 import { initHarnieStore, resolveHarnieHome } from "../store/database.js";
@@ -17,7 +18,7 @@ export interface RunHandoffOptions {
   readonly stderr: { write(chunk: string): unknown };
 }
 
-type HandoffTarget = "opencode" | "pi" | "codex";
+type HandoffTarget = "opencode" | "pi" | "codex" | "grok";
 
 const usage = "Usage: harnie handoff <work> [--checkpoint <id>] --to <target> [--json]\n";
 
@@ -64,7 +65,9 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
           ? renderPiHandoff(handoff)
           : target === "codex"
             ? renderCodexHandoff(handoff)
-            : renderOpenCodeHandoff(handoff);
+            : target === "grok"
+              ? renderGrokHandoff(handoff)
+              : renderOpenCodeHandoff(handoff);
       // Renderers already redact; this final pass is an idempotent backstop
       // so CLI/file output stays redacted even if a renderer path changes.
       const markdown = applyOutputRedaction(rendered);
@@ -91,7 +94,7 @@ export const runHandoff = async (argv: string[], options: RunHandoffOptions): Pr
 };
 
 const isHandoffTarget = (value: string): value is HandoffTarget =>
-  value === "opencode" || value === "pi" || value === "codex";
+  value === "opencode" || value === "pi" || value === "codex" || value === "grok";
 
 interface ParsedHandoffArgs {
   readonly workId: string;
@@ -191,7 +194,8 @@ const writeHandoffFile = (
   // pass on store open (enforceHandoffArtifactPermissions) stays as a
   // convergence backstop for artifacts written by older versions.
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const suffix = target === "pi" ? ".pi.md" : target === "codex" ? ".codex.md" : ".md";
+  const suffix =
+    target === "pi" ? ".pi.md" : target === "codex" ? ".codex.md" : target === "grok" ? ".grok.md" : ".md";
   const checkpointSuffix = checkpointId === undefined ? "" : `.${safeWorkId(checkpointId)}`;
   const path = join(directory, `${safeWorkId(workId)}${checkpointSuffix}${suffix}`);
   writeFileSync(path, markdown, { mode: 0o600 });

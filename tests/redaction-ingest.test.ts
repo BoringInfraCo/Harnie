@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runShow } from "../src/cli/show.js";
 import {
   importCodexSessionFile,
+  importGrokSessionPath,
   importOpenCodeSessionFile,
   importPiSessionFile,
 } from "../src/engine/import.js";
@@ -184,6 +185,33 @@ describe("ingestion redaction", () => {
       expect(work?.decisions?.some((item) => item.summary.includes(BENIGN_DECISION))).toBe(true);
       expect(work?.operations?.some((item) => item.command === "cat src/cli.ts")).toBe(true);
       expect(work?.operations?.some((item) => item.command === "ls -la /workspace/redact-codex")).toBe(true);
+      expect(work?.findings?.some((item) => item.statement.includes("[REDACTED:bearer-token]"))).toBe(true);
+
+      await expectShowSeesRedaction(home, result.workId);
+    } finally {
+      store.close();
+    }
+  });
+
+  it("redacts grok sessions before persistence", async () => {
+    const home = await makeHome();
+    const store = initHarnieStore({ home });
+    try {
+      const result = await importGrokSessionPath(store, "tests/fixtures/redaction/grok-secrets");
+      const work = loadWork(store, result.workId);
+      expect(result.workId).toBe("work:grok:01redactgrok000000000000001");
+      expect(work?.events.length).toBeGreaterThan(0);
+
+      expectNoRawSecrets(work!);
+      expectTraceability(work!);
+      expectDerivedClaimsClean(work!);
+
+      const text = persistedText(work!);
+      expect(text).toContain("cat src/cli.ts");
+      expect(text).toContain("ls -la /workspace/redact-grok");
+      expect(work?.decisions?.some((item) => item.summary.includes(BENIGN_DECISION))).toBe(true);
+      expect(work?.operations?.some((item) => item.path === "src/cli.ts")).toBe(true);
+      expect(work?.operations?.some((item) => item.command === "ls -la /workspace/redact-grok")).toBe(true);
       expect(work?.findings?.some((item) => item.statement.includes("[REDACTED:bearer-token]"))).toBe(true);
 
       await expectShowSeesRedaction(home, result.workId);

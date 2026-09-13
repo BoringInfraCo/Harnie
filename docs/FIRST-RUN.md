@@ -35,11 +35,13 @@ Commands:
                     (snapshot JSON file, or a live ses_* id from the
                     local OpenCode database; see import --help)
   import codex <path>
-                    Import a Codex rollout as observed Work
-                    (--work <id> attaches as a new execution)
+                     Import a Codex rollout as observed Work
+                     (--work <id> attaches as a new execution)
+  import grok <path> Import a Grok session directory (or chat_history.jsonl)
+                     as observed Work
   import --help     Explain valid per-harness import paths
-  sessions [--harness pi|opencode|codex]
-                    List local sessions available for import
+  sessions [--harness pi|opencode|codex|grok]
+                     List local sessions available for import
   list              List persisted observed Work
   show <work>       Show observed Work
   executions <work> List executions of observed Work
@@ -51,7 +53,7 @@ Commands:
   diff <work> <execution-a> <execution-b>
                     Diff two executions of observed Work
   handoff <work> [--checkpoint <id>] --to <target>
-                     Write a continuation handoff for opencode, pi, or codex
+                      Write a continuation handoff for opencode, pi, codex, or grok
   backup <path>      Write a consistent snapshot of the SQLite store
   restore <path> [--force]
                      Restore the store from a backup file
@@ -89,7 +91,8 @@ below lives under `$HARNIE_HOME`: `harnie.db` (the store) and `handoffs/`
 Before importing anything by hand, ask Harnie what is already importable on
 this machine. `harnie sessions` scans the known local session locations —
 Pi (`$PI_CODING_AGENT_SESSION_DIR`, else `~/.pi/agent/sessions/`), Codex
-(`$CODEX_HOME/sessions/` and `$CODEX_HOME/archived_sessions/`), and OpenCode
+(`$CODEX_HOME/sessions/` and `$CODEX_HOME/archived_sessions/`), Grok
+(`$GROK_HOME/sessions/`, default `~/.grok/sessions/`), and OpenCode
 (`$XDG_DATA_HOME/opencode/opencode.db`, else `~/.local/share/opencode/opencode.db`,
 macOS fallback `~/Library/Application Support/opencode/opencode.db`) — and
 prints one row per session with the exact copy-pasteable import command:
@@ -114,7 +117,7 @@ fixtures copied into Pi/Codex-style paths, and an `opencode.db` built from
 On your machine you will see your own sessions and paths.)
 
 Missing directories are skipped, never an error; `--harness
-pi|opencode|codex` narrows the scan. An empty scan prints a hint instead of
+pi|opencode|codex|grok` narrows the scan. An empty scan prints a hint instead of
 failing:
 
 ```text
@@ -160,6 +163,11 @@ the `harnie sessions` output in section 2:
   Codex CLI rollout file (`type`/`payload`/`timestamp` records). Real
   rollout imports and inspection work; the receiver gate — continuing Codex
   work from a Harnie handoff in a live Codex run — is not yet validated.
+- **Grok (experimental):** `harnie import grok <your-session-dir>` — a Grok
+  session directory (`chat_history.jsonl` plus `summary.json`), or the
+  transcript file directly. Real session-directory imports and inspection
+  work against production `~/.grok` chats; the receiver gate — continuing
+  Grok work from a Harnie handoff in a live Grok run — is not yet validated.
 - **OpenCode:** two shapes are accepted:
   - a **live session id** (`ses_...`) — copy-paste the command from the
     `harnie sessions` OpenCode row. The session is read read-only from the
@@ -198,6 +206,22 @@ Work
 work:codex:01codexunfinished000000000001
 Events inserted
 8
+```
+
+The committed Grok fixture to compare against (a session directory holding
+`chat_history.jsonl` plus `summary.json`):
+
+```sh
+harnie import grok tests/fixtures/grok/unfinished-demo
+```
+
+```text
+Imported grok session.
+
+Work
+work:grok:01grokdemo000000000000000001
+Events inserted
+12
 ```
 
 If the path is wrong you get `Session file not found: <path>` followed by a
@@ -446,7 +470,8 @@ Edits reported success on src/example.txt. Verification not recorded.
 ```
 
 The other targets render the same work for their receiver (`--to pi`
-writes `.pi.md`, `--to codex` writes `.codex.md`), and
+writes `.pi.md`, `--to codex` writes `.codex.md`, `--to grok` writes
+`.grok.md`), and
 `--checkpoint <id>` scopes the package to checkpoint state. Confirm the
 artifact exists and note its permissions:
 
