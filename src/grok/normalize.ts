@@ -9,10 +9,34 @@ import {
 
 const OUTPUT_LIMIT = 200;
 const USER_QUERY_PATTERN = /<user_query>([\s\S]*?)<\/user_query>/gu;
-const USER_INFO_PATTERN = /<user_info>[\s\S]*?<\/user_info>/gu;
-const GIT_STATUS_PATTERN = /<git_status>[\s\S]*?<\/git_status>/gu;
-const SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*?<\/system-reminder>/gu;
+/**
+ * Context/instruction wrappers Grok injects into a user turn. Their contents
+ * are environment or policy boilerplate, never the human's request, so they
+ * are stripped before deciding whether an untagged entry is real speech.
+ * `<rules>` is the outer wrapper for workspace/memory/user rules; its nested
+ * blocks (`user_rules`, `user_rule`, `always_applied_workspace_rules`) close
+ * with their own tag names, so a non-greedy `<rules>...</rules>` matches the
+ * outer close correctly.
+ */
+const CONTEXT_WRAPPER_TAGS = [
+  "user_info",
+  "git_status",
+  "system-reminder",
+  "rules",
+  "user_rules",
+  "user_rule",
+  "always_applied_workspace_rules",
+  "agent_requested_rules",
+] as const;
 const UNCLOSED_SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*$/u;
+const stripContextWrappers = (text: string): string => {
+  let remainder = text;
+  for (const tag of CONTEXT_WRAPPER_TAGS) {
+    const paired = new RegExp(`<${tag}>[\\s\\S]*?</${tag}>`, "gu");
+    remainder = remainder.replace(paired, "");
+  }
+  return remainder.replace(UNCLOSED_SYSTEM_REMINDER_PATTERN, "");
+};
 
 /** Argument keys that name the file or directory a Grok tool operates on. */
 const PATH_KEYS = ["target_file", "file_path", "target_directory", "path", "filePath"] as const;
@@ -87,7 +111,8 @@ const normalizeEntry = (sessionId: string, entry: GrokChatEntry): readonly Obser
  * the genuine first prompt in a plain untagged block, so when no query wrapper
  * is present the known context/reminder wrappers are stripped and any
  * remaining text is treated as speech. Entries that are pure context
- * (`<user_info>`/`<git_status>`/`<system-reminder>`) yield an empty string.
+ * (`<user_info>`/`<git_status>`/`<system-reminder>`/`<rules>` and their nested
+ * rule blocks) yield an empty string.
  */
 const userSpeechText = (content: JsonValue | undefined): string => {
   const text = blockText(content);
@@ -101,15 +126,7 @@ const userSpeechText = (content: JsonValue | undefined): string => {
   }
   if (queries.length > 0) return queries.join("\n");
 
-  USER_INFO_PATTERN.lastIndex = 0;
-  GIT_STATUS_PATTERN.lastIndex = 0;
-  SYSTEM_REMINDER_PATTERN.lastIndex = 0;
-  let remainder = text.replace(USER_INFO_PATTERN, "");
-  remainder = remainder.replace(GIT_STATUS_PATTERN, "");
-  remainder = remainder.replace(SYSTEM_REMINDER_PATTERN, "");
-  // Some sessions end a reminder without its closing tag.
-  remainder = remainder.replace(UNCLOSED_SYSTEM_REMINDER_PATTERN, "");
-  return remainder.trim();
+  return stripContextWrappers(text).trim();
 };
 
 const blockText = (content: JsonValue | undefined): string => {

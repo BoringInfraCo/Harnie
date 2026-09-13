@@ -96,4 +96,31 @@ describe("normalizeGrokSession user entries", () => {
     expect(events[0]?.kind).toBe("message");
     expect(events[0]?.payload).toEqual({ role: "user", content: "Real task follows." });
   });
+
+  it("treats a <rules> entry (with nested user_rules) as user_context, not speech", () => {
+    const events = normalizeGrokSession(session(userEntry(7, textBlock(
+      "<user_info>\nWorkspace Path: /w\n</user_info>\n" +
+      "<rules>\nThe rules section has possible rules/memories/context.\n" +
+      "<always_applied_workspace_rules description=\"ws\">\nUse tabs.\n</always_applied_workspace_rules>\n" +
+      "<user_rules>\n<user_rule>Prefer small diffs.</user_rule>\n</user_rules>\n" +
+      "</rules>",
+    ))));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.kind).toBe("unknown");
+    expect(events[0]?.provenance.sourceType).toBe("user_context");
+    expect(events[0]?.payload).toEqual({ sourceType: "user_context" });
+  });
+
+  it("prefers <user_query> over an earlier rules-only context entry", () => {
+    const events = normalizeGrokSession(session(
+      userEntry(8, textBlock("<rules>\n<user_rules>\n<user_rule>Be terse.</user_rule>\n</user_rules>\n</rules>")),
+      userEntry(9, textBlock("<user_query>Do the real thing.</user_query>")),
+    ));
+
+    expect(events).toHaveLength(2);
+    expect(events[0]?.kind).toBe("unknown");
+    expect(events[1]?.kind).toBe("message");
+    expect(events[1]?.payload).toEqual({ role: "user", content: "Do the real thing." });
+  });
 });
