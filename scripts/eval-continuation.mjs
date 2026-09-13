@@ -148,6 +148,10 @@ export const TASKS = [
 //                      exec uses --sandbox workspace-write (exec never prompts).
 //   pi 0.84.4        — `--print` is the non-interactive mode; tools enabled by
 //                      default; `--model` supports "provider/id".
+//   grok 1.0.30      — `-p/--single <PROMPT>` is single-turn, prints the reply
+//                      to stdout and exits (verified live 2026-09-13); `-m`
+//                      selects the model; `--always-approve` auto-approves tool
+//                      executions in headless mode.
 // Model flags are injected per-agent (after the subcommand) via modelArgs.
 const AGENTS = {
   opencode: {
@@ -167,6 +171,12 @@ const AGENTS = {
     args: ["--print", "{prompt_text}"],
     modelArgs: ["--model", "{model}"],
     note: "pi --print is non-interactive; read/bash/edit/write tools are enabled by default; --model supports \"provider/id\".",
+  },
+  grok: {
+    bin: "grok",
+    args: ["-p", "{prompt_text}", "--always-approve"],
+    modelArgs: ["-m", "{model}"],
+    note: "grok -p (--single) is the documented non-interactive single-turn mode; --always-approve auto-approves tool executions. In the evaluator this scopes to the disposable clone only — do not treat it as a default for ordinary user runs.",
   },
 };
 
@@ -2092,7 +2102,7 @@ Commands:
       List the benchmark task registry.
   prepare --task <id> [--condition handoff,baseline] [--ref HEAD|worktree|<sha>] [--run <id>]
       Prepare disposable clones under ${EVAL_ROOT}.
-  run --task <id> [--condition handoff|baseline|handoff,baseline] [--agent opencode|codex|pi]
+  run --task <id> [--condition handoff|baseline|handoff,baseline] [--agent opencode|codex|pi|grok]
       [--handoff <path>] [--model <provider/model>] [--agent-arg <arg>]...
       [--ref HEAD|worktree|<sha>] [--run <id>] [--timeout <ms>]
       [--source-harness pi|opencode|codex] [--target-harness <name>]

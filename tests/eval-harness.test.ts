@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -70,6 +70,27 @@ writeFileSync(
 
 const agentCommand = (mark: string) =>
   `node ${fakeAgentPath} --mark ${mark} --clone {clone} --prompt-file {prompt_file}`;
+
+// A fake `grok` on PATH, used to pin the receiver argv the harness builds for
+// --agent grok without spending live API turns. The wrapper delegates to a .mjs
+// impl so argv (which can contain newlines) is captured as JSON, not lines.
+const fakeGrokDir = join(scratch, "fake-grok-bin");
+mkdirSync(fakeGrokDir, { recursive: true });
+const fakeGrokImpl = join(fakeGrokDir, "grok-impl.mjs");
+writeFileSync(
+  fakeGrokImpl,
+  [
+    'import { writeFileSync } from "node:fs";',
+    "const args = process.argv.slice(2);",
+    'if (args[0] === "--version") { console.log("grok 1.0.30 (fake)"); process.exit(0); }',
+    'if (process.env.FAKE_GROK_ARGV_OUT) writeFileSync(process.env.FAKE_GROK_ARGV_OUT, JSON.stringify(args));',
+    'console.log("fake grok done");',
+  ].join("\n") + "\n",
+);
+const fakeGrokPath = join(fakeGrokDir, "grok");
+writeFileSync(fakeGrokPath, ['#!/bin/sh', 'exec node "$(dirname "$0")/grok-impl.mjs" "$@"', ""].join("\n"));
+chmodSync(fakeGrokPath, 0o755);
+const fakeGrokEnv = () => ({ PATH: `${fakeGrokDir}:${process.env.PATH ?? ""}` });
 
 // Run ids must embed the execution timestamp in the canonical
 // eval-<YYYYMMDD>T<HHMM>[-suffix] form (UTC) — verify-evidence binds the id
@@ -371,6 +392,49 @@ describe("eval harness — mocked agent run", () => {
     expect(resultB.taskId).toBe("shebang-guard");
     expect(resultA.environment.agent).toBe("custom:node");
     expect(resultB.environment.agent).toBe("custom:node");
+  });
+});
+
+describe("eval harness — built-in agent argv (grok)", () => {
+  const readResult = (runId: string) =>
+    JSON.parse(
+      readFileSync(join(EVAL_BASE, runId, "version-flag", "baseline", "result.json"), "utf8"),
+    );
+  const versionFlagPrompt = () => {
+    const task = mod.TASKS.find(({ id }) => id === "version-flag")!;
+    return mod.buildPrompt(task, "baseline", null);
+  };
+
+  it("invokes grok as: -p <prompt> --always-approve", () => {
+    const runId = uniqueRun();
+    const argvOut = join(scratch, `grok-argv-${runId}.json`);
+    const res = runHarness(
+      ["run", "--task", "version-flag", "--condition", "baseline", "--run", runId, "--agent", "grok"],
+      { ...fakeGrokEnv(), FAKE_GROK_ARGV_OUT: argvOut },
+    );
+    expect(res.code).toBe(0);
+    const argv = JSON.parse(readFileSync(argvOut, "utf8"));
+    expect(argv).toEqual(["-p", versionFlagPrompt(), "--always-approve"]);
+    // The recorded invocation keeps the binary NAME and the exact argv order.
+    const result = readResult(runId);
+    expect(result.environment.agent).toBe("grok");
+    expect(result.execution.invocation[0]).toBe("grok");
+    expect(result.execution.invocation.slice(1)).toEqual(argv);
+  });
+
+  it("injects --model via -m before the prompt", () => {
+    const runId = uniqueRun();
+    const argvOut = join(scratch, `grok-argv-model-${runId}.json`);
+    const res = runHarness(
+      ["run", "--task", "version-flag", "--condition", "baseline", "--run", runId, "--agent", "grok", "--model", "grok-4.6"],
+      { ...fakeGrokEnv(), FAKE_GROK_ARGV_OUT: argvOut },
+    );
+    expect(res.code).toBe(0);
+    const argv = JSON.parse(readFileSync(argvOut, "utf8"));
+    expect(argv).toEqual(["-m", "grok-4.6", "-p", versionFlagPrompt(), "--always-approve"]);
+    const result = readResult(runId);
+    expect(result.environment.model).toBe("grok-4.6");
+    expect(result.execution.invocation.slice(1)).toEqual(argv);
   });
 });
 
