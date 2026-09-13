@@ -1,0 +1,109 @@
+{
+  "schema": "harnie-eval-summary/v1",
+  "runId": "eval-20260913T154001",
+  "ref": "20e4c82d5312038e0568b7674454fdbaee87193f",
+  "node": "v22.23.2",
+  "platform": "darwin",
+  "rows": [
+    {
+      "taskId": "version-flag",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "version-flag",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "shebang-guard",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "first-run-recovery",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "handoff",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "help-regression-test",
+      "condition": "baseline",
+      "present": false,
+      "status": "missing"
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "handoff",
+      "present": true,
+      "status": "ran",
+      "agent": "grok",
+      "model": null,
+      "sourceHarness": "opencode",
+      "targetHarness": "grok",
+      "tagSha": "20e4c82d5312038e0568b7674454fdbaee87193f",
+      "refName": "20e4c82d5312038e0568b7674454fdbaee87193f",
+      "handoffArtifactSha": "6c0251688ec3167c7f241db1b9c9880cc50ee93c8c0dce9d27066415fffbd3bd",
+      "timedOut": false,
+      "exitCode": 0,
+      "filesEdited": [
+        "src/cli.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": 3386,
+      "notRunReason": null,
+      "notes": "Live Grok receiver: grok 1.0.30 (04b7ffed98c6) [stable], invoked as `grok -p <prompt> --always-approve` (no -m passed, so environment.model is null = Grok default). Handoff context was accurate and consumed (steps 1-2 done, step 3 remaining). Surprise: the handoff-condition diff is byte-identical to the baseline diff (same blob index 8930b96), and both receivers' narration says it looked at a 'prior successful step-3 implementation'. The evaluated checkout ships a prior greeting-command solution at docs/research/eval-2026-09-09/runs/eval-20260909T0006-cont/greeting-command/handoff/edits.diff, so the clone contained reference-solution leakage (not supplied by the handoff); the receiver still had to adapt it to the current src/cli.ts. repeatedInvestigation=partial because it re-confirmed the already-known src/greeting.ts precondition and searched for the prior solution rather than editing purely from the handoff."
+    },
+    {
+      "taskId": "greeting-command",
+      "condition": "baseline",
+      "present": true,
+      "status": "ran",
+      "agent": "grok",
+      "model": null,
+      "sourceHarness": null,
+      "targetHarness": "grok",
+      "tagSha": "20e4c82d5312038e0568b7674454fdbaee87193f",
+      "refName": "20e4c82d5312038e0568b7674454fdbaee87193f",
+      "handoffArtifactSha": null,
+      "timedOut": false,
+      "exitCode": 0,
+      "filesEdited": [
+        "src/cli.ts"
+      ],
+      "outOfScopeFiles": [],
+      "verificationPassed": true,
+      "repeatedFinishedEdits": "none",
+      "falseCompletion": false,
+      "taskCompleted": true,
+      "packageSizeChars": null,
+      "notRunReason": null,
+      "notes": "Live Grok receiver: grok 1.0.30 (04b7ffed98c6) [stable], invoked as `grok -p <prompt> --always-approve` (no -m passed, so environment.model is null = Grok default). Statement-only baseline (no handoff). Produced a byte-identical src/cli.ts diff to the handoff condition (same blob index 8930b96); its narration also references a 'prior successful step-3 implementation'. The evaluated checkout ships a prior greeting-command solution at docs/research/eval-2026-09-09/runs/eval-20260909T0006-cont/greeting-command/handoff/edits.diff, i.e. reference-solution leakage present in both conditions; the receiver still had to adapt it to the current src/cli.ts. repeatedInvestigation=none because a baseline has no prior session to repeat (no prior state provided)."
+    }
+  ]
+}

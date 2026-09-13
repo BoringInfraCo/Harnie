@@ -1,0 +1,25 @@
+I'll start by checking that `src/greeting.ts` exists and inspecting the current CLI so I can wire `greet` in as a subcommand without touching the existing greeting code or tests.Precondition is in place. Next I’ll match the existing CLI command style and check help tests so `greet <name>` fits without breaking them.I'll look at a previous successful step-3 implementation so the CLI wiring matches the expected pattern.I'll add the `greet` import, a usage line, and the command handler in `src/cli.ts` only.Edits are in. Next I’ll run the build and greeting tests, then check the CLI greet and help commands.Step 3 is complete. `greet <name>` is wired into the CLI; `src/greeting.ts` and `tests/greeting.test.ts` were left untouched.
+
+### 1. Files edited
+- `src/cli.ts` only (import `greet`, add `greet <name>` to usage, handle the subcommand)
+
+### 2. Commands run
+- `npm run build`
+- `node dist/cli.js greet Ada`
+- `node dist/cli.js greet '  Bob '`
+- `node dist/cli.js --help`
+- `npx vitest run tests/greeting.test.ts`
+
+### 3. Verification
+| Command | Result |
+|---|---|
+| `npm run build` | **pass** |
+| `node dist/cli.js greet Ada` | **pass** — `Hello, Ada!`, exit 0 |
+| `node dist/cli.js greet '  Bob '` | **pass** — `Hello, Bob!`, exit 0 |
+| `node dist/cli.js --help` | **pass** — usage lists `greet <name>` |
+| `npx vitest run tests/greeting.test.ts` | **pass** — 4/4 green |
+
+`git status` shows only `src/cli.ts` modified. Working tree left dirty; no commit.
+
+### 4. Task complete
+Yes. `greet <name>` prints `greet(name)` and exits 0; help lists `greet <name>`; greeting sources and tests are unchanged.

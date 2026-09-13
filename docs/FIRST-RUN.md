@@ -163,11 +163,13 @@ the `harnie sessions` output in section 2:
   Codex CLI rollout file (`type`/`payload`/`timestamp` records). Real
   rollout imports and inspection work; the receiver gate — continuing Codex
   work from a Harnie handoff in a live Codex run — is not yet validated.
-- **Grok (experimental):** `harnie import grok <your-session-dir>` — a Grok
-  session directory (`chat_history.jsonl` plus `summary.json`), or the
-  transcript file directly. Real session-directory imports and inspection
-  work against production `~/.grok` chats; the receiver gate — continuing
-  Grok work from a Harnie handoff in a live Grok run — is not yet validated.
+- **Grok:** `harnie import grok <your-session-dir>` — a Grok session
+  directory (`chat_history.jsonl` plus `summary.json`), or the transcript
+  file directly. Session-directory imports and inspection are supported
+  against production `~/.grok` chats. `handoff --to grok` remains
+  experimental: its one live receiver leg completed safely but was
+  contaminated by a committed reference solution, so continuation value is
+  not established (`docs/research/eval-2026-09-13/`).
 - **OpenCode:** two shapes are accepted:
   - a **live session id** (`ses_...`) — copy-paste the command from the
     `harnie sessions` OpenCode row. The session is read read-only from the
