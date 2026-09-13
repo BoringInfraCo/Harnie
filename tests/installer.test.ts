@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const repository = fileURLToPath(new URL("..", import.meta.url));
 const installSh = join(repository, "worker", "public", "harnie", "install.sh");
+const installPs1 = join(repository, "worker", "public", "harnie", "install.ps1");
 const syncScript = join(repository, "scripts", "sync-installer-version.mjs");
 const manifest = JSON.parse(readFileSync(join(repository, "package.json"), "utf8")) as { version: string };
 const version = manifest.version;
@@ -25,6 +26,13 @@ interface Harness {
   curlLog: string;
   fullPath: string;
   restrictedPath: string;
+  env: NodeJS.ProcessEnv;
+}
+
+interface PowerShellHarness {
+  root: string;
+  binDir: string;
+  downloadLog: string;
   env: NodeJS.ProcessEnv;
 }
 
@@ -122,6 +130,7 @@ const createSyncFixture = (): string => {
   for (const path of [
     "package.json",
     "worker/public/harnie/install.sh",
+    "worker/public/harnie/install.ps1",
     "scripts/prepare-installer-assets.sh",
     "wrangler.jsonc",
   ]) {
@@ -138,11 +147,74 @@ const runSyncCheck = (root: string) =>
     env: { ...process.env, HARNIE_INSTALLER_ROOT: root },
   });
 
+const createPowerShellHarness = (): PowerShellHarness => {
+  const root = mkdtempSync(join(tmpdir(), "harnie-powershell-installer-"));
+  temporaryRoots.push(root);
+  const binDir = join(root, "bin");
+  mkdirSync(binDir);
+
+  writeFileSync(
+    join(binDir, "node.cmd"),
+    "@echo off\r\necho %FAKE_NODE_VERSION%\r\nexit /b 0\r\n",
+  );
+  writeFileSync(join(binDir, "npm.cmd"), "@echo off\r\nexit /b %FAKE_NPM_STATUS%\r\n");
+  writeFileSync(
+    join(binDir, "harnie.cmd"),
+    "@echo off\r\necho harnie %FAKE_INSTALLED_VERSION%\r\nexit /b 0\r\n",
+  );
+
+  const downloadLog = join(root, "downloads.log");
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: `${binDir};${process.env.PATH ?? ""}`,
+    TEMP: root,
+    TMP: root,
+    FAKE_NODE_VERSION: "22.23.0",
+    FAKE_NPM_STATUS: "0",
+    FAKE_INSTALLED_VERSION: version,
+    FAKE_DOWNLOAD_LOG: downloadLog,
+    FAKE_EXPECTED_HASH: "a".repeat(64),
+    FAKE_ACTUAL_HASH: "a".repeat(64),
+    HARNIE_INSTALL_PS1: installPs1,
+  };
+
+  return { root, binDir, downloadLog, env };
+};
+
+const runPowerShellInstaller = (harness: PowerShellHarness, overrides: NodeJS.ProcessEnv = {}) => {
+  const wrapper = join(harness.root, "invoke-installer.ps1");
+  writeFileSync(
+    wrapper,
+    `function Invoke-WebRequest {
+  param([switch]$UseBasicParsing, [string]$Uri, [string]$OutFile)
+  Add-Content -LiteralPath $env:FAKE_DOWNLOAD_LOG -Value $Uri
+  if ($Uri.EndsWith('.sha256')) {
+    Set-Content -LiteralPath $OutFile -NoNewline -Value "$env:FAKE_EXPECTED_HASH  harnie-${version}.tgz"
+  } else {
+    Set-Content -LiteralPath $OutFile -NoNewline -Value 'fake archive'
+  }
+}
+function Get-FileHash {
+  param([string]$LiteralPath, [string]$Algorithm)
+  [PSCustomObject]@{ Hash = $env:FAKE_ACTUAL_HASH }
+}
+& $env:HARNIE_INSTALL_PS1
+exit $LASTEXITCODE
+`,
+  );
+
+  return spawnSync(
+    "pwsh",
+    ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", wrapper],
+    { encoding: "utf8", env: { ...harness.env, ...overrides } },
+  );
+};
+
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-describe("harnie curl installer", () => {
+describe.skipIf(process.platform === "win32")("harnie curl installer", () => {
   it("installs the expected version when node, checksum, and npm succeed", () => {
     const harness = createHarness();
     const result = runInstaller(harness, harness.fullPath);
@@ -217,6 +289,20 @@ describe("harnie curl installer", () => {
       mutate: (source: string) => source.replace(/^HARNIE_VERSION=.*$/m, `HARNIE_VERSION='${version}'`),
     },
     {
+      name: "missing PowerShell version assignment",
+      path: "worker/public/harnie/install.ps1",
+      mutate: (source: string) => source.replace(/^\$HarnieVersion =.*$/m, ""),
+    },
+    {
+      name: "duplicate PowerShell version assignment",
+      path: "worker/public/harnie/install.ps1",
+      mutate: (source: string) =>
+        source.replace(
+          /^\$HarnieVersion =.*$/m,
+          `$HarnieVersion = "${version}"\n$HarnieVersion = "${version}"`,
+        ),
+    },
+    {
       name: "missing release route",
       path: "wrangler.jsonc",
       mutate: (source: string) =>
@@ -241,5 +327,65 @@ describe("harnie curl installer", () => {
     const result = runSyncCheck(root);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("9.9.9");
+  });
+});
+
+describe("harnie PowerShell installer source", () => {
+  it("is routed as a Worker asset and verifies SHA-256 before the global install", () => {
+    const source = readFileSync(installPs1, "utf8");
+    const wrangler = readFileSync(join(repository, "wrangler.jsonc"), "utf8");
+    const headers = readFileSync(join(repository, "worker", "public", "_headers"), "utf8");
+    expect(source).toContain(`$HarnieVersion = "${version}"`);
+    expect(source).toContain("Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256");
+    expect(source.indexOf("checksum verification failed")).toBeLessThan(
+      source.indexOf("install --global $ArchivePath"),
+    );
+    expect(wrangler).toContain('"pattern": "https://boringinfra.company/harnie/install.ps1"');
+    expect(headers).toContain("/harnie/install.ps1");
+  });
+});
+
+describe.skipIf(process.platform !== "win32")("harnie PowerShell installer behavior", () => {
+  it("installs and verifies the expected version", () => {
+    const harness = createPowerShellHarness();
+    const result = runPowerShellInstaller(harness);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain(`Harnie ${version} installed successfully.`);
+    expect(readFileSync(harness.downloadLog, "utf8")).toContain(`harnie-${version}.tgz.sha256`);
+  });
+
+  it("rejects a checksum mismatch", () => {
+    const harness = createPowerShellHarness();
+    const result = runPowerShellInstaller(harness, { FAKE_ACTUAL_HASH: "b".repeat(64) });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("checksum verification failed");
+  });
+
+  it("rejects a malformed checksum file", () => {
+    const harness = createPowerShellHarness();
+    const result = runPowerShellInstaller(harness, { FAKE_EXPECTED_HASH: "not-a-sha256" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("checksum file is malformed");
+  });
+
+  it("rejects unsupported Node versions", () => {
+    const harness = createPowerShellHarness();
+    const result = runPowerShellInstaller(harness, { FAKE_NODE_VERSION: "22.22.0" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("22.23 or newer");
+  });
+
+  it("reports npm installation failures", () => {
+    const harness = createPowerShellHarness();
+    const result = runPowerShellInstaller(harness, { FAKE_NPM_STATUS: "1" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("npm failed to install Harnie");
+  });
+
+  it("rejects an unexpected installed version", () => {
+    const harness = createPowerShellHarness();
+    const result = runPowerShellInstaller(harness, { FAKE_INSTALLED_VERSION: "9.9.9" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(`expected harnie ${version}`);
   });
 });

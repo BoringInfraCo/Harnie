@@ -13,6 +13,10 @@
       "zone_name": "boringinfra.company"
     },
     {
+      "pattern": "https://boringinfra.company/harnie/install.ps1",
+      "zone_name": "boringinfra.company"
+    },
+    {
       "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.8/harnie-0.1.0-rc.8.tgz",
       "zone_name": "boringinfra.company"
     },

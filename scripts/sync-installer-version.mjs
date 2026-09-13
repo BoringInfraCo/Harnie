@@ -21,6 +21,8 @@ if (typeof version !== "string" || version.length === 0) {
 }
 
 const syncAssignment = (source) => source.replace(/HARNIE_VERSION="[^"]*"/, `HARNIE_VERSION="${version}"`);
+const syncPowerShellAssignment = (source) =>
+  source.replace(/\$HarnieVersion = "[^"]*"/, `$HarnieVersion = "${version}"`);
 const syncRoutes = (source) =>
   source.replace(
     /v[^"/]*\/harnie-[^"]*?\.tgz(\.sha256)?/g,
@@ -33,6 +35,12 @@ const targets = [
     expectedCount: 1,
     transform: syncAssignment,
     read: (source) => [...source.matchAll(/HARNIE_VERSION="([^"]*)"/g)].map((match) => match[1] ?? ""),
+  },
+  {
+    path: "worker/public/harnie/install.ps1",
+    expectedCount: 1,
+    transform: syncPowerShellAssignment,
+    read: (source) => [...source.matchAll(/\$HarnieVersion = "([^"]*)"/g)].map((match) => match[1] ?? ""),
   },
   {
     path: "scripts/prepare-installer-assets.sh",
