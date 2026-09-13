@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-$HarnieVersion = "0.1.0-rc.8"
+$HarnieVersion = "0.1.0-rc.9"
 $HarnieReleaseBase = "https://boringinfra.company/harnie/releases/v$HarnieVersion"
 $HarnieArchive = "harnie-$HarnieVersion.tgz"
 $HarnieChecksum = "$HarnieArchive.sha256"

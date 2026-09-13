@@ -17,11 +17,11 @@
       "zone_name": "boringinfra.company"
     },
     {
-      "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.8/harnie-0.1.0-rc.8.tgz",
+      "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.9/harnie-0.1.0-rc.9.tgz",
       "zone_name": "boringinfra.company"
     },
     {
-      "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.8/harnie-0.1.0-rc.8.tgz.sha256",
+      "pattern": "https://boringinfra.company/harnie/releases/v0.1.0-rc.9/harnie-0.1.0-rc.9.tgz.sha256",
       "zone_name": "boringinfra.company"
     }
   ],

@@ -2,7 +2,7 @@
 
 set -eu
 
-HARNIE_VERSION="0.1.0-rc.8"
+HARNIE_VERSION="0.1.0-rc.9"
 HARNIE_RELEASE_BASE="https://boringinfra.company/harnie/releases/v${HARNIE_VERSION}"
 HARNIE_ARCHIVE="harnie-${HARNIE_VERSION}.tgz"
 HARNIE_CHECKSUM="${HARNIE_ARCHIVE}.sha256"
