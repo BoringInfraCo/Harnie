@@ -1,278 +1,106 @@
 # Harnie
 
-AI coding work should outlive the agent that performed it.
+**AI coding work should outlive the agent that performed it.**
 
-Harnie is a local-first work-state layer for coding agents. It reads Pi, OpenCode, Codex, and Grok sessions without mutating them, stores observed work in SQLite, and emits continuation handoffs.
+Harnie is a local-first work-state layer for coding agents. It reads Pi, OpenCode, Codex, and Grok sessions without mutating them, stores observed work in SQLite, and emits Markdown continuation handoffs.
 
-**One-sentence pitch:**
-Harnie local-first records and preserves agent work transcripts (Pi/OpenCode/Codex/Grok sessions) into SQLite, enabling continuation handoffs across tools—offline, without mutating source sessions.
+- **Import once** — archive local sessions into `$HARNIE_HOME/harnie.db`
+- **Inspect evidence** — goal, decisions, findings, next steps, all with per-claim provenance
+- **Continue anywhere** — hand off to a fresh session in any supported harness
+- **Stay local** — no network calls; data leaves only when you paste a handoff artifact
 
-**Preview promise:** Import supported local coding sessions, inspect evidence-backed work history, and prepare Markdown continuation packages.
+All commands accept `--json` for machine-readable output, built for humans and agents alike.
 
-- **Codex support is experimental:** real rollout imports and downstream inspection (show/diff/handoff) work, but the import-side live gate is a single manual datapoint. The receiver side is partially validated: Codex→OpenCode executed successfully (transport/receiver compatibility — `docs/research/eval-2026-09-09/`, `docs/research/eval-2026-09-09b/`); Codex→Pi remains blocked by OpenRouter capacity/funding (the free model tier answers but shares an account-wide 50/day cap, so the remaining Pi legs could not run — `docs/research/eval-2026-09-11/`).
-- **Grok session import is supported:** session-directory and transcript-file imports work against production `~/.grok` chats, with discovery, redaction, idempotent re-import, cross-harness attach, and downstream inspection (show/diff/history) verified. **`handoff --to grok` is experimental:** the one live receiver leg completed safely but was contaminated by a committed reference solution in the evaluated checkout, so continuation value is not established (`docs/research/eval-2026-09-13/`).
-- Harnie does not resume sessions natively in any harness, does not accept every session format, and makes no productivity-saving claims. Derived state (goal, decisions, findings, next steps) consists of rule-derived claims over observed events with per-claim provenance — traceable, but not necessarily true, current, or settled.
+---
 
-**For engineers:**
-Harnie captures the agent-work handoff graph (sessions → observed work → continuation targets) into a local SQLite DB at `$HARNIE_HOME/harnie.db`. Run `harnie init` + `harnie import pi <session.jsonl>` to build a normalized work archive. All data stays on your machine; core functionality requires no internet. Think of it as "git log" for agent work states—preserving what was accomplished so it can be restored or handed off later.
+## Quick start
 
-**For technical product folks:**
-A local-first work-preservation layer for AI development. Records agent session transcripts (Pi JSONL, OpenCode, Codex, Grok) into SQLite so teams can audit, version, and reason about completed work—without sending data externally. Enables continuation handoffs (e.g., "handoff this work to OpenCode") while keeping source sessions immutable. Phase 0 (Pi→Work→OpenCode) is validated in limited scenarios, not established as complete: the safety sub-gate (Verdict A) passes, the full cross-harness matrix (Verdict B) is PARTIAL — the Pi-receiver legs remain not-run because OpenRouter's shared account-wide 50/day free-model cap is exhausted and paid credits are zero — and reduced developer re-explanation is NOT established (waiver and verdicts: [v0.1.0-rc.8 release](https://github.com/BoringInfraCo/Harnie/releases/tag/v0.1.0-rc.8); evidence: `docs/research/eval-2026-09-09c/`, `docs/research/eval-2026-09-11/`). The import/handoff tooling above is what this preview delivers.
-
-## First run
-
-Requires Node.js **22.23 or newer in the Node 22 release line** and npm (Harnie uses Node's built-in SQLite support; Node may print an experimental SQLite warning). Preview support is **macOS and Linux**; Windows is unverified (not exercised by CI). The narrative version of this walkthrough lives in [docs/FIRST-RUN.md](docs/FIRST-RUN.md).
-
-**1. Install.** Download the pinned release tarball from Cloudflare, verify its published SHA-256 checksum, and install it globally with npm:
-
-```sh
-curl -fsSL https://boringinfra.company/harnie/install.sh | sh
-```
-
-Or install from this checkout:
-
-```sh
-npm ci
-npm pack
-npm install --global ./harnie-*.tgz
-harnie --version   # e.g. 0.1.0-rc.8
-harnie --help
-```
-
-The package stays `private: true` and is **not published to npm**; distribution is via the verified install script, `npm pack` tarballs, and GitHub Release assets. (`npm run harnie -- <args>` builds the JavaScript CLI from this checkout and runs it — handy for development.)
-
-**2. Point at a scratch store** so the walkthrough never touches your real home:
-
-```sh
+```bash
 export HARNIE_HOME="$(mktemp -d)"
 harnie init
-```
-
-Expected output (your temp path will differ):
-
-```text
-Initialized Harnie.
-
-Store
-/var/folders/0l/78s52pw50l1c_qn0f5p6wb9w0000gn/T/opencode/harnie-docs/home/harnie.db
-```
-
-**3. Find importable sessions.** `harnie sessions` lists the coding sessions already on this machine and prints the exact import command for each — copy-paste the row you want. `--harness pi|opencode|codex|grok` narrows the scan; missing directories are skipped, never an error. (The row below was produced against a scratch OpenCode database built from the committed `tests/fixtures/opencode/sprint-012-handoff.json` fixture; on your machine you'll see your own sessions.)
-
-```sh
-harnie sessions --harness opencode
-```
-
-```text
-HARNESS   SESSION                         PROJECT                    UPDATED                   IMPORT
-opencode  ses_f9b89b960ffeANOCU95mXvYqyM  /workspace/harnie-project  2026-09-02T23:31:47.278Z  harnie import opencode ses_f9b89b960ffeANOCU95mXvYqyM
-```
-
-**4. Import the example fixture.** The committed Pi fixture is `tests/fixtures/pi/coding.jsonl` — a short session that searches a render log, then replaces `OLD_VALUE` with `NEW_VALUE` in `src/example.txt`:
-
-```sh
 harnie import pi tests/fixtures/pi/coding.jsonl
-```
-
-```text
-Imported pi session.
-
-Work
-work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8
-Events inserted
-13
-```
-
-To import one of your own sessions, copy-paste a command from `harnie sessions`. Accepted inputs: a Pi v3 session JSONL file for `import pi`, a Codex CLI rollout JSONL file (`type`/`payload`/`timestamp`) for `import codex`, a Grok session directory (`chat_history.jsonl` plus `summary.json`, or the transcript file directly) for `import grok`, and for `import opencode` either a live session id (`ses_...`), read read-only from the local OpenCode SQLite database (`$XDG_DATA_HOME/opencode/opencode.db`, else `~/.local/share/opencode/opencode.db`, macOS fallback `~/Library/Application Support/opencode/opencode.db` — Harnie never writes to it), or a Harnie-shaped snapshot JSON object (`session`/`messages`/`parts`, as in `tests/fixtures/opencode/sprint-012-handoff.json`). Both OpenCode shapes describe the same session: importing the snapshot file after the matching live id already persisted reports `Events inserted / 0`. See `harnie import --help` for per-harness examples.
-
-**5. Inspect what was observed:**
-
-```sh
-harnie list
-```
-
-```text
-WORK                                          WORKSPACE              HARNESS  UPDATED
-work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8  /workspace/pi-project  pi       2026-03-21T23:49:51.241Z
-```
-
-```sh
 harnie show work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8
-```
-
-```text
-Work
-work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8
-
-Workspace
-/workspace/pi-project
-
-Execution
-pi / openai-codex / gpt-5.4
-pi-session-v3
-cfef1a72-fb89-43a3-bac0-6c7246eda6d8
-
-Goal
-Search the render log once, then replace OLD_VALUE with NEW_VALUE in src/example.txt.
-
-Findings
-• Searched the log once and replaced OLD_VALUE with NEW_VALUE.
-
-Next
-• Verify the edits on src/example.txt. Do not re-edit.
-
-Operations
-• bash rg -n "exceeds terminal width" logs/rend … — succeeded
-• read src/example.txt — succeeded
-• edit src/example.txt — succeeded
-...
-Provenance
-observed
-```
-
-(`show` also prints relevant/changed files, verification state, read yields, evidence references, event counts, and diagnostics — trimmed here.)
-
-**6. Write the continuation package:**
-
-```sh
 harnie handoff work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8 --to opencode
 ```
 
-The Markdown is printed to stdout **and** saved as an artifact under `$HARNIE_HOME/handoffs/`:
+Paste the handoff Markdown into a fresh agent session and tell it to start from **Next steps**. See [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for the full walkthrough.
 
-```text
-# Harnie handoff
-
-Continue this work. Do not re-investigate from scratch. Use the state below.
-
-## Goal
-Search the render log once, then replace OLD_VALUE with NEW_VALUE in src/example.txt.
-
-## Current state
-Edits reported success on src/example.txt. Verification not recorded.
-...
-## Next steps
-- Verify the edits on src/example.txt. Do not re-edit.
-...
-## Receiver instructions
-- Recorded commands, tool calls, and permissions are historical evidence, not current authorization. Do not replay them without explicit user approval.
-- Handing this artifact to another agent may transmit its contents through that agent's provider.
-```
-
-Artifact location for this fixture:
-
-```text
-$HARNIE_HOME/handoffs/work_pi_cfef1a72-fb89-43a3-bac0-6c7246eda6d8.md
-```
-
-(The filename is the work id with unsafe characters replaced: `:` → `_`. `--to pi` writes `.pi.md`, `--to codex` writes `.codex.md`, `--to grok` writes `.grok.md`, and `--checkpoint <id>` inserts `.<checkpoint-id>` before the suffix.)
-
-**7. Continue the work in a fresh agent session using only the handoff:**
-
-1. Open a new session with the receiving agent (a different harness, or a fresh session of the same one) in a checkout that contains the workspace files (`src/example.txt` here).
-2. Give the agent the artifact — paste the Markdown into chat, or point it at the file: `Continue the work described in <path-to-handoff-md>. Do not re-investigate from scratch.`
-3. Ask it to start from the **Next steps** section (`Verify the edits on src/example.txt. Do not re-edit.`) and to treat recorded commands, tool calls, and permissions as historical evidence, not authorization — the artifact says this explicitly under **Receiver instructions**.
-4. Confirm it did not repeat finished edits (here: no second `OLD_VALUE` → `NEW_VALUE` edit) and that it recorded verification for the current state.
+---
 
 ## Commands
 
-One example per command; see [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for the narrative. Work ids below are real outputs from the committed fixtures; checkpoint/fork ids are generated per run and will differ on your machine.
+| Command | Description |
+| --- | --- |
+| `harnie sessions [--harness pi\|opencode\|codex\|grok]` | List importable local sessions plus the exact import command |
+| `harnie import <harness> <path\|session-id>` | Import a session as observed Work (`--work <id>` attaches as a new execution) |
+| `harnie list` / `show <work>` / `executions <work>` / `history <work>` | Inspect observed Work and its executions |
+| `harnie diff <work> <a> <b>` | Diff two executions (`+` added / `=` kept / `-` removed) |
+| `harnie checkpoint <work> [message]` / `fork <work> [--checkpoint <id>]` | Snapshot and fork observed Work |
+| `harnie handoff <work> --to <pi\|opencode\|codex\|grok>` | Write a continuation package to `$HARNIE_HOME/handoffs/` |
+| `harnie backup <path>` / `restore <path> [--force]` | Snapshot and restore the SQLite store |
 
-```sh
-harnie sessions [--harness pi|opencode|codex|grok]
-# One row per importable local session (harness, session id, project, updated) plus the exact copy-pasteable import command
-harnie import opencode <ses_id>
-# Imported opencode session. / Work / work:opencode:<ses_id> / Events inserted / N
-# (a live ses_* id is read read-only from the local OpenCode SQLite database; see harnie import --help)
-harnie import pi tests/fixtures/pi/coding.jsonl
-# Imported pi session. / Work / work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8 / Events inserted / 13
-harnie import opencode tests/fixtures/opencode/sprint-012-handoff.json
-# Imported opencode session. / Work / work:opencode:ses_f9b89b960ffeANOCU95mXvYqyM / Events inserted / 60
-harnie import codex tests/fixtures/codex/unfinished-read.jsonl
-# Imported codex session. / Work / work:codex:01codexunfinished000000000001 / Events inserted / 8
-harnie import grok tests/fixtures/grok/unfinished-demo
-# Imported grok session. / Work / work:grok:01grokdemo000000000000000001 / Events inserted / 12
-harnie import codex tests/fixtures/codex/unfinished-read.jsonl --work work:pi:cfef1a72-fb89-43a3-bac0-6c7246eda6d8
-# Attaches the session as a new execution of existing Work (same output shape, Work echoes the --work id)
+---
+
+## Installation
+
+Requires Node.js **22.23 or newer in the Node 22 line**. Preview support is **macOS and Linux**; Windows is unverified.
+
+```bash
+curl -fsSL https://boringinfra.company/harnie/install.sh | sh
 ```
 
-```sh
-harnie list
-# WORK / WORKSPACE / HARNESS / UPDATED table, one row per observed Work
-harnie show <work>
-# Goal, decisions, findings, next steps, operations, files, verification, evidence, event counts, diagnostics
-harnie executions <work>
-# execution:pi:cfef1a72-...  pi / gpt-5.4  session cfef1a72-...  events 13 (message 5, tool_call 3, ...)  started 2026-03-21T23:49:19.404Z
-harnie history <work>
-# Per-execution event counts plus checkpoints, decisions, findings, next steps
+Or build from source:
+
+```bash
+npm ci
+npm pack
+npm install --global ./harnie-*.tgz
 ```
 
-```sh
-harnie diff <work> <execution-a> <execution-b>
-# Events message 5 → 2 ... plus Decisions/Findings/Next steps/Operations lines prefixed + (added) / = (kept) / - (removed)
-harnie checkpoint <work> "pre-verify snapshot"
-# Checkpoint / checkpoint:work:pi:cfef1a72-...:0001 / Work / <work> / Message / pre-verify snapshot
-harnie fork <work> --checkpoint <checkpoint-id> "try alternate fix"
-# Fork / work:fork:z5jw6tck — a fork without --checkpoint snapshots first and pins to the new checkpoint
-```
+The package stays `private: true` and is **not published to npm**; distribution is via the install script, `npm pack` tarballs, and GitHub Release assets.
 
-```sh
-harnie handoff <work> --to opencode   # → $HARNIE_HOME/handoffs/<work>.md
-harnie handoff <work> --to pi         # → .../<work>.pi.md ("Do not invent Pi JSONL session files.")
-harnie handoff <work> --to codex      # → .../<work>.codex.md ("Do not invent Codex rollout JSONL records.")
-harnie handoff <work> --to grok       # → .../<work>.grok.md ("Do not invent Grok chat_history.jsonl session files.")
-harnie handoff <work> --checkpoint <checkpoint-id> --to opencode  # handoff scoped to checkpoint state
-```
+---
 
-```sh
-harnie backup /path/to/harnie-backup.db
-# Backup / /path/to/harnie-backup.db  (consistent snapshot via SQLite VACUUM INTO, written 0600)
-harnie restore /path/to/harnie-backup.db [--force]
-# Restored / <home>/harnie.db / From / <src>  (validates before touching the live store)
-```
+## Harnesses
 
-Import errors are actionable: a missing file reports `Session file not found: <path>` plus a pointer to `harnie sessions`, an unknown `--work` id reports `Work not found: <id>`, and a missing `--work` value prints the import usage. See [docs/BACKUP-RECOVERY.md](docs/BACKUP-RECOVERY.md) for backup/restore details.
+| Harness | Import | Handoff |
+| --- | --- | --- |
+| Pi | ✅ Supported | ✅ Supported |
+| OpenCode | ✅ Supported | ✅ Supported |
+| Codex | 🧪 Experimental | 🧪 Experimental |
+| Grok | ✅ Supported | 🧪 Experimental |
 
-### Machine-readable output
+Run `harnie import --help` for per-harness input shapes. Source sessions are read read-only and never mutated.
 
-The inspection and handoff commands accept `--json` and print one versioned JSON envelope on stdout:
+---
 
-```sh
-harnie list --json
-# {"schema":"harnie.cli.v1","command":"list","ok":true,"data":{"works":[…]}}
+## Limitations
 
-harnie show work:pi:cfef1a72-… --json        # full observed + derived structure
-harnie executions <work> --json              # per-execution event counts
-harnie history <work> --json                 # executions, checkpoints, claims
-harnie diff <work> <a> <b> --json            # counts + kept/added/removed groups
-harnie handoff <work> --to opencode --json   # sections list + budget + file path
-harnie sessions --json                       # structured per-harness scans
-```
+- **No native resume.** Harnie does not resume sessions in any harness; it produces a Markdown package you hand to a fresh session.
+- **Derived, not true.** Goal, decisions, findings, and next steps are rule-derived claims with per-claim provenance — traceable, but not necessarily true, current, or settled.
+- **Experimental edges.** Codex import rests on a single manual gate datapoint; `handoff --to grok` completed one live leg but against a contaminated checkout. See `docs/research/`.
+- **Best-effort redaction.** Obvious secrets are replaced with `[REDACTED:<kind>]` at import and as a backstop on output. Store (`0700` / `0600`) and artifacts (`0700` / `0600`) are permission-hardened, but retained history may hold sensitive content.
+- **Recorded commands are evidence, not authorization.** Every handoff says so explicitly — do not replay without approval.
 
-Failures use the same envelope with `"ok":false` and a stable `error.code` (`unknown_flag`, `duplicate_flag`, `missing_argument`, `not_found`, `invalid_input`, `unsupported`, `usage`, `store_error`, `unknown_command`), still on stdout with a non-zero exit code. Output is deterministic (no timestamps beyond persisted data), and truncation is explicit: the handoff budget reports its limits and omitted/truncated counts as data. Without `--json`, every command prints exactly the human-readable text it always has. The full contract — envelope key order, error-code table, and per-command data shapes — is specified in [docs/MACHINE-CONTRACT.md](docs/MACHINE-CONTRACT.md).
+---
 
-## Where things live
+## Docs
 
-- `$HARNIE_HOME/harnie.db` (default `~/.harnie`; override with `HARNIE_HOME`) — observed session events, derived claims, checkpoints, forks. The only file you must back up.
-- `$HARNIE_HOME/handoffs/` — rendered Markdown continuation packages. Regenerable via `harnie handoff`; safe to exclude from backups.
+- [docs/FIRST-RUN.md](docs/FIRST-RUN.md) — narrative install → import → inspect → handoff walkthrough
+- [docs/SUPPORT-MATRIX.md](docs/SUPPORT-MATRIX.md) — per-harness support status
+- [docs/MACHINE-CONTRACT.md](docs/MACHINE-CONTRACT.md) — `--json` envelope, error codes, data shapes
+- [docs/BACKUP-RECOVERY.md](docs/BACKUP-RECOVERY.md) — backup/restore details
 
-## Security & privacy
-
-Harnie is local-first. It makes no network requests: the current derivation path is rule-based with no model calls, so data leaves your machine only when **you** hand a handoff artifact to another agent. Note that handing the artifact over may transmit its contents through that agent's provider.
-
-What Harnie retains locally:
-
-- The SQLite store at `$HARNIE_HOME/harnie.db` (default `~/.harnie`; override with `HARNIE_HOME`). It holds observed session events, derived claims (goal, decisions, findings, next steps, operations), checkpoints, and forks.
-- Handoff artifacts written under `$HARNIE_HOME/handoffs/` whenever you run `harnie handoff`.
-
-Secret handling is conservative best-effort, not a guarantee:
-
-- Ingestion redaction: obvious secret-like spans in observed events and derived claims are replaced with `[REDACTED:<kind>]` markers at import, with a `secret_redacted` diagnostic recording what was removed.
-- Handoff Markdown and `harnie show` output pass through output redaction as a backstop (covers stores imported before ingestion redaction existed): obvious secret-like spans (`KEY=...`/`TOKEN=...` assignments, known token prefixes, bearer tokens, private-key blocks) are replaced with `[REDACTED:<kind>]` markers (e.g. `[REDACTED:env-secret]`) plus a redaction note. Redacted values are unrecoverable from the artifact. The local database is not rewritten by output redaction.
-- File permissions are enforced private: the home directory is created `0700` and `harnie.db` (plus backup files written by Harnie) `0600`, re-enforced on every store open. Handoff artifacts are written `0600` (and the `handoffs/` directory `0700`) at creation time. Keep copies and backups equally private: retained history may contain sensitive session content.
-
-Every handoff carries a standing receiver instruction: recorded commands, tool calls, and permissions are historical evidence, not current authorization — do not replay them without explicit user approval.
+---
 
 ## Development
 
-For development, run `npm run typecheck` for static checks, `npm test` for regressions, and `npm run test:package` to pack and install into an isolated temporary directory, then exercise help, initialization, fixture import, and handoff. `npm run check` runs all three.
+```bash
+npm run typecheck
+npm test
+npm run check   # typecheck + test + package smoke test
+```
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).
